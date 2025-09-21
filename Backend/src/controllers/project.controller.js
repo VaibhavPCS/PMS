@@ -48,3 +48,19 @@ exports.completeStage = async (req, res, next) => {
     res.json({ ok: true, ...result });
   } catch (e) { next(e); }
 };
+
+exports.createProject = async (req, res, next) => {
+  try {
+    const project = await ProjectService.createProject(req.user, req.body);
+    res.status(201).json(project);
+  } catch (e) { next(e); }
+};
+
+exports.completeStage = async (req, res, next) => {
+  try {
+    const { id, team } = req.params;
+    const { startISO, endISO } = req.body;
+    const result = await ProjectService.completeStage(id, team, startISO, endISO);
+    res.json({ ok: true, ...result });
+  } catch (e) { next(e); }
+};

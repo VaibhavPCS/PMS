@@ -47,3 +47,4 @@ app.use('/api/projects', require('./routes/project.test.routes'));
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/projects', require('./routes/project.routes'));
 app.use(require('./middleware/errorHandler'));
+app.use('/api/holidays', require('./routes/holiday.routes'));

@@ -1,6 +1,7 @@
 const Project = require('../models/Project');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { getActiveHolidaySet, workingHoursBetween, hoursToParts } = require('../utils/time');
 
 function asInt(value, fallback) {
   const n = Number(value);
@@ -151,5 +152,104 @@ exports.completeStage = async (id, team, startISO, endISO) => {
     project,
     actualHours: stage.actualHours,
     penaltyHours: stage.penaltyHours
+  };
+};
+
+async function resolveUserId(idOrEmail) {
+  if (!idOrEmail) return null;
+  if (idOrEmail.includes && idOrEmail.includes('@')) {
+    const u = await User.findOne({ email: idOrEmail }).select('_id');
+    if (!u) throw new Error(`Head not found for email: ${idOrEmail}`);
+    return u._id;
+  }
+  // assume ObjectId string
+  return new mongoose.Types.ObjectId(idOrEmail);
+}
+
+function toHoursFromDaysHours(days, hours) {
+  const d = Number(days || 0);
+  const h = Number(hours || 0);
+  return d * 24 + h;
+}
+
+exports.createProject = async (adminUser, payload) => {
+  const { title, description, heads = {}, adminExpected = {} } = payload;
+  if (!title) throw new Error('title is required');
+
+  const dataHead = await resolveUserId(heads.data);
+  const designHead = await resolveUserId(heads.design);
+  const devHead = await resolveUserId(heads.dev);
+
+  const stages = [];
+
+  // helper to build stage with optional adminExpected
+  function pushStage(team, headId, cfg) {
+    const stage = { team, head: headId };
+    if (cfg && (cfg.startISO || cfg.days || cfg.hours)) {
+      stage.adminExpected = {
+        start: cfg.startISO ? new Date(cfg.startISO) : undefined,
+        hours: toHoursFromDaysHours(cfg.days, cfg.hours)
+      };
+    }
+    stages.push(stage);
+  }
+
+  pushStage('data', dataHead, adminExpected.data);
+  pushStage('design', designHead, adminExpected.design);
+  pushStage('dev', devHead, adminExpected.dev);
+
+  const project = await Project.create({
+    title,
+    description,
+    createdBy: adminUser.id,
+    status: 'in_data',
+    currentTeam: 'data',
+    stages
+  });
+
+  return project;
+};
+
+/**
+ * replace your existing completeStage with this enhanced version
+ * (uses working hours skipping weekends/holidays for penalty calc)
+ */
+exports.completeStage = async (id, team, startISO, endISO) => {
+  const project = await Project.findById(id);
+  if (!project) throw new Error('Project not found');
+
+  const stage = project.stages.find(s => s.team === team);
+  if (!stage) throw new Error('Invalid team');
+
+  stage.actual.start = startISO ? new Date(startISO) : stage.actual.start || new Date();
+  stage.actual.end = endISO ? new Date(endISO) : new Date();
+  stage.status = 'done';
+
+  // advance pipeline
+  const order = ['data', 'design', 'dev'];
+  const idx = order.indexOf(team);
+  if (idx === 2) {
+    project.status = 'done';
+    project.currentTeam = null;
+  } else {
+    project.status = `in_${order[idx + 1]}`;
+    project.currentTeam = order[idx + 1];
+  }
+
+  await project.save();
+
+  // penalty/actual using working-hours (skip weekends + holidays)
+  const holidaySet = await getActiveHolidaySet();
+  const actualWorkingHours = workingHoursBetween(stage.actual.start, stage.actual.end, holidaySet);
+  const headExpected = Number(stage.expected?.hours || 0);
+  const penaltyHours = Math.max(0, Math.round((actualWorkingHours - headExpected) * 100) / 100);
+
+  return {
+    project,
+    actualHours: actualWorkingHours,
+    actualParts: hoursToParts(actualWorkingHours),
+    headExpectedHours: headExpected,
+    headExpectedParts: hoursToParts(headExpected),
+    penaltyHours
   };
 };
