@@ -6,6 +6,8 @@ const { connectDB } = require('./config/db');
 const app = express();
 const port = process.env.PORT || 3000;
 
+const cors = require('cors');
+
 app.use(express.json());
 
 // Health
@@ -28,6 +30,8 @@ app.use('/api/projects', require('./routes/project.routes'));
 // app.use('/api/projects-test', require('./routes/project.test.routes'));
 
 app.use(require('./middleware/errorHandler'));
+
+app.use(cors({ origin: ['http://localhost:5173','http://localhost:3001'], credentials: true }));
 
 connectDB().then(() => {
   app.listen(port, () => console.log(`🚀 API listening at http://localhost:${port}`));

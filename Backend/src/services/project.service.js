@@ -97,11 +97,41 @@ async function resolveUserId(idOrEmail) {
   return new mongoose.Types.ObjectId(idOrEmail);
 }
 
+// function toHoursFromDaysHours(days, hours) {
+//   const d = Number(days || 0);
+//   const h = Number(hours || 0);
+//   return d * 24 + h;
+// }
+
+// ensure toHoursFromDaysHours helper exists in this file
 function toHoursFromDaysHours(days, hours) {
   const d = Number(days || 0);
   const h = Number(hours || 0);
   return d * 24 + h;
 }
+
+exports.updateAdminExpected = async (id, team, { startISO, days, hours }) => {
+  const project = await Project.findById(id);
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  const stage = project.stages.find(s => s.team === team);
+  if (!stage) { const e = new Error('Invalid team'); e.status = 400; throw e; }
+
+  // Compute new values if provided; otherwise keep previous ones
+  const hasHoursInput = days != null || hours != null;
+  const newHours = hasHoursInput ? toHoursFromDaysHours(days, hours) : stage.adminExpected?.hours;
+  const newStart = startISO ? new Date(startISO) : stage.adminExpected?.start;
+
+  stage.adminExpected = {
+    start: newStart,
+    hours: newHours
+  };
+
+  // Do NOT flip status or currentTeam here; admin schedule is informational
+  await project.save();
+  return project;
+};
+
 
 exports.createProject = async (adminUser, payload) => {
   const { title, description, heads = {}, adminExpected = {} } = payload;
@@ -137,18 +167,60 @@ exports.createProject = async (adminUser, payload) => {
   });
 };
 
+// exports.completeStage = async (id, team, startISO, endISO) => {
+//   // DEBUG marker so you can see in logs which implementation is running
+//   console.log('[completeStage] using working-hours calc');
+
+//   const project = await Project.findById(id);
+//   if (!project) throw new Error('Project not found');
+
+//   const stage = project.stages.find(s => s.team === team);
+//   if (!stage) throw new Error('Invalid team');
+
+//   stage.actual.start = startISO ? new Date(startISO) : stage.actual.start || new Date();
+//   stage.actual.end = endISO ? new Date(endISO) : new Date();
+//   stage.status = 'done';
+
+//   const order = ['data', 'design', 'dev'];
+//   const idx = order.indexOf(team);
+//   if (idx === 2) { project.status = 'done'; project.currentTeam = null; }
+//   else { project.status = `in_${order[idx + 1]}`; project.currentTeam = order[idx + 1]; }
+
+//   await project.save();
+
+//   const holidaySet = await getActiveHolidaySet();
+//   const actualWorkingHours = workingHoursBetween(stage.actual.start, stage.actual.end, holidaySet);
+
+//   const headExpected = Number(stage.expected?.hours || 0);
+//   const penaltyHours = Math.max(0, Math.round((actualWorkingHours - headExpected) * 100) / 100);
+
+//   return {
+//     project,
+//     actualHours: actualWorkingHours,
+//     actualParts: hoursToParts(actualWorkingHours),
+//     headExpectedHours: headExpected,
+//     headExpectedParts: hoursToParts(headExpected),
+//     penaltyHours
+//   };
+// };
+
 exports.completeStage = async (id, team, startISO, endISO) => {
-  // DEBUG marker so you can see in logs which implementation is running
   console.log('[completeStage] using working-hours calc');
 
   const project = await Project.findById(id);
-  if (!project) throw new Error('Project not found');
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
 
   const stage = project.stages.find(s => s.team === team);
-  if (!stage) throw new Error('Invalid team');
+  if (!stage) { const e = new Error('Invalid team'); e.status = 400; throw e; }
+
+  // 🚫 NEW: must have a head estimate before completion
+  if (!(stage.expected && Number.isFinite(stage.expected.hours) && stage.expected.hours >= 0)) {
+    const e = new Error('Stage must have an estimate (expected.hours) before completion');
+    e.status = 400; throw e;
+  }
 
   stage.actual.start = startISO ? new Date(startISO) : stage.actual.start || new Date();
-  stage.actual.end = endISO ? new Date(endISO) : new Date();
+  stage.actual.end   = endISO   ? new Date(endISO)   : new Date();
   stage.status = 'done';
 
   const order = ['data', 'design', 'dev'];
@@ -174,12 +246,25 @@ exports.completeStage = async (id, team, startISO, endISO) => {
   };
 };
 
+
+// function ensureStage(project, team) {
+//   const stage = project.stages.find((s) => s.team === team);
+//   if (!stage) {
+//     const err = new Error('Invalid team'); err.status = 400; throw err;
+//   }
+//   return stage;
+// }
+
 function ensureStage(project, team) {
-  const stage = project.stages.find((s) => s.team === team);
-  if (!stage) {
-    const err = new Error('Invalid team'); err.status = 400; throw err;
+  const s = project.stages.find(x => x.team === team);
+  if (!s) { const e=new Error('Invalid team'); e.status=400; throw e; }
+  return s;
+}
+
+function ensureCurrentTeam(project, team) {
+  if (project.currentTeam !== team) {
+    const e = new Error(`Stage '${team}' is not active`); e.status = 400; throw e;
   }
-  return stage;
 }
 
 function canReadProject(user, project) {
@@ -261,4 +346,27 @@ exports.deleteNote = async (user, projectId, team, noteId) => {
   note.deleteOne();
   await project.save();
   return { ok: true };
+};
+
+async function resolveUserId(idOrEmail) {
+  if (!idOrEmail) return null;
+  if (idOrEmail.includes && idOrEmail.includes('@')) {
+    const u = await User.findOne({ email: idOrEmail }).select('_id');
+    if (!u) { const e = new Error(`Head not found: ${idOrEmail}`); e.status = 400; throw e; }
+    return u._id;
+  }
+  return new mongoose.Types.ObjectId(idOrEmail);
+}
+
+exports.updateHeads = async (id, { data, design, dev }) => {
+  const p = await Project.findById(id);
+  if (!p) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  const map = { data, design, dev };
+  for (const stage of p.stages) {
+    const val = map[stage.team];
+    if (val !== undefined) stage.head = val ? await resolveUserId(val) : null;
+  }
+  await p.save();
+  return p;
 };

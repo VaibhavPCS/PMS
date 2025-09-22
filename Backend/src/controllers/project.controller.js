@@ -88,3 +88,20 @@ exports.deleteNote = async (req, res, next) => {
     res.json(result);
   } catch (e) { next(e); }
 };
+
+exports.updateAdminExpected = async (req, res, next) => {
+  try {
+    const { id, team } = req.params;
+    const { startISO, days, hours } = req.body;
+    const project = await ProjectService.updateAdminExpected(id, team, { startISO, days, hours });
+    res.json({ ok: true, project });
+  } catch (e) { next(e); }
+};
+
+// controllers/project.controller.js
+exports.updateHeads = async (req, res, next) => {
+  try {
+    const project = await ProjectService.updateHeads(req.params.id, req.body);
+    res.json({ ok: true, project });
+  } catch (e) { next(e); }
+};
