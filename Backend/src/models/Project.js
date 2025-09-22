@@ -113,4 +113,10 @@ ProjectSchema.set('toJSON', {
   }
 });
 
+ProjectSchema.index({ createdAt: -1 });
+ProjectSchema.index({ status: 1, createdAt: -1 });
+ProjectSchema.index({ createdBy: 1, createdAt: -1 });
+ProjectSchema.index({ 'stages.team': 1 });
+ProjectSchema.index({ 'stages.head': 1 });
+
 module.exports = mongoose.model('Project', ProjectSchema);

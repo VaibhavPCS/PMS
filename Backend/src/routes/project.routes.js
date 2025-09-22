@@ -1,76 +1,93 @@
-// src/routes/project.routes.js
 const express = require('express');
 const ctrl = require('../controllers/project.controller');
-const note = require('../controllers/note.controller');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
-const { body } = require('express-validator');
-const validate = require('../middleware/validate'); // wrap to return 400 with messages
+const { body, param, query } = require('express-validator');
+const validate = require('../middleware/validate');
 
 const router = express.Router();
 
-// Admin
-router.post('/', auth, requireRole(['admin']), ctrl.createProject);
-router.get('/', auth, requireRole(['admin']), ctrl.listAll);
+// Params
+const idParam = param('id').isMongoId().withMessage('Invalid project id');
+const teamParam = param('team').isIn(['data', 'design', 'dev']).withMessage('Invalid team');
+const noteIdParam = param('noteId').isMongoId().withMessage('Invalid note id');
 
-// Shared (admin + heads)
-router.get('/mine', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.listMine);
-router.get('/:id', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.getById);
+// Bodies
+const createBody = [
+  body('title').isString().trim().notEmpty(),
+  body('description').optional().isString()
+];
 
-// Stage ops by role
-router.patch('/:id/stage/data/estimate', auth, requireRole(['data_head']), ctrl.estimateStage);
-router.patch('/:id/stage/data/complete', auth, requireRole(['data_head']), ctrl.completeStage);
-router.patch('/:id/stage/design/estimate', auth, requireRole(['design_head']), ctrl.estimateStage);
-router.patch('/:id/stage/design/complete', auth, requireRole(['design_head']), ctrl.completeStage);
-router.patch('/:id/stage/dev/estimate', auth, requireRole(['dev_head']), ctrl.estimateStage);
-router.patch('/:id/stage/dev/complete', auth, requireRole(['dev_head']), ctrl.completeStage);
+const estimateBody = [
+  body('startISO').optional().isISO8601().toDate(),
+  body('hours').isFloat({ gt: 0 }).withMessage('hours>0 required')
+];
 
-// Notes (RBAC inside service does fine-grained checks)
-router.get('/:id/stage/:team/notes', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), note.list);
-router.post('/:id/stage/:team/notes', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), note.add);
-router.patch('/:id/stage/:team/notes/:noteId', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), note.update);
-router.delete('/:id/stage/:team/notes/:noteId', auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), note.remove);
+const completeBody = [
+  body('startISO').isISO8601().withMessage('startISO required').toDate(),
+  body('endISO').isISO8601().withMessage('endISO required').toDate()
+];
 
-router.get('/:id/stage/:team/notes',
-  auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.listNotes);
-
-router.post('/:id/stage/:team/notes',
-  auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.addNote);
-
-router.patch('/:id/stage/:team/notes/:noteId',
-  auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.updateNote);
-
-router.delete('/:id/stage/:team/notes/:noteId',
-  auth, requireRole(['admin', 'data_head', 'design_head', 'dev_head']), ctrl.deleteNote);
-
-router.patch('/:id/stage/:team/admin-expected',
-  auth, requireRole(['admin']),
-  ctrl.updateAdminExpected
-);
-
-router.patch('/:id/stage/:team/adminExpected',
-  auth, requireRole(['admin']), ctrl.updateAdminExpected);
-
-router.patch('/:id/heads', auth, requireRole(['admin']), ctrl.updateHeads);
-
-router.patch(
-  '/:id/stage/:team/estimate',
-  auth, requireRole(['data_head','design_head','dev_head']),
-  body('startISO').optional().isISO8601(),
-  body('hours').isFloat({ min: 0 }),
-  validate,
-  ctrl.estimateStage
-);
-
-router.patch(
-  '/:id/stage/:team/adminExpected',
-  auth, requireRole(['admin']),
-  body('startISO').optional().isISO8601(),
+const adminExpectedBody = [
+  body('startISO').optional().isISO8601().toDate(),
   body('days').optional().isInt({ min: 0 }),
-  body('hours').optional().isFloat({ min: 0 }),
-  validate,
-  ctrl.updateAdminExpected
+  body('hours').optional().isInt({ min: 0 })
+];
+
+const noteBody = [ body('text').isString().trim().isLength({ min:1, max:2000 }) ];
+
+// Query filters (optional)
+const listAllQuery = [
+  query('page').optional().isInt({ min:1 }),
+  query('limit').optional().isInt({ min:1, max:100 }),
+  query('status').optional().isIn(['queued','in_data','in_design','in_dev','done']),
+  query('team').optional().isIn(['data','design','dev']),
+  query('search').optional().isString()
+];
+
+// Admin: create project
+router.post('/', auth, requireRole(['admin']), createBody, validate, ctrl.createProject);
+
+// Lists
+router.get('/', auth, requireRole(['admin']), listAllQuery, validate, ctrl.listAll);
+router.get('/mine', auth, requireRole(['admin','data_head','design_head','dev_head']), ctrl.listMine);
+
+// Fetch one
+router.get('/:id', auth, requireRole(['admin','data_head','design_head','dev_head']), idParam, validate, ctrl.getById);
+
+// Stage estimate/complete (generic)
+router.patch('/:id/stage/:team/estimate',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, estimateBody, validate, ctrl.estimateStage
 );
 
+router.patch('/:id/stage/:team/complete',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, completeBody, validate, ctrl.completeStage
+);
+
+// Admin-only: adminExpected
+router.patch('/:id/stage/:team/adminExpected',
+  auth, requireRole(['admin']),
+  idParam, teamParam, adminExpectedBody, validate, ctrl.updateAdminExpected
+);
+
+// Notes
+router.get('/:id/stage/:team/notes',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, validate, ctrl.listNotes
+);
+router.post('/:id/stage/:team/notes',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, noteBody, validate, ctrl.addNote
+);
+router.patch('/:id/stage/:team/notes/:noteId',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, noteIdParam, noteBody, validate, ctrl.updateNote
+);
+router.delete('/:id/stage/:team/notes/:noteId',
+  auth, requireRole(['admin','data_head','design_head','dev_head']),
+  idParam, teamParam, noteIdParam, validate, ctrl.deleteNote
+);
 
 module.exports = router;
