@@ -33,7 +33,8 @@ app.get('/', (_req, res) => res.send('Hello World!'));
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/holidays', require('./routes/holiday.routes'));
-app.use('/api/projects', require('./routes/project.routes'));
+app.use('/api/projects', require('./routes/project.routes'))
+app.use('/api/users', require('./routes/user.routes'));
 
 // Error handler LAST
 app.use(require('./middleware/errorHandler'));
@@ -41,3 +42,4 @@ app.use(require('./middleware/errorHandler'));
 connectDB().then(() => {
   app.listen(port, () => console.log(`🚀 API listening at http://localhost:${port}`));
 });
+

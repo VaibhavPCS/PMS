@@ -90,4 +90,10 @@ router.delete('/:id/stage/:team/notes/:noteId',
   idParam, teamParam, noteIdParam, validate, ctrl.deleteNote
 );
 
+// Admin-only: delete project
+router.delete('/:id',
+  auth, requireRole(['admin']),
+  idParam, validate, ctrl.deleteProject
+);
+
 module.exports = router;

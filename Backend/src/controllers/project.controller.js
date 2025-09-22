@@ -88,3 +88,11 @@ exports.deleteNote = async (req, res, next) => {
     res.json(out);
   } catch (e) { next(e); }
 };
+
+exports.deleteProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await ProjectService.deleteProject(id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+};
