@@ -23,7 +23,6 @@ exports.getById = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-
 exports.createTest = async (req, res, next) => {
   try {
     const project = await ProjectService.createTestProject();
@@ -37,15 +36,6 @@ exports.estimateStage = async (req, res, next) => {
     const { startISO, hours } = req.body;
     const project = await ProjectService.setEstimate(id, team, startISO, hours);
     res.json({ ok: true, project });
-  } catch (e) { next(e); }
-};
-
-exports.completeStage = async (req, res, next) => {
-  try {
-    const { id, team } = req.params;
-    const { startISO, endISO } = req.body;
-    const result = await ProjectService.completeStage(id, team, startISO, endISO);
-    res.json({ ok: true, ...result });
   } catch (e) { next(e); }
 };
 
