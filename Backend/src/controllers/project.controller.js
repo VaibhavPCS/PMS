@@ -54,3 +54,37 @@ exports.completeStage = async (req, res, next) => {
     res.json({ ok: true, ...result });
   } catch (e) { next(e); }
 };
+
+exports.listNotes = async (req, res, next) => {
+  try {
+    const { id, team } = req.params;
+    const notes = await ProjectService.listNotes(req.user, id, team);
+    res.json(notes);
+  } catch (e) { next(e); }
+};
+
+exports.addNote = async (req, res, next) => {
+  try {
+    const { id, team } = req.params;
+    const { text } = req.body;
+    const note = await ProjectService.addNote(req.user, id, team, text);
+    res.status(201).json(note);
+  } catch (e) { next(e); }
+};
+
+exports.updateNote = async (req, res, next) => {
+  try {
+    const { id, team, noteId } = req.params;
+    const { text } = req.body;
+    const note = await ProjectService.updateNote(req.user, id, team, noteId, text);
+    res.json(note);
+  } catch (e) { next(e); }
+};
+
+exports.deleteNote = async (req, res, next) => {
+  try {
+    const { id, team, noteId } = req.params;
+    const result = await ProjectService.deleteNote(req.user, id, team, noteId);
+    res.json(result);
+  } catch (e) { next(e); }
+};

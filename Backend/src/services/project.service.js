@@ -173,3 +173,92 @@ exports.completeStage = async (id, team, startISO, endISO) => {
     penaltyHours
   };
 };
+
+function ensureStage(project, team) {
+  const stage = project.stages.find((s) => s.team === team);
+  if (!stage) {
+    const err = new Error('Invalid team'); err.status = 400; throw err;
+  }
+  return stage;
+}
+
+function canReadProject(user, project) {
+  if (user.role === 'admin') return true;
+  const uid = String(user.id);
+  if (String(project.createdBy) === uid) return true;
+  return project.stages.some(s => String(s.head) === uid);
+}
+
+function canWriteStage(user, project, stage) {
+  if (user.role === 'admin') return true;
+  return String(stage.head) === String(user.id);
+}
+
+function isAuthor(user, note) {
+  return String(note.author) === String(user.id);
+}
+
+exports.listNotes = async (user, projectId, team) => {
+  const project = await Project.findById(projectId).populate('stages.notes.author', 'name email role');
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  if (!canReadProject(user, project)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
+
+  const stage = ensureStage(project, team);
+  return stage.notes
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // ascending
+};
+
+exports.addNote = async (user, projectId, team, text) => {
+  if (!text || !text.trim()) { const e = new Error('Text is required'); e.status = 400; throw e; }
+
+  const project = await Project.findById(projectId);
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  const stage = ensureStage(project, team);
+  if (!canWriteStage(user, project, stage)) { const e = new Error('Forbidden'); e.status = 403; throw e; }
+
+  stage.notes.push({ author: user.id, text: text.trim() });
+  await project.save();
+
+  const note = stage.notes[stage.notes.length - 1];
+  return note;
+};
+
+exports.updateNote = async (user, projectId, team, noteId, text) => {
+  if (!text || !text.trim()) { const e = new Error('Text is required'); e.status = 400; throw e; }
+
+  const project = await Project.findById(projectId);
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  const stage = ensureStage(project, team);
+  const note = stage.notes.id(noteId);
+  if (!note) { const e = new Error('Note not found'); e.status = 404; throw e; }
+
+  // Only admin or author can edit
+  if (!(user.role === 'admin' || isAuthor(user, note))) {
+    const e = new Error('Forbidden'); e.status = 403; throw e;
+  }
+
+  note.text = text.trim();
+  await project.save();
+  return note;
+};
+
+exports.deleteNote = async (user, projectId, team, noteId) => {
+  const project = await Project.findById(projectId);
+  if (!project) { const e = new Error('Project not found'); e.status = 404; throw e; }
+
+  const stage = ensureStage(project, team);
+  const note = stage.notes.id(noteId);
+  if (!note) { const e = new Error('Note not found'); e.status = 404; throw e; }
+
+  // Admin can delete any; stage head can delete own; authors can delete own
+  if (!(user.role === 'admin' || canWriteStage(user, project, stage) || isAuthor(user, note))) {
+    const e = new Error('Forbidden'); e.status = 403; throw e;
+  }
+
+  note.deleteOne();
+  await project.save();
+  return { ok: true };
+};
