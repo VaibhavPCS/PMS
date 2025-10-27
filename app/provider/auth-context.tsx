@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitialized: boolean;
   error: Error | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -21,7 +22,9 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     const [user, setUser] = useState<User | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    // Duplicate declaration removed
     const [error, setError] = useState<Error | null>(null);
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
     // Fetch user information from API
     const fetchUserInfo = async () => {
@@ -45,6 +48,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     // Check for existing authentication on app startup
     useEffect(() => {
         const checkAuthStatus = async () => {
+            setIsInitialized(false);
+            
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
             const currentPath = window.location.pathname;
@@ -52,6 +57,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             // Skip auth check on public routes
             if (publicRoutes.includes(currentPath)) {
                 setIsLoading(false);
+                setIsInitialized(true);
                 return;
             }
             
@@ -64,6 +70,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
                 setUser(null);
             }
             setIsLoading(false);
+            setIsInitialized(true);
         };
 
         checkAuthStatus();
@@ -147,12 +154,25 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         user,
         isAuthenticated,
         isLoading,
+        isInitialized,
         error,
         login,
         logout,
         setAuthenticated,
         fetchUserInfo,
         forceAuthCheck
+    }
+
+    // Show loading state until context is properly initialized
+    if (!isInitialized) {
+        return (
+            <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Initializing authentication...</p>
+                </div>
+            </div>
+        );
     }
 
     return (
