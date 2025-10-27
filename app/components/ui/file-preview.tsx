@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { File, Download, Eye, X } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
+import { buildBackendUrl } from '@/lib/config';
 
 interface Attachment {
   fileName: string;
@@ -41,7 +42,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
   const downloadFile = (attachment: Attachment) => {
     const link = document.createElement('a');
-    link.href = `${import.meta.env.VITE_API_URL}${attachment.fileUrl}`;
+    link.href = buildBackendUrl(attachment.fileUrl);
     link.download = attachment.fileName;
     document.body.appendChild(link);
     link.click();
@@ -58,10 +59,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
             // Image Preview
             <div className="relative max-w-xs">
               <img
-                src={`${import.meta.env.VITE_API_URL}${attachment.fileUrl}`}
+                src={buildBackendUrl(attachment.fileUrl)}
                 alt={attachment.fileName}
                 className="rounded-lg max-h-48 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => setPreviewImage(`${import.meta.env.VITE_API_URL}${attachment.fileUrl}`)}
+                onClick={() => setPreviewImage(buildBackendUrl(attachment.fileUrl))}
               />
               <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                 {attachment.fileName}

@@ -132,3 +132,20 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Add to your CSS file */
+[data-radix-portal] {
+  z-index: 9999 !important;
+}
+
+[role="dialog"] {
+  z-index: 10000 !important;
+  position: fixed !important;
+}
+
+.dialog-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  z-index: 9998 !important;
+}

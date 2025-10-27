@@ -5,7 +5,9 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
+    "dev:https": "react-router dev --https",
     "start": "npx serve build/client -s",
+    "start:https": "npx serve build/client -s --ssl-cert ../PMS_BACKEND/certs/server.crt --ssl-key ../PMS_BACKEND/certs/server.key",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {

@@ -1,11 +1,10 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig, AxiosError } from "axios";
 import type { AxiosResponse } from "axios";
-
-const BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:5000/api-v1';
+import { getApiBaseUrl } from "./config";
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },

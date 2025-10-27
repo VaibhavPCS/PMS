@@ -340,30 +340,6 @@ const WorkspacePage = () => {
     },
     [userRole, currentUserId, currentUserRole]
   );
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchUserRole();
-      fetchWorkspaces();
-      fetchProjects();
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated && currentWorkspace?._id) {
-      fetchWorkspaceMembers();
-    }
-  }, [isAuthenticated, currentWorkspace?._id]);
-
-  useEffect(() => {
-    if (currentWorkspace) {
-      setEditWorkspace({
-        name: currentWorkspace.name,
-        description: currentWorkspace.description,
-      });
-    }
-  }, [currentWorkspace]);
-
   const fetchUserRole = useCallback(async () => {
     try {
       const response = await fetchData("/auth/me");
@@ -402,6 +378,29 @@ const WorkspacePage = () => {
       toast.error("Failed to load projects");
     }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUserRole();
+      fetchWorkspaces();
+      fetchProjects();
+    }
+  }, [isAuthenticated, fetchUserRole, fetchWorkspaces, fetchProjects]);
+
+  useEffect(() => {
+    if (isAuthenticated && currentWorkspace?._id) {
+      fetchWorkspaceMembers();
+    }
+  }, [isAuthenticated, currentWorkspace?._id]);
+
+  useEffect(() => {
+    if (currentWorkspace) {
+      setEditWorkspace({
+        name: currentWorkspace.name,
+        description: currentWorkspace.description,
+      });
+    }
+  }, [currentWorkspace]);
 
   const fetchWorkspaceMembers = useCallback(async () => {
     if (!currentWorkspace?._id) {
@@ -876,30 +875,173 @@ const WorkspacePage = () => {
 
   if (workspaces.length === 0 && canCreateWorkspace) {
     return (
-      <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <>
+        <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+          <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+            <Card className="w-full max-w-md border-0 shadow-xl">
+              <CardHeader className="text-center pb-8">
+                <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                  <Building2 className="w-10 h-10 text-white" />
+                </div>
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  Welcome to PMS
+                </CardTitle>
+                <CardDescription className="text-base text-gray-600 mt-2">
+                  Create your first workspace to start organizing projects and
+                  collaborating with your team.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pb-8">
+                <Button
+                  onClick={() => setShowCreateWorkspaceModal(true)}
+                  className="w-full h-12"
+                  size="lg"
+                  type="button"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Your First Workspace
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Create Workspace Dialog (mounted in this branch) */}
+        <Dialog
+          open={showCreateWorkspaceModal}
+          onOpenChange={setShowCreateWorkspaceModal}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+                <span>Create New Workspace</span>
+              </DialogTitle>
+              <DialogDescription>
+                Create a workspace to organize your projects and team
+                collaboration.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateWorkspace} className="space-y-6 mt-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="workspace-name"
+                    className="text-sm font-semibold text-gray-800"
+                  >
+                    Workspace Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="workspace-name"
+                    type="text"
+                    required
+                    value={newWorkspace.name}
+                    onChange={(e) =>
+                      setNewWorkspace({ ...newWorkspace, name: e.target.value })
+                    }
+                    placeholder="Enter workspace name"
+                    className="h-12 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="workspace-description"
+                    className="text-sm font-semibold text-gray-800"
+                  >
+                    Description
+                  </Label>
+                  <Textarea
+                    id="workspace-description"
+                    value={newWorkspace.description}
+                    onChange={(e) =>
+                      setNewWorkspace({
+                        ...newWorkspace,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Describe what this workspace will be used for..."
+                    rows={3}
+                    className="resize-none focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex space-x-3 pt-6 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateWorkspaceModal(false);
+                    setNewWorkspace({ name: "", description: "" });
+                  }}
+                  className="flex-1 h-11"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submittingWorkspace}
+                  className="flex-1 h-11"
+                >
+                  {submittingWorkspace ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Workspace
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  // ✅ ADD: Handle case when user has no workspaces and no permission to create them
+  if (workspaces.length === 0 && !canCreateWorkspace) {
+    return (
+      <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200">
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-md border-0 shadow-xl">
             <CardHeader className="text-center pb-8">
-              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-                <Building2 className="w-10 h-10 text-white" />
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                <AlertTriangle className="w-10 h-10 text-white" />
               </div>
               <CardTitle className="text-2xl font-bold text-gray-900">
-                Welcome to PMS
+                No Workspaces Available
               </CardTitle>
               <CardDescription className="text-base text-gray-600 mt-2">
-                Create your first workspace to start organizing projects and
-                collaborating with your team.
+                You don't have access to any workspaces yet. Please contact an
+                administrator to get invited to a workspace or to upgrade your
+                account permissions.
               </CardDescription>
             </CardHeader>
-            <CardContent className="pb-8">
-              <Button
-                onClick={() => setShowCreateWorkspaceModal(true)}
-                className="w-full h-12"
-                size="lg"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Create Your First Workspace
-              </Button>
+            <CardContent className="pb-8 text-center">
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800 font-medium">
+                    Need access to a workspace?
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Ask an administrator to invite you to their workspace
+                  </p>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-sm text-amber-800 font-medium">
+                    Want to create workspaces?
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Contact support to upgrade to admin permissions
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1089,7 +1231,7 @@ const WorkspacePage = () => {
                   );
                 })}
 
-                {(userRole === "admin" || userRole === "super-admin") && (
+                {canCreateWorkspace && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -1642,196 +1784,7 @@ const WorkspacePage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={showInviteToProjectModal}
-        onOpenChange={setShowInviteToProjectModal}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
-                <UserPlus className="w-5 h-5 text-white" />
-              </div>
-              <span>Invite Team Member</span>
-            </DialogTitle>
-            <DialogDescription>
-              Invite a team member to join{" "}
-              <span className="font-semibold">"{selectedProject?.title}"</span>{" "}
-              project
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleInviteToProject} className="space-y-6 mt-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="project-invite-email"
-                  className="text-sm font-semibold text-gray-800"
-                >
-                  Email Address <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="project-invite-email"
-                  type="email"
-                  required
-                  value={inviteToProjectData.email}
-                  onChange={(e) =>
-                    setInviteToProjectData({
-                      ...inviteToProjectData,
-                      email: e.target.value,
-                    })
-                  }
-                  placeholder="Enter team member's email"
-                  className="h-12 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800">
-                  Category <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={inviteToProjectData.categoryName}
-                  onValueChange={(value) =>
-                    setInviteToProjectData({
-                      ...inviteToProjectData,
-                      categoryName: value,
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select project category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedProject?.categories.map((category) => (
-                      <SelectItem key={category.name} value={category.name}>
-                        <div className="flex items-center justify-between w-full pr-4">
-                          <div className="flex items-center space-x-2">
-                            <FolderOpen className="w-4 h-4 text-blue-600" />
-                            <span className="font-medium">{category.name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {category.members.length} members
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800">
-                  Role <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={inviteToProjectData.role}
-                  onValueChange={(value: "lead" | "member") =>
-                    setInviteToProjectData({
-                      ...inviteToProjectData,
-                      role: value,
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-12">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="member">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-blue-600" />
-                        <div>
-                          <span className="font-medium">Member</span>
-                          <p className="text-xs text-gray-500">
-                            Can participate in tasks
-                          </p>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="lead">
-                      <div className="flex items-center space-x-2">
-                        <Crown className="w-4 h-4 text-yellow-600" />
-                        <div>
-                          <span className="font-medium">Lead</span>
-                          <p className="text-xs text-gray-500">
-                            Can manage category and tasks
-                          </p>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="font-semibold text-blue-900 mb-1">
-                      Invitation Details
-                    </p>
-                    <p className="text-blue-700">
-                      <span className="font-medium">
-                        {inviteToProjectData.email || "Selected member"}
-                      </span>{" "}
-                      will be added to
-                      <span className="font-medium">
-                        {" "}
-                        "
-                        {inviteToProjectData.categoryName ||
-                          "selected category"}
-                        "{" "}
-                      </span>
-                      as a{" "}
-                      <span className="font-medium">
-                        {inviteToProjectData.role}
-                      </span>
-                      .
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-3 pt-6 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowInviteToProjectModal(false);
-                  setSelectedProject(null);
-                  setInviteToProjectData({
-                    email: "",
-                    categoryName: "",
-                    role: "member",
-                  });
-                }}
-                className="flex-1 h-11"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={submittingProjectInvite}
-                className="flex-1 h-11"
-              >
-                {submittingProjectInvite ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending Invite...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Send Invitation
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
+      {/* Create Workspace Dialog */}
       <Dialog
         open={showCreateWorkspaceModal}
         onOpenChange={setShowCreateWorkspaceModal}
@@ -1849,7 +1802,6 @@ const WorkspacePage = () => {
               collaboration.
             </DialogDescription>
           </DialogHeader>
-
           <form onSubmit={handleCreateWorkspace} className="space-y-6 mt-4">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -1871,7 +1823,6 @@ const WorkspacePage = () => {
                   className="h-12 focus:ring-blue-500"
                 />
               </div>
-
               <div className="space-y-2">
                 <Label
                   htmlFor="workspace-description"
@@ -1894,7 +1845,6 @@ const WorkspacePage = () => {
                 />
               </div>
             </div>
-
             <div className="flex space-x-3 pt-6 border-t">
               <Button
                 type="button"

@@ -1,13 +1,16 @@
 import axios from 'axios';
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+import { getApiBaseUrl } from './config';
 
 const api = axios.create({
-  baseURL: `${baseURL}/api-v1`,
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Include HTTP-only cookies in requests
+  // Handle self-signed certificates in development
+  ...(import.meta.env.DEV && {
+    httpsAgent: typeof window === 'undefined' ? undefined : undefined
+  })
 });
 
 export default api;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { fetchData, postData } from "@/lib/fetch-util";
+import { buildApiUrl, buildBackendUrl } from "@/lib/config";
 import {
   ArrowLeft,
   Calendar,
@@ -279,7 +280,7 @@ const FilePreview: React.FC<{
 
   const downloadFile = (attachment: any) => {
     const link = document.createElement("a");
-    link.href = `http://localhost:5000${attachment.fileUrl}`;
+    link.href = buildBackendUrl(attachment.fileUrl);
     link.download = attachment.fileName;
     document.body.appendChild(link);
     link.click();
@@ -295,11 +296,11 @@ const FilePreview: React.FC<{
           {attachment.fileType === "image" ? (
             <div className="relative max-w-xs">
               <img
-                src={`http://localhost:5000${attachment.fileUrl}`}
+                src={buildBackendUrl(attachment.fileUrl)}
                 alt={attachment.fileName}
                 className="rounded max-h-32 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() =>
-                  setPreviewImage(`http://localhost:5000${attachment.fileUrl}`)
+                  setPreviewImage(buildBackendUrl(attachment.fileUrl))
                 }
               />
               <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
@@ -637,7 +638,7 @@ const TaskDetail = () => {
       console.log("Fetching task details for ID:", taskId);
       // Use direct fetch instead of fetchData for better error handling
       const response = await fetch(
-        `http://localhost:5000/api-v1/task/${taskId}`,
+        buildApiUrl(`/task/${taskId}`),
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -678,7 +679,7 @@ const TaskDetail = () => {
     try {
       console.log("Fetching comments for task:", taskId);
       const response = await fetch(
-        `http://localhost:5000/api-v1/comment/task/${taskId}`,
+        buildApiUrl(`/comment/task/${taskId}`),
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -787,7 +788,7 @@ const TaskDetail = () => {
   const loadReplies = async (commentId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api-v1/comment/${commentId}/replies`,
+        buildApiUrl(`/comment/${commentId}/replies`),
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -826,7 +827,7 @@ const TaskDetail = () => {
         formData.append("attachments", file);
       });
 
-      const response = await fetch(`http://localhost:5000/api-v1/comment`, {
+      const response = await fetch(buildApiUrl(`/comment`), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -860,7 +861,7 @@ const TaskDetail = () => {
   const handleEditComment = async (commentId: string, content: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api-v1/comment/${commentId}`,
+        buildApiUrl(`/comment/${commentId}`),
         {
           method: "PUT",
           headers: {
@@ -890,7 +891,7 @@ const TaskDetail = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api-v1/comment/${commentId}`,
+        buildApiUrl(`/comment/${commentId}`),
         {
           method: "DELETE",
           headers: {
@@ -957,7 +958,7 @@ const TaskDetail = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api-v1/comment/${commentId}`,
+        buildApiUrl(`/comment/${commentId}`),
         {
           method: "DELETE",
           headers: {
