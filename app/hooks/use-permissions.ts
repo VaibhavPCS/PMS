@@ -23,12 +23,7 @@ export const usePermissions = (): PermissionConfig => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
+        // HTTP-only cookies are sent automatically with fetchData
         const response = await fetchData('/auth/me');
         setUserData(response.user);
       } catch (error) {

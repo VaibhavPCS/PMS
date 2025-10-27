@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useVerifyOTPMutation } from "@/hooks/use-auth"; // Change this
+import { useVerifyOTPMutation } from "@/hooks/use-auth";
+import { useAuth } from "../../provider/auth-context";
 import { toast } from "sonner";
 
 const verifyOtpSchema = z.object({
@@ -33,6 +34,7 @@ const VerifyOtp = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(300); // 5 minutes
+  const { forceAuthCheck } = useAuth();
 
   const { userId, email, type, message } = location.state || {};
 
@@ -43,7 +45,7 @@ const VerifyOtp = () => {
     },
   });
 
-  const { mutate: verifyOTP, isPending } = useVerifyOTPMutation(); // Change this
+  const { mutate: verifyOTP, isPending } = useVerifyOTPMutation();
 
   useEffect(() => {
     if (!userId || !email || !type) {
@@ -70,26 +72,27 @@ const VerifyOtp = () => {
     verifyOTP(
       { userId, otp: values.otp, type },
       {
-        onSuccess: (data: any) => {
+        onSuccess: async (data: any) => {
           toast.success("Verification successful!");
 
-          // Handle both login and registration verification (both now return tokens)
-          if ((type === "login" || type === "registration") && data.token) {
-            // Store token and trigger auth state change
-            localStorage.setItem("token", data.token);
-
-            // Trigger auth state update
-            window.dispatchEvent(new Event("authStateChange"));
-
+          // Handle both login and registration verification
+          if (type === "login" || type === "registration") {
             // Show appropriate message
             if (type === "registration") {
               toast.success("Welcome! Your account is ready.");
             }
 
-            // Small delay to ensure auth context updates
-            setTimeout(() => {
+            try {
+              // Force auth check to update context with HTTP-only cookie
+              await forceAuthCheck();
+              
+              // Navigate to dashboard after auth context is updated
               navigate("/dashboard");
-            }, 100);
+            } catch (error) {
+              console.error("Failed to fetch user info after verification:", error);
+              toast.error("Login successful but failed to load user data. Please try refreshing.");
+              navigate("/dashboard");
+            }
           } else {
             // Fallback for password-reset or other types
             navigate("/sign-in");

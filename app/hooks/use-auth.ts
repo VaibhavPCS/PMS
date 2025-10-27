@@ -24,14 +24,26 @@ export const useSignInMutation = () => {
 
 export const useVerifyOTPMutation = () => {
   return useMutation({
-    mutationFn: (data: { userId: string; otp: string; type: string }) => 
-      postData('/auth/verify-email', { 
-        token: {
-          userId: data.userId,
-          otp: data.otp,
-          type: data.type
-        }
-      }),
+    mutationFn: (data: { userId: string; otp: string; type: string }) => {
+      // Use different endpoints based on type
+      if (data.type === 'login') {
+        return postData('/auth/verify-otp', { 
+          token: {
+            userId: data.userId,
+            otp: data.otp
+          }
+        });
+      } else {
+        // For registration and other types, use verify-email
+        return postData('/auth/verify-email', { 
+          token: {
+            userId: data.userId,
+            otp: data.otp,
+            type: data.type
+          }
+        });
+      }
+    },
   });
 };
 

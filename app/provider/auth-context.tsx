@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { User } from '../types/index';
-import { fetchData } from '@/lib/fetch-util';
+import { fetchData, postData } from '@/lib/fetch-util';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setAuthenticated: (value: boolean) => void;
   fetchUserInfo: () => Promise<void>;
+  forceAuthCheck: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,20 +35,31 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             if (err.response?.status === 401 || err.response?.status === 403) {
                 setUser(null);
                 setIsAuthenticated(false);
-                localStorage.removeItem('token');
+                // No need to remove token - HTTP-only cookies are handled by server
+            } else {
+                setError(err);
             }
-            setError(err);
         }
     };
 
-    // Check for existing token on app startup AND when localStorage changes
+    // Check for existing authentication on app startup
     useEffect(() => {
         const checkAuthStatus = async () => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                // Fetch user data to validate token
+            // Define public routes where we don't need to check auth
+            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+            const currentPath = window.location.pathname;
+            
+            // Skip auth check on public routes
+            if (publicRoutes.includes(currentPath)) {
+                setIsLoading(false);
+                return;
+            }
+            
+            // Try to fetch user info - server will validate HTTP-only cookie
+            try {
                 await fetchUserInfo();
-            } else {
+            } catch (err) {
+                // If no valid cookie, user is not authenticated
                 setIsAuthenticated(false);
                 setUser(null);
             }
@@ -58,12 +70,19 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
 
         // Listen for storage changes (when token is added/removed)
         const handleStorageChange = () => {
-            checkAuthStatus();
+            // Define public routes where we don't need to check auth
+            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+            const currentPath = window.location.pathname;
+            
+            // Skip auth check on public routes
+            if (!publicRoutes.includes(currentPath)) {
+                checkAuthStatus();
+            }
         };
 
         // Handle force logout from 401 responses
         const handleForceLogout = () => {
-            localStorage.removeItem('token');
+            // No need to remove token - HTTP-only cookies are handled by server
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
@@ -85,7 +104,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     const setAuthenticated = (value: boolean) => {
         setIsAuthenticated(value);
         if (!value) {
-            localStorage.removeItem('token');
+            // No need to remove token - HTTP-only cookies are handled by server
             setUser(null);
         }
         // Dispatch custom event to trigger re-check
@@ -98,13 +117,31 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     }
 
     const logout = async () => {
-        localStorage.removeItem('token');
+        try {
+            // Call backend logout endpoint to clear HTTP-only cookie
+            await postData('/auth/logout', {});
+        } catch (err) {
+            // Even if logout fails, clear local state
+            console.warn('Logout request failed:', err);
+        }
+        
+        // Clear local storage (except token which is now in HTTP-only cookie)
         localStorage.removeItem('currentWorkspaceId');
         setUser(null);
         setIsAuthenticated(false);
         setError(null);
         window.dispatchEvent(new Event('authStateChange'));
     }
+
+    // Force auth check regardless of route (used after login/logout)
+    const forceAuthCheck = async () => {
+        try {
+            await fetchUserInfo();
+        } catch (err) {
+            setIsAuthenticated(false);
+            setUser(null);
+        }
+    };
 
     const values={
         user,
@@ -114,7 +151,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         login,
         logout,
         setAuthenticated,
-        fetchUserInfo
+        fetchUserInfo,
+        forceAuthCheck
     }
 
     return (

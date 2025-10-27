@@ -22,12 +22,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router";
 import { useSignInMutation } from "@/hooks/use-auth";
+import { useAuth } from "../../provider/auth-context";
 import { toast } from "sonner";
 
 type SigninFormData = z.infer<typeof signInSchema>;
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const { forceAuthCheck } = useAuth();
   const form = useForm<SigninFormData>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -57,15 +59,14 @@ const SignIn = () => {
           });
         } else {
           toast.success("Login successful!");
-          localStorage.setItem("token", data.token);
-
-          // ✅ CRITICAL FIX: Trigger auth state update
-          window.dispatchEvent(new Event("authStateChange"));
-
-          // Small delay to ensure auth context updates
-          setTimeout(() => {
+          
+          // Force auth check to update context with HTTP-only cookie
+          forceAuthCheck().then(() => {
             navigate("/dashboard");
-          }, 100);
+          }).catch(() => {
+            // Even if force check fails, try to navigate
+            navigate("/dashboard");
+          });
         }
       },
       onError: (error: any) => {
