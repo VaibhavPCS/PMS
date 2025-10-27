@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
 import { postData, fetchData, putData, deleteData } from "@/lib/fetch-util";
@@ -158,6 +158,11 @@ const WorkspacePage = () => {
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const permissions = usePermissions();
+
+  // One-time init guard to avoid duplicate fetches in StrictMode
+  const didInitRef = useRef(false);
+  // Track last workspace for which members were loaded to avoid redundant calls
+  const lastMembersWorkspaceIdRef = useRef<string | null>(null);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -379,19 +384,45 @@ const WorkspacePage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchUserRole();
-      fetchWorkspaces();
-      fetchProjects();
+  // Move the declaration above its usage to satisfy linter
+  const fetchWorkspaceMembers = useCallback(async () => {
+    const wsId = currentWorkspace?._id;
+    if (!wsId) {
+      setWorkspaceMembers([]);
+      lastMembersWorkspaceIdRef.current = null;
+      return;
     }
+
+    // Avoid repeated fetch for same workspace
+    if (lastMembersWorkspaceIdRef.current === wsId) {
+      return;
+    }
+
+    try {
+      const response = await fetchData("/project/members");
+      setWorkspaceMembers(response.members || []);
+      lastMembersWorkspaceIdRef.current = wsId;
+    } catch (error) {
+      setWorkspaceMembers([]);
+    }
+  }, [currentWorkspace?._id]);
+
+  // Initial data load — guard to avoid duplicate calls
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+
+    fetchUserRole();
+    fetchWorkspaces();
+    fetchProjects();
   }, [isAuthenticated, fetchUserRole, fetchWorkspaces, fetchProjects]);
 
   useEffect(() => {
     if (isAuthenticated && currentWorkspace?._id) {
       fetchWorkspaceMembers();
     }
-  }, [isAuthenticated, currentWorkspace?._id]);
+  }, [isAuthenticated, currentWorkspace?._id, fetchWorkspaceMembers]);
 
   useEffect(() => {
     if (currentWorkspace) {
@@ -399,25 +430,6 @@ const WorkspacePage = () => {
         name: currentWorkspace.name,
         description: currentWorkspace.description,
       });
-    }
-  }, [currentWorkspace]);
-
-  const fetchWorkspaceMembers = useCallback(async () => {
-    if (!currentWorkspace?._id) {
-      setWorkspaceMembers([]);
-      return;
-    }
-
-    try {
-      // ✅ FIXED: Use workspace-specific endpoint or skip if not needed
-      const response = await fetchData(
-        `/workspace/${currentWorkspace._id}/members`
-      );
-      setWorkspaceMembers(response.members);
-    } catch (error) {
-      console.error("Failed to load workspace members:", error);
-      // Set empty array instead of showing error for now
-      setWorkspaceMembers([]);
     }
   }, [currentWorkspace]);
 
