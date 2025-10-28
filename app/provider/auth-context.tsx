@@ -19,6 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({children}: {children: React.ReactNode}) => {
+    const navigate = useNavigate();
     const [user, setUser] = useState<User | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -93,8 +94,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
-            // Navigate to login page
-            window.location.href = '/sign-in';
+            // Navigate to login page client-side to avoid server 404 on deep links
+            navigate('/sign-in', { replace: true });
         };
 
         window.addEventListener('storage', handleStorageChange);
@@ -138,6 +139,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         setIsAuthenticated(false);
         setError(null);
         window.dispatchEvent(new Event('authStateChange'));
+        // Navigate to login after logout
+        navigate('/sign-in', { replace: true });
     }
 
     // Force auth check regardless of route (used after login/logout)

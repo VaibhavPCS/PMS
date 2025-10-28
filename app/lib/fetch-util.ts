@@ -5,11 +5,8 @@ import { getApiBaseUrl } from "./config";
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  headers: {
-    "Content-Type": "application/json",
-    "Cache-Control": "no-cache", // Add this to prevent caching
-  },
-  withCredentials: true, 
+  // Do not set global Content-Type or Cache-Control to avoid unnecessary CORS preflights
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -30,28 +27,42 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       window.dispatchEvent(new Event("force-logout"));
     }
+    // Surface network/CORS errors more clearly
+    if (!error.response) {
+      // Axios network error (e.g., CORS/preflight failure, DNS, SSL)
+      window.dispatchEvent(new CustomEvent('network-error', { detail: { message: error.message } }));
+    }
     return Promise.reject(error);
   }
 );
 
 // ✅ ALL API METHODS USING AXIOS
 const postData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.post(url, data);
+  const response = await api.post(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
 const putData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.put(url, data);
+  const response = await api.put(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
 const updateData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.put(url, data);
+  const response = await api.put(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
 const fetchData = async <T = any>(url: string): Promise<T> => {
-  const response = await api.get<T>(url);
+  const response = await api.get<T>(url, {
+    // Keep GET simple to minimize preflights
+    headers: { 'Accept': 'application/json' },
+  });
   return response.data;
 };
 
