@@ -52,7 +52,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setIsInitialized(false);
             
             // Define public routes where we don't need to check auth
-            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
             const currentPath = window.location.pathname;
             
             // Skip auth check on public routes
@@ -79,7 +79,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         // Listen for storage changes (when token is added/removed)
         const handleStorageChange = () => {
             // Define public routes where we don't need to check auth
-            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
             const currentPath = window.location.pathname;
             
             // Skip auth check on public routes
@@ -94,8 +94,13 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
+            // Avoid redirecting away from public routes (like '/')
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+            const currentPath = window.location.pathname;
             // Navigate to login page client-side to avoid server 404 on deep links
-            navigate('/sign-in', { replace: true });
+            if (!publicRoutes.includes(currentPath)) {
+                navigate('/sign-in', { replace: true });
+            }
         };
 
         window.addEventListener('storage', handleStorageChange);
