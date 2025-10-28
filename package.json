@@ -50,6 +50,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
     "@react-router/dev": "^7.9.2",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/eslint-plugin-query": "^5.91.0",
