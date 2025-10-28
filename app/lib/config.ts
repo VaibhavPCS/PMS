@@ -5,7 +5,7 @@
 
 /**
  * Get the backend base URL from environment variables
- * Falls back to localhost:5000 if not configured
+ * Falls back to http://pms.upda.co.in:5000 if not configured
  */
 export const getBackendBaseUrl = (): string => {
   // Always use environment variable if available
@@ -14,9 +14,9 @@ export const getBackendBaseUrl = (): string => {
   if (envApiUrl) {
     return envApiUrl;
   }
-  
+
   // Simple fallback - no automatic protocol switching
-  return 'http://localhost:5000';
+  return 'http://pms.upda.co.in:5000';
 };
 
 /**

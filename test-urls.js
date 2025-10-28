@@ -9,7 +9,7 @@ const getBackendBaseUrl = () => {
   if (envApiUrl) {
     return envApiUrl;
   }
-  return 'http://localhost:5000';
+  return 'http://pms.upda.co.in:5000';
 };
 
 const getApiBaseUrl = () => {
