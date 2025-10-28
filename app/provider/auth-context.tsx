@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { User } from '../types/index';
 import { fetchData, postData } from '@/lib/fetch-util';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -94,23 +95,32 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
+            toast.error('Your session has expired. Redirecting to home.');
             // Avoid redirecting away from public routes (like '/')
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
             const currentPath = window.location.pathname;
             // Navigate to login page client-side to avoid server 404 on deep links
             if (!publicRoutes.includes(currentPath)) {
-                navigate('/sign-in', { replace: true });
+                navigate('/', { replace: true });
             }
+        };
+
+        // Show feedback on network-level errors
+        const handleNetworkError = (e: any) => {
+            const message = e?.detail?.message ?? 'A network error occurred';
+            toast.error(`Network error: ${message}`);
         };
 
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('authStateChange', handleStorageChange);
         window.addEventListener('force-logout', handleForceLogout);
+        window.addEventListener('network-error', handleNetworkError as EventListener);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('authStateChange', handleStorageChange);
             window.removeEventListener('force-logout', handleForceLogout);
+            window.removeEventListener('network-error', handleNetworkError as EventListener);
         };
     }, []);
 
