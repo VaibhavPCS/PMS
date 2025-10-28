@@ -4,9 +4,10 @@ import { useAuth } from '../../provider/auth-context';
 import Sidebar from './sidebar';
 
 const DashboardLayout = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized } = useAuth();
 
-  if (isLoading) {
+  // Wait for both loading to finish AND initialization to complete
+  if (isLoading || !isInitialized) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -17,6 +18,7 @@ const DashboardLayout = () => {
     );
   }
 
+  // Only redirect after initialization is complete
   if (!isAuthenticated) {
     return <Navigate to="/" />;
   }

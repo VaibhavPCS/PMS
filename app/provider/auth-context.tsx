@@ -50,21 +50,22 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     // Check for existing authentication on app startup
     useEffect(() => {
         const checkAuthStatus = async () => {
+            setIsLoading(true);
             setIsInitialized(false);
-            
+
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
             const currentPath = (window.location.hash && window.location.hash.startsWith('#/'))
                 ? window.location.hash.slice(1)
                 : window.location.pathname;
-            
+
             // Skip auth check on public routes
             if (publicRoutes.includes(currentPath)) {
                 setIsLoading(false);
                 setIsInitialized(true);
                 return;
             }
-            
+
             // Try to fetch user info - server will validate HTTP-only cookie
             try {
                 await fetchUserInfo();
@@ -72,9 +73,11 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
                 // If no valid cookie, user is not authenticated
                 setIsAuthenticated(false);
                 setUser(null);
+            } finally {
+                // Ensure loading and initialization states are always updated
+                setIsLoading(false);
+                setIsInitialized(true);
             }
-            setIsLoading(false);
-            setIsInitialized(true);
         };
 
         checkAuthStatus();
@@ -128,7 +131,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             window.removeEventListener('force-logout', handleForceLogout);
             window.removeEventListener('network-error', handleNetworkError as EventListener);
         };
-    }, []);
+    }, [navigate]);
 
     const setAuthenticated = (value: boolean) => {
         setIsAuthenticated(value);
