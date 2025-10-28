@@ -1,3 +1,10 @@
+/**
+ * URL Construction Test Script
+ * Modified: January 2025
+ * Original: 'http://pms.upda.co.in:5001' (inconsistent with main config)
+ * New: 'https://pms.upda.co.in:5001' (production server - consistent with main config)
+ */
+
 // Simple test to verify URL construction
 console.log('Environment variables:');
 console.log('VITE_API_BASE_URL:', process.env.VITE_API_BASE_URL);
@@ -9,7 +16,11 @@ const getBackendBaseUrl = () => {
   if (envApiUrl) {
     return envApiUrl;
   }
-  return 'http://pms.upda.co.in:5000';
+  // Production API endpoint (updated to HTTPS)
+  return 'https://pms.upda.co.in:5001';
+  
+  // Previous configuration (commented out for reference)
+  // return 'http://pms.upda.co.in:5001';
 };
 
 const getApiBaseUrl = () => {
