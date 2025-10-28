@@ -7,15 +7,12 @@ const api = axios.create({
   baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
+    "Cache-Control": "no-cache", // Add this to prevent caching
   },
-  withCredentials: true, // Enable cookies for HTTP-only authentication
+  withCredentials: true, 
 });
 
-// ✅ ENHANCED REQUEST INTERCEPTOR
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Remove localStorage token handling - cookies are sent automatically
-  
-  // ✅ ADD WORKSPACE HEADER SUPPORT (Optional - for future use)
   const currentWorkspaceId = localStorage.getItem("currentWorkspaceId");
   if (currentWorkspaceId && config.url?.includes('/workspace/')) {
     if (config.headers) {
