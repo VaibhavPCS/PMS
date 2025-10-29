@@ -22,6 +22,7 @@ export default [
     route("dashboard", "routes/dashboard/dashboard.tsx"),
     route("workspace", "routes/workspace/workspace.tsx"),
     route("tasks", "routes/tasks/tasks.tsx"),
+    route("meetings", "routes/meetings/meetings.tsx"),
     route("members", "routes/members/members.tsx"),
     route("archived", "routes/archived/archived.tsx"),
     route("settings", "routes/settings/settings.tsx"),

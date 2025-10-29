@@ -5,7 +5,12 @@ export interface User {
   role?: 'user' | 'admin' | 'super_admin';  // Add role property
   profilePicture?: string;
   isEmailVerified?: boolean;
-  currentWorkspace?: string;
+  currentWorkspace?: string | {
+    _id: string;
+    name: string;
+    description?: string;
+    createdAt: string;
+  };
   workspaces?: Array<{
     workspaceId: string;
     role: string;
