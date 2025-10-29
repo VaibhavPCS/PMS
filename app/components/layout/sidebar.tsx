@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
-import { fetchData, postData } from '@/lib/fetch-util';
+import { fetchData, postData, patchData } from '@/lib/fetch-util';
 import {
   Home,
   Building2,
@@ -120,7 +120,7 @@ const Sidebar = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await postData(`/notification/${notificationId}/read`, {});
+      await patchData(`/notification/${notificationId}/read`, {});
       
       setNotifications(notifications.map(n => 
         n._id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
@@ -134,7 +134,7 @@ const Sidebar = () => {
 
   const markAllAsRead = async () => {
     try {
-      await postData('/notification/read-all', {});
+      await patchData('/notification/read-all', {});
       
       const updatedNotifications = notifications.map(n => ({
         ...n,
@@ -190,6 +190,62 @@ const Sidebar = () => {
     // ✅ Close mobile menus when toggling
     setShowMobileUserMenu(false);
     setShowNotifications(false);
+  };
+
+  // Enhanced navigation function for notifications
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if unread
+    if (!notification.isRead) {
+      await markAsRead(notification._id);
+    }
+
+    // Close notification panel
+    setShowNotifications(false);
+
+    // Navigate based on notification data
+    const { data } = notification;
+    let targetPath = '';
+    let targetElement = '';
+
+    if (data.workspaceId && data.projectId && data.taskId) {
+      // Task-related notification
+      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+      targetElement = `task-${data.taskId}`;
+    } else if (data.workspaceId && data.projectId) {
+      // Project-related notification
+      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+    } else if (data.workspaceId) {
+      // Workspace-related notification
+      targetPath = `/workspace/${data.workspaceId}`;
+    } else if (data.inviteId) {
+      // Invite-related notification
+      targetPath = '/invitations';
+    } else {
+      // Default to dashboard
+      targetPath = '/dashboard';
+    }
+
+    // Navigate to the target path
+    navigate(targetPath);
+
+    // Smooth scroll to specific element if specified
+    if (targetElement) {
+      setTimeout(() => {
+        const element = document.getElementById(targetElement);
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+          // Add a subtle highlight effect
+          element.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          }, 3000);
+        }
+      }, 100);
+    }
   };
 
   const navItems = [
@@ -254,12 +310,12 @@ const Sidebar = () => {
               {notifications.map((notification) => (
                 <div
                   key={notification._id}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                  className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                     !notification.isRead 
-                      ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
-                      : 'hover:bg-gray-50'
+                      ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100 shadow-sm' 
+                      : 'bg-gray-50 border-l-4 border-l-gray-300 hover:bg-gray-100 opacity-75'
                   }`}
-                  onClick={() => !notification.isRead && markAsRead(notification._id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="text-lg flex-shrink-0">
@@ -345,12 +401,12 @@ const Sidebar = () => {
             {notifications.map((notification) => (
               <div
                 key={notification._id}
-                className={`p-3 mb-2 rounded-md cursor-pointer transition-colors ${
+                className={`p-3 mb-2 rounded-md cursor-pointer transition-all duration-200 ${
                   !notification.isRead 
-                    ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
-                    : 'hover:bg-gray-50'
+                    ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100 shadow-sm' 
+                    : 'bg-gray-50 border-l-4 border-l-gray-300 hover:bg-gray-100 opacity-75'
                 }`}
-                onClick={() => !notification.isRead && markAsRead(notification._id)}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-start space-x-3">
                   <div className="text-lg flex-shrink-0">

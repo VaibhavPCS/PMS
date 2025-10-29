@@ -18,6 +18,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fetchData, postData, deleteData } from '@/lib/fetch-util';
 import { useAuth } from '@/provider/auth-context';
+import { EditMeetingModal } from './edit-meeting-modal';
 
 interface Meeting {
   _id: string;
@@ -60,6 +61,7 @@ interface MeetingCardProps {
 export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onUpdate, compact = false }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -160,6 +162,14 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onUpdate, com
     }
   };
 
+  const handleEditMeeting = () => {
+    setShowEditModal(true);
+  };
+
+  const handleEditSuccess = () => {
+    onUpdate();
+  };
+
   const downloadAttachment = (attachment: any) => {
     window.open(attachment.fileUrl, '_blank');
   };
@@ -168,213 +178,233 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({ meeting, onUpdate, com
 
   if (compact) {
     return (
-      <Card className="hover:shadow-md transition-shadow">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-medium text-sm">{meeting.title}</h4>
-                <Badge className={`text-xs ${getStatusColor(meeting.status)}`}>
-                  {meeting.status}
-                </Badge>
+      <>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-medium text-sm">{meeting.title}</h4>
+                  <Badge className={`text-xs ${getStatusColor(meeting.status)}`}>
+                    {meeting.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(meeting.scheduledDate)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(meeting.scheduledDate)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {meeting.participants.length + 1}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(meeting.scheduledDate)}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {formatTime(meeting.scheduledDate)}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  {meeting.participants.length + 1}
-                </div>
-              </div>
+              {meeting.meetingLink && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(meeting.meetingLink, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            {meeting.meetingLink && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.open(meeting.meetingLink, '_blank')}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Edit Meeting Modal */}
+        <EditMeetingModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          meeting={meeting}
+          onSuccess={handleEditSuccess}
+        />
+      </>
     );
   }
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-lg font-semibold">{meeting.title}</h3>
-              <Badge className={getStatusColor(meeting.status)}>
-                {meeting.status}
-              </Badge>
+    <>
+      <Card className="hover:shadow-md transition-shadow">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-lg font-semibold">{meeting.title}</h3>
+                <Badge className={getStatusColor(meeting.status)}>
+                  {meeting.status}
+                </Badge>
+              </div>
+              {meeting.description && (
+                <p className="text-gray-600 text-sm mb-3">{meeting.description}</p>
+              )}
             </div>
-            {meeting.description && (
-              <p className="text-gray-600 text-sm mb-3">{meeting.description}</p>
+            
+            {(isOrganizer() || currentUserParticipant) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isOrganizer() && (
+                    <>
+                      <DropdownMenuItem onClick={handleEditMeeting}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Meeting
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleDeleteMeeting} className="text-red-600">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Meeting
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {currentUserParticipant && currentUserParticipant.status === 'pending' && (
+                    <>
+                      <DropdownMenuItem onClick={() => handleParticipantResponse('accepted')}>
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        Accept
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleParticipantResponse('declined')}>
+                        <UserX className="h-4 w-4 mr-2" />
+                        Decline
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
-          
-          {(isOrganizer() || currentUserParticipant) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {isOrganizer() && (
-                  <>
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Meeting
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleDeleteMeeting} className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Meeting
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {currentUserParticipant && currentUserParticipant.status === 'pending' && (
-                  <>
-                    <DropdownMenuItem onClick={() => handleParticipantResponse('accepted')}>
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      Accept
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleParticipantResponse('declined')}>
-                      <UserX className="h-4 w-4 mr-2" />
-                      Decline
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Calendar className="h-4 w-4" />
+              <span>{formatDate(meeting.scheduledDate)} at {formatTime(meeting.scheduledDate)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Clock className="h-4 w-4" />
+              <span>{meeting.duration} minutes</span>
+            </div>
+          </div>
+
+          {/* Organizer */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-2">Organized by</p>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="text-xs">
+                  {meeting.organizer.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm">{meeting.organizer.name}</span>
+            </div>
+          </div>
+
+          {/* Participants */}
+          {meeting.participants.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-2">Participants ({meeting.participants.length})</p>
+              <div className="space-y-2">
+                {meeting.participants.map((participant, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">
+                          {participant.user.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{participant.user.name}</span>
+                    </div>
+                    <Badge className={`text-xs ${getParticipantStatusColor(participant.status)}`}>
+                      {participant.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Calendar className="h-4 w-4" />
-            <span>{formatDate(meeting.scheduledDate)} at {formatTime(meeting.scheduledDate)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Clock className="h-4 w-4" />
-            <span>{meeting.duration} minutes</span>
-          </div>
-        </div>
-
-        {/* Organizer */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">Organized by</p>
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-xs">
-                {meeting.organizer.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{meeting.organizer.name}</span>
-          </div>
-        </div>
-
-        {/* Participants */}
-        {meeting.participants.length > 0 && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-500 mb-2">Participants ({meeting.participants.length})</p>
-            <div className="space-y-2">
-              {meeting.participants.map((participant, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs">
-                        {participant.user.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">{participant.user.name}</span>
+          {/* Attachments */}
+          {meeting.attachments.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-2">Attachments ({meeting.attachments.length})</p>
+              <div className="space-y-2">
+                {meeting.attachments.map((attachment, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
+                    onClick={() => downloadAttachment(attachment)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="h-4 w-4" />
+                      <span className="text-sm">{attachment.fileName}</span>
+                      <span className="text-xs text-gray-500">
+                        ({(attachment.fileSize / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
                   </div>
-                  <Badge className={`text-xs ${getParticipantStatusColor(participant.status)}`}>
-                    {participant.status}
-                  </Badge>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Attachments */}
-        {meeting.attachments.length > 0 && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-500 mb-2">Attachments ({meeting.attachments.length})</p>
-            <div className="space-y-2">
-              {meeting.attachments.map((attachment, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100"
-                  onClick={() => downloadAttachment(attachment)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4" />
-                    <span className="text-sm">{attachment.fileName}</span>
-                    <span className="text-xs text-gray-500">
-                      ({(attachment.fileSize / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </div>
-                  <ExternalLink className="h-4 w-4 text-gray-400" />
-                </div>
-              ))}
+          {/* Meeting Link */}
+          {meeting.meetingLink && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <span className="text-sm text-gray-600">Join Meeting</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(meeting.meetingLink, '_blank')}
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Join
+              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Meeting Link */}
-        {meeting.meetingLink && (
-          <div className="flex items-center justify-between pt-4 border-t">
-            <span className="text-sm text-gray-600">Join Meeting</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(meeting.meetingLink, '_blank')}
-              className="flex items-center gap-2"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Join
-            </Button>
-          </div>
-        )}
+          {/* Participant Response Actions */}
+          {currentUserParticipant && currentUserParticipant.status === 'pending' && (
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                size="sm"
+                onClick={() => handleParticipantResponse('accepted')}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <UserCheck className="h-4 w-4" />
+                Accept
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleParticipantResponse('declined')}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <UserX className="h-4 w-4" />
+                Decline
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Participant Response Actions */}
-        {currentUserParticipant && currentUserParticipant.status === 'pending' && (
-          <div className="flex gap-2 pt-4 border-t">
-            <Button
-              size="sm"
-              onClick={() => handleParticipantResponse('accepted')}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <UserCheck className="h-4 w-4" />
-              Accept
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleParticipantResponse('declined')}
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <UserX className="h-4 w-4" />
-              Decline
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Edit Meeting Modal */}
+      <EditMeetingModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        meeting={meeting}
+        onSuccess={handleEditSuccess}
+      />
+    </>
   );
 };

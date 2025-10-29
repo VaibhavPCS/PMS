@@ -79,9 +79,16 @@ const fetchData = async <T = any>(url: string): Promise<T> => {
 };
 
 // ✅ CLEAN: Single deleteData function using axios
+const patchData = async <T = any>(url: string, data: unknown = {}): Promise<T> => {
+  const response = await api.patch(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return response.data;
+};
+
 const deleteData = async <T = any>(url: string): Promise<T> => {
   const response = await api.delete(url);
   return response.data;
 };
 
-export { postData, postMultipart, putData, updateData, fetchData, deleteData };
+export { postData, postMultipart, putData, updateData, patchData, fetchData, deleteData };
