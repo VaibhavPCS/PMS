@@ -40,13 +40,54 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     return '📁';
   };
 
-  const downloadFile = (attachment: Attachment) => {
-    const link = document.createElement('a');
-    link.href = buildBackendUrl(attachment.fileUrl);
-    link.download = attachment.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadFile = async (attachment: Attachment) => {
+    try {
+      // Fetch the file with proper headers to force download
+      const response = await fetch(buildBackendUrl(attachment.fileUrl), {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
+      // Get the file as a blob
+      const blob = await response.blob();
+      
+      // Create a blob URL with the correct MIME type for forced download
+      const blobUrl = URL.createObjectURL(new Blob([blob], { 
+        type: 'application/octet-stream' // Force download by using generic binary type
+      }));
+
+      // Create and trigger download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = attachment.fileName;
+      link.style.display = 'none';
+      
+      // Add to DOM, click, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL to free memory
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to the original method if fetch fails
+      const link = document.createElement('a');
+      link.href = buildBackendUrl(attachment.fileUrl);
+      link.download = attachment.fileName;
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const openFile = (attachment: Attachment) => {
