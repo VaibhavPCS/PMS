@@ -11,9 +11,12 @@ const api = axios.create({
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const currentWorkspaceId = localStorage.getItem("currentWorkspaceId");
-  if (currentWorkspaceId && config.url?.includes('/workspace/')) {
+  // Always include workspace-id if available to ensure backend context
+  if (currentWorkspaceId) {
     if (config.headers) {
-      config.headers['workspace-id'] = currentWorkspaceId;
+      (config.headers as any)['workspace-id'] = currentWorkspaceId;
+    } else {
+      (config.headers as any) = { 'workspace-id': currentWorkspaceId };
     }
   }
   
@@ -40,6 +43,15 @@ api.interceptors.response.use(
 const postData = async <T = any>(url: string, data: unknown): Promise<T> => {
   const response = await api.post(url, data, {
     headers: { 'Content-Type': 'application/json' },
+  });
+  return response.data;
+};
+
+// Multipart/form-data post helper for file uploads
+const postMultipart = async <T = any>(url: string, formData: FormData): Promise<T> => {
+  const response = await api.post(url, formData, {
+    // Let axios/browser set the correct Content-Type with boundary
+    headers: {},
   });
   return response.data;
 };
@@ -72,4 +84,4 @@ const deleteData = async <T = any>(url: string): Promise<T> => {
   return response.data;
 };
 
-export { postData, putData, updateData, fetchData, deleteData };
+export { postData, postMultipart, putData, updateData, fetchData, deleteData };
