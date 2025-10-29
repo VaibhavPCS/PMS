@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import type { User } from '../types/index';
 import { fetchData, postData } from '@/lib/fetch-util';
 import { toast } from 'sonner';
+import { getCurrentPath, isPublicRoute } from '@/lib/route-utils';
 
 interface AuthContextType {
   user: User | null;
@@ -55,10 +56,9 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
 
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = window.location.pathname;
-            
-            // Skip auth check on public routes
-            if (publicRoutes.includes(currentPath)) {
+
+            // Use hash-aware path detection
+            if (isPublicRoute(publicRoutes)) {
                 setIsLoading(false);
                 setIsInitialized(true);
                 return;
@@ -84,10 +84,9 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         const handleStorageChange = () => {
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = window.location.pathname;
-            
-            // Skip auth check on public routes
-            if (!publicRoutes.includes(currentPath)) {
+
+            // Skip auth check on public routes using hash-aware detection
+            if (!isPublicRoute(publicRoutes)) {
                 checkAuthStatus();
             }
         };
@@ -99,11 +98,12 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setIsAuthenticated(false);
             setIsLoading(false);
             toast.error('Your session has expired. Redirecting to home.');
+
             // Avoid redirecting away from public routes (like '/')
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = window.location.pathname;
+
             // Navigate to login page client-side to avoid server 404 on deep links
-            if (!publicRoutes.includes(currentPath)) {
+            if (!isPublicRoute(publicRoutes)) {
                 navigate('/', { replace: true });
             }
         };

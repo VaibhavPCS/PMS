@@ -5,7 +5,10 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
+  useNavigate,
 } from "react-router";
+import { useEffect } from "react";
 
 // @ts-expect-error – no declaration file for this JS module
 import ReactQueryProvider from "./provider/react-query-provider.jsx";
@@ -51,6 +54,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Handle hash-based routing for static deployments
+  // On initial load, if URL contains a hash like /#/dashboard, navigate to that route
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#/')) {
+      const hashPath = hash.slice(1); // Remove '#' to get '/dashboard'
+      const currentPath = location.pathname;
+
+      // Only navigate if we're not already on the correct path
+      if (currentPath !== hashPath) {
+        navigate(hashPath, { replace: true });
+      }
+    }
+    // Run only on mount to handle initial page load with hash URLs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep hash in sync with the current route
+  // This allows copy/paste of URLs and proper refresh behavior
+  useEffect(() => {
+    const desiredHash = `#${location.pathname}${location.search}`;
+    if (window.location.hash !== desiredHash) {
+      // Update hash without triggering navigation
+      window.history.replaceState(null, '', desiredHash);
+    }
+  }, [location.pathname, location.search]);
+
   return (
     <ReactQueryProvider>
       <AuthProvider>
