@@ -55,10 +55,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
 
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = (window.location.hash && window.location.hash.startsWith('#/'))
-                ? window.location.hash.slice(1)
-                : window.location.pathname;
-
+            const currentPath = window.location.pathname;
+            
             // Skip auth check on public routes
             if (publicRoutes.includes(currentPath)) {
                 setIsLoading(false);
@@ -86,9 +84,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         const handleStorageChange = () => {
             // Define public routes where we don't need to check auth
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = (window.location.hash && window.location.hash.startsWith('#/'))
-                ? window.location.hash.slice(1)
-                : window.location.pathname;
+            const currentPath = window.location.pathname;
             
             // Skip auth check on public routes
             if (!publicRoutes.includes(currentPath)) {
@@ -105,9 +101,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             toast.error('Your session has expired. Redirecting to home.');
             // Avoid redirecting away from public routes (like '/')
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = (window.location.hash && window.location.hash.startsWith('#/'))
-                ? window.location.hash.slice(1)
-                : window.location.pathname;
+            const currentPath = window.location.pathname;
             // Navigate to login page client-side to avoid server 404 on deep links
             if (!publicRoutes.includes(currentPath)) {
                 navigate('/', { replace: true });
