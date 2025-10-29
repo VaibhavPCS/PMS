@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { File, Download, Eye, X } from 'lucide-react';
+import { File, Download, Eye, X, ExternalLink } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { buildBackendUrl } from '@/lib/config';
@@ -49,6 +49,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     document.body.removeChild(link);
   };
 
+  const openFile = (attachment: Attachment) => {
+    const fileUrl = buildBackendUrl(attachment.fileUrl);
+    window.open(fileUrl, '_blank');
+  };
+
   if (!attachments || attachments.length === 0) return null;
 
   return (
@@ -94,7 +99,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => openFile(attachment)}
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => downloadFile(attachment)}
+                  title="Download file"
                 >
                   <Download className="w-4 h-4" />
                 </Button>

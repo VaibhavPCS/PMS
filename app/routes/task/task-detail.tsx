@@ -27,6 +27,7 @@ import {
   Paperclip,
   Smile,
   MoreVertical,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -318,6 +319,11 @@ const FilePreview: React.FC<{
     document.body.removeChild(link);
   };
 
+  const openFile = (attachment: any) => {
+    const fileUrl = buildBackendUrl(attachment.fileUrl);
+    window.open(fileUrl, '_blank');
+  };
+
   if (!attachments || attachments.length === 0) return null;
 
   return (
@@ -351,14 +357,26 @@ const FilePreview: React.FC<{
                   </div>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => downloadFile(attachment)}
-                className="h-6 px-2"
-              >
-                <Download className="w-3 h-3" />
-              </Button>
+              <div className="flex items-center space-x-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openFile(attachment)}
+                  className="h-6 px-2"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadFile(attachment)}
+                  className="h-6 px-2"
+                  title="Download file"
+                >
+                  <Download className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
