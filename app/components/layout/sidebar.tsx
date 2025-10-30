@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
+  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -197,6 +198,7 @@ const Sidebar = () => {
     { name: 'My Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Members', href: '/members', icon: Users },
     { name: 'Archived', href: '/archived', icon: Archive },
+    { name: 'Chat', href: '/chat', icon: MessageCircle },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
