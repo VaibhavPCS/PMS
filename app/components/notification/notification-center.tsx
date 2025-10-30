@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { BellIcon } from '@heroicons/react/24/outline';
-import { fetchData, postData } from '@/lib/fetch-util';
+import { fetchData, postData, patchData } from '@/lib/fetch-util';
 
 // ✅ SOLUTION: Define proper notification interface
 interface Notification {
@@ -35,6 +36,8 @@ interface NotificationResponse {
 }
 
 const NotificationCenter = () => {
+  const navigate = useNavigate();
+  
   // ✅ SOLUTION: Properly type the state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -65,7 +68,7 @@ const NotificationCenter = () => {
   // ✅ SOLUTION: Add mark as read functionality
   const markAsRead = async (notificationId: string) => {
     try {
-      await postData(`/notification/${notificationId}/read`, {});
+      await patchData(`/notification/${notificationId}/read`, {});
       
       // Update local state
       setNotifications(notifications.map(n => 
@@ -80,13 +83,69 @@ const NotificationCenter = () => {
   // ✅ SOLUTION: Add mark all as read functionality
   const markAllAsRead = async () => {
     try {
-      await postData('/notification/read-all', {});
+      await patchData('/notification/read-all', {});
       
       // Update local state
       setNotifications(notifications.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  // Enhanced navigation function for notifications
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if unread
+    if (!notification.isRead) {
+      await markAsRead(notification._id);
+    }
+
+    // Close notification panel
+    setIsOpen(false);
+
+    // Navigate based on notification data
+    const { data } = notification;
+    let targetPath = '';
+    let targetElement = '';
+
+    if (data.workspaceId && data.projectId && data.taskId) {
+      // Task-related notification
+      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+      targetElement = `task-${data.taskId}`;
+    } else if (data.workspaceId && data.projectId) {
+      // Project-related notification
+      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+    } else if (data.workspaceId) {
+      // Workspace-related notification
+      targetPath = `/workspace/${data.workspaceId}`;
+    } else if (data.inviteId) {
+      // Invite-related notification
+      targetPath = '/invitations';
+    } else {
+      // Default to dashboard
+      targetPath = '/dashboard';
+    }
+
+    // Navigate to the target path
+    navigate(targetPath);
+
+    // Smooth scroll to specific element if specified
+    if (targetElement) {
+      setTimeout(() => {
+        const element = document.getElementById(targetElement);
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+          // Add a subtle highlight effect
+          element.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          }, 3000);
+        }
+      }, 100);
     }
   };
 
@@ -184,10 +243,12 @@ const NotificationCenter = () => {
               notifications.slice(0, 10).map((notification) => (
                 <div
                   key={notification._id}
-                  className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                    !notification.isRead ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                  className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
+                    !notification.isRead 
+                      ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100 shadow-sm' 
+                      : 'bg-gray-50 border-l-4 border-l-gray-300 hover:bg-gray-100 opacity-75'
                   }`}
-                  onClick={() => !notification.isRead && markAsRead(notification._id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start space-x-3">
                     {/* Icon */}

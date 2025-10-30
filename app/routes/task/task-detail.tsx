@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
-import { fetchData, postData } from "@/lib/fetch-util";
+import { fetchData, postData, postMultipart } from "@/lib/fetch-util";
 import { buildApiUrl, buildBackendUrl } from "@/lib/config";
 import {
   ArrowLeft,
@@ -24,6 +24,10 @@ import {
   File,
   Image,
   Download,
+  Paperclip,
+  Smile,
+  MoreVertical,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +57,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { format, isToday, isYesterday, isSameDay } from "date-fns";
 
 interface Task {
   _id: string;
@@ -80,6 +84,13 @@ interface Task {
   createdAt: string;
   completedAt?: string;
   handoverNotes?: string;
+  handoverAttachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: "image" | "document";
+    fileSize: number;
+    mimeType: string;
+  }>;
   workspace?: string;
 }
 
@@ -115,6 +126,7 @@ interface Comment {
   updatedAt: string;
   replyCount?: number;
   hasReplies?: boolean;
+  replies?: Comment[];
 }
 
 interface CommentsResponse {
@@ -125,6 +137,22 @@ interface CommentsResponse {
     totalCount: number;
   };
 }
+
+// Helper function to format date header
+const getDateHeader = (date: Date): string => {
+  if (isToday(date)) {
+    return "Today";
+  } else if (isYesterday(date)) {
+    return "Yesterday";
+  } else {
+    return format(date, "MMMM d, yyyy");
+  }
+};
+
+// Helper function to format message timestamp
+const formatMessageTime = (dateString: string): string => {
+  return format(new Date(dateString), "h:mm a");
+};
 
 // File Upload Component
 const FileUpload: React.FC<{
@@ -201,19 +229,23 @@ const FileUpload: React.FC<{
           {selectedFiles.map((file, index) => (
             <div
               key={index}
-              className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm"
             >
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 {isImage(file) ? (
-                  <Image className="w-4 h-4 text-blue-500" />
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Image className="w-4 h-4 text-blue-600" />
+                  </div>
                 ) : (
-                  <File className="w-4 h-4 text-gray-500" />
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <File className="w-4 h-4 text-gray-600" />
+                  </div>
                 )}
                 <div>
-                  <span className="text-sm font-medium">{file.name}</span>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                  <div className="text-xs text-gray-500">
                     {formatFileSize(file.size)}
-                  </span>
+                  </div>
                 </div>
               </div>
               <Button
@@ -221,7 +253,7 @@ const FileUpload: React.FC<{
                 variant="ghost"
                 size="sm"
                 onClick={() => removeFile(index)}
-                className="p-1 h-auto"
+                className="p-1 h-auto text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -242,13 +274,13 @@ const FileUpload: React.FC<{
       {selectedFiles.length < maxFiles && (
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="w-full h-8 text-xs"
+          className="w-10 h-10 rounded-full p-0 text-gray-500 hover:text-blue-600 hover:bg-gray-100 transition-colors duration-200"
+          aria-label="Attach files"
         >
-          <Upload className="w-3 h-3 mr-1" />
-          Attach Files ({selectedFiles.length}/{maxFiles})
+          <Paperclip className="w-5 h-5" />
         </Button>
       )}
     </div>
@@ -278,13 +310,59 @@ const FilePreview: React.FC<{
     return "📁";
   };
 
-  const downloadFile = (attachment: any) => {
-    const link = document.createElement("a");
-    link.href = buildBackendUrl(attachment.fileUrl);
-    link.download = attachment.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadFile = async (attachment: any) => {
+    try {
+      // Fetch the file with proper headers to force download
+      const response = await fetch(buildBackendUrl(attachment.fileUrl), {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
+      // Get the file as a blob
+      const blob = await response.blob();
+      
+      // Create a blob URL with the correct MIME type for forced download
+      const blobUrl = URL.createObjectURL(new Blob([blob], { 
+        type: 'application/octet-stream' // Force download by using generic binary type
+      }));
+
+      // Create and trigger download link
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = attachment.fileName;
+      link.style.display = "none";
+      
+      // Add to DOM, click, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL to free memory
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      
+    } catch (error) {
+      console.error("Download failed:", error);
+      // Fallback to the original method if fetch fails
+      const link = document.createElement("a");
+      link.href = buildBackendUrl(attachment.fileUrl);
+      link.download = attachment.fileName;
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const openFile = (attachment: any) => {
+    const fileUrl = buildBackendUrl(attachment.fileUrl);
+    window.open(fileUrl, '_blank');
   };
 
   if (!attachments || attachments.length === 0) return null;
@@ -320,14 +398,26 @@ const FilePreview: React.FC<{
                   </div>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => downloadFile(attachment)}
-                className="h-6 px-2"
-              >
-                <Download className="w-3 h-3" />
-              </Button>
+              <div className="flex items-center space-x-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openFile(attachment)}
+                  className="h-6 px-2"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadFile(attachment)}
+                  className="h-6 px-2"
+                  title="Download file"
+                >
+                  <Download className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -354,39 +444,29 @@ const FilePreview: React.FC<{
   );
 };
 
-// Chat Message Component
-const ChatMessage: React.FC<{
+// WhatsApp-style Chat Message Component (Group Style)
+const ChatMessage = React.memo<{
   comment: Comment;
   currentUser: any;
   canReply: boolean;
   canEdit: boolean;
   canDelete: boolean;
-  replies?: Comment[];
-  isExpanded?: boolean;
   onReply: (comment: Comment) => void;
   onEdit: (commentId: string, content: string) => void;
   onDelete: (commentId: string) => void;
-  onToggleExpand: (commentId: string) => void;
-  onLoadReplies?: (commentId: string) => void;
-}> = ({
+}>(({
   comment,
   currentUser,
   canReply,
   canEdit,
   canDelete,
-  replies = [],
-  isExpanded = false,
   onReply,
   onEdit,
   onDelete,
-  onToggleExpand,
-  onLoadReplies,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
-
-  const isOwnMessage = comment.author._id === currentUser._id;
-  const hasReplies = (comment.replyCount ?? 0) > 0;
+  const isOwnMessage = currentUser && comment.author._id === currentUser._id;
 
   const handleEdit = () => {
     if (editContent.trim() && editContent !== comment.content) {
@@ -400,149 +480,156 @@ const ChatMessage: React.FC<{
     setIsEditing(false);
   };
 
-  const handleToggleExpand = () => {
-    if (hasReplies && !isExpanded && replies.length === 0 && onLoadReplies) {
-      onLoadReplies(comment._id);
-    }
-    onToggleExpand(comment._id);
-  };
-
   return (
-    <div className="group">
-      <div
-        className={`flex space-x-2 p-2 rounded hover:bg-gray-50 ${
-          isOwnMessage ? "bg-blue-50" : "bg-white"
-        }`}
-      >
-        <Avatar className="w-6 h-6 flex-shrink-0 mt-1">
-          <AvatarFallback className="text-xs">
-            {comment.author.name.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+    <div className="mb-1">
+      <div className="group px-3 py-1 hover:bg-gray-100/50 transition-colors">
+        {/* WhatsApp Group Style: Always show left-aligned with avatar */}
+        <div className="flex items-start space-x-2">
+          {/* Avatar - Always on left in group style */}
+          <Avatar className="w-8 h-8 flex-shrink-0 mt-1">
+            <AvatarImage src={comment.author.avatar} />
+            <AvatarFallback className="text-xs bg-gray-500 text-white">
+              {comment.author.name.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="font-medium text-xs">{comment.author.name}</span>
-            <span className="text-xs text-gray-500">
-              {formatDistanceToNow(new Date(comment.createdAt), {
-                addSuffix: true,
-              })}
-              {comment.isEdited && <span className="ml-1">(edited)</span>}
-            </span>
-          </div>
-
-          {comment.parentComment && (
-            <div className="mb-2 p-2 bg-gray-100 rounded border-l-2 border-gray-300">
-              <div className="text-xs text-gray-600">
-                Replying to{" "}
-                <span className="font-medium">
-                  {comment.parentComment.author.name}
+          {/* Message Content */}
+          <div className="flex-1 min-w-0">
+            {/* Message bubble */}
+            <div
+              className={`rounded-lg shadow-sm px-3 py-2 ${
+                isOwnMessage
+                  ? "bg-blue-100 border border-blue-200"
+                  : "bg-white border border-gray-200"
+              }`}
+            >
+              {/* Author name and time - WhatsApp group style */}
+              <div className="flex items-baseline justify-between mb-1">
+                <span className={`text-xs font-semibold ${
+                  isOwnMessage ? "text-blue-700" : "text-gray-700"
+                }`}>
+                  {comment.author.name}
+                </span>
+                <span className="text-xs text-gray-500 ml-2">
+                  {formatMessageTime(comment.createdAt)}
                 </span>
               </div>
-              <div className="text-xs text-gray-700 truncate">
-                {comment.parentComment.content.length > 30
-                  ? `${comment.parentComment.content.substring(0, 30)}...`
-                  : comment.parentComment.content}
-              </div>
-            </div>
-          )}
 
-          {isEditing ? (
-            <div className="mb-2">
-              <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="text-xs p-2 border rounded resize-none"
-                rows={2}
-              />
-              <div className="flex space-x-2 mt-1">
+              {/* Reply indicator */}
+              {comment.parentComment && (
+                <div className={`mb-2 p-2 rounded border-l-4 text-xs ${
+                  isOwnMessage
+                    ? "bg-blue-50 border-blue-400"
+                    : "bg-gray-50 border-gray-400"
+                }`}>
+                  <div className="text-gray-600 font-medium mb-1 flex items-center">
+                    <Reply className="w-3 h-3 inline mr-1" />
+                    {comment.parentComment.author.name}
+                  </div>
+                  <div className="text-gray-700 italic line-clamp-2">
+                    {comment.parentComment.content}
+                  </div>
+                </div>
+              )}
+
+              {/* Message content */}
+              {isEditing ? (
+                <div>
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="text-sm p-2 border border-gray-300 rounded resize-none mb-2"
+                    rows={3}
+                    placeholder="Edit your message..."
+                  />
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      onClick={handleEdit}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-900">
+                    {comment.content}
+                  </div>
+
+                  {/* Attachments */}
+                  {comment.attachments && comment.attachments.length > 0 && (
+                    <div className="mt-2">
+                      <FilePreview attachments={comment.attachments} />
+                    </div>
+                  )}
+
+                  {/* Status indicators */}
+                  <div className="flex items-center justify-end mt-1">
+                    {comment.isEdited && (
+                      <span className="text-xs text-gray-400 italic mr-1">edited</span>
+                    )}
+                    {isOwnMessage && (
+                      <CheckCircle className="w-3 h-3 text-blue-500" />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Action buttons - WhatsApp style */}
+            <div className="flex items-center space-x-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {canReply && (
                 <Button
                   size="sm"
-                  onClick={handleEdit}
-                  className="h-6 px-2 text-xs"
+                  variant="ghost"
+                  onClick={() => onReply(comment)}
+                  className="h-6 px-2 text-xs text-gray-600"
                 >
-                  Save
+                  <Reply className="w-3 h-3 mr-1" />
+                  Reply
                 </Button>
+              )}
+              {canEdit && isOwnMessage && !isEditing && (
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={handleCancelEdit}
-                  className="h-6 px-2 text-xs"
+                  variant="ghost"
+                  onClick={() => setIsEditing(true)}
+                  className="h-6 px-2 text-xs text-gray-600"
                 >
-                  Cancel
+                  <Edit3 className="w-3 h-3 mr-1" />
+                  Edit
                 </Button>
-              </div>
+              )}
+              {canDelete && isOwnMessage && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onDelete(comment._id)}
+                  className="h-6 px-2 text-xs text-red-600"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Delete
+                </Button>
+              )}
             </div>
-          ) : (
-            <div className="text-xs text-gray-900 mb-1 whitespace-pre-wrap">
-              {comment.content}
-            </div>
-          )}
-
-          {comment.attachments && comment.attachments.length > 0 && (
-            <FilePreview attachments={comment.attachments} />
-          )}
-
-          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            {canReply && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onReply(comment)}
-                className="text-xs h-5 px-1"
-              >
-                <Reply className="w-3 h-3 mr-1" />
-                Reply
-              </Button>
-            )}
-            {canEdit && isOwnMessage && !isEditing && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                className="text-xs h-5 px-1"
-              >
-                <Edit3 className="w-3 h-3 mr-1" />
-                Edit
-              </Button>
-            )}
-            {canDelete && isOwnMessage && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onDelete(comment._id)}
-                className="text-xs h-5 px-1 text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Delete
-              </Button>
-            )}
           </div>
-
-          {hasReplies && (
-  <div className="mt-1">
-    <Button
-      size="sm"
-      variant="ghost"
-      onClick={handleToggleExpand}
-      className="text-xs h-5 px-1 text-blue-600 hover:text-blue-700"
-    >
-      {isExpanded ? (
-        <ChevronDown className="w-3 h-3 mr-1" />
-      ) : (
-        <ChevronRight className="w-3 h-3 mr-1" />
-      )}
-      {comment.replyCount} {comment.replyCount === 1 ? 'reply' : 'replies'}
-    </Button>
-  </div>
-)}
-
         </div>
       </div>
 
-      {hasReplies && isExpanded && (
-        <div className="ml-8 mt-1 space-y-1 border-l-2 border-gray-200 pl-2">
-          {replies.map((reply) => (
+      {/* Display replies - indented WhatsApp style */}
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="ml-12 mt-1 border-l-2 border-gray-200 pl-2">
+          {comment.replies.map((reply) => (
             <ChatMessage
               key={reply._id}
               comment={reply}
@@ -553,11 +640,23 @@ const ChatMessage: React.FC<{
               onReply={onReply}
               onEdit={onEdit}
               onDelete={onDelete}
-              onToggleExpand={() => {}}
             />
           ))}
         </div>
       )}
+    </div>
+  );
+});
+
+ChatMessage.displayName = "ChatMessage";
+
+// Date Header Component
+const DateHeader: React.FC<{ date: Date }> = ({ date }) => {
+  return (
+    <div className="flex justify-center my-3">
+      <div className="bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1 rounded-lg shadow-sm">
+        {getDateHeader(date)}
+      </div>
     </div>
   );
 };
@@ -572,20 +671,85 @@ const TaskDetail = () => {
   const [newComment, setNewComment] = useState("");
   const [handoverNotes, setHandoverNotes] = useState("");
   const [loading, setLoading] = useState(true);
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [editingComment, setEditingComment] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
   const [savingHandover, setSavingHandover] = useState(false);
+  const [handoverFiles, setHandoverFiles] = useState<File[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Comments loading and error states
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
 
   // New chat-related states
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
-  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(
-    new Set()
-  );
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [replies, setReplies] = useState<Record<string, Comment[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Organize comments with their replies
+  const commentsWithReplies = useMemo(() => {
+    const commentMap = new Map<string, Comment>();
+    const topLevel: Comment[] = [];
+
+    // First pass: create a map of all comments
+    comments.forEach((comment) => {
+      commentMap.set(comment._id, { ...comment, replies: [] });
+    });
+
+    // Second pass: organize into parent-child relationships
+    comments.forEach((comment) => {
+      const commentWithReplies = commentMap.get(comment._id)!;
+      
+      const parentId = comment.parentComment 
+        ? (typeof comment.parentComment === 'string' 
+            ? comment.parentComment 
+            : comment.parentComment._id)
+        : null;
+      
+      if (parentId) {
+        const parent = commentMap.get(parentId);
+        if (parent) {
+          if (!parent.replies) parent.replies = [];
+          parent.replies.push(commentWithReplies);
+        }
+      } else {
+        topLevel.push(commentWithReplies);
+      }
+    });
+
+    // Sort replies by creation date (oldest first)
+    const sortReplies = (comment: Comment) => {
+      if (comment.replies && comment.replies.length > 0) {
+        comment.replies.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        comment.replies.forEach(sortReplies);
+      }
+    };
+
+    topLevel.forEach(sortReplies);
+
+    return topLevel;
+  }, [comments]);
+
+  // Group top-level comments with replies by date
+  const groupedCommentsWithReplies = useMemo(() => {
+    const groups: { date: Date; comments: Comment[] }[] = [];
+    
+    commentsWithReplies.forEach((comment) => {
+      const commentDate = new Date(comment.createdAt);
+      const existingGroup = groups.find((group) =>
+        isSameDay(group.date, commentDate)
+      );
+
+      if (existingGroup) {
+        existingGroup.comments.push(comment);
+      } else {
+        groups.push({
+          date: commentDate,
+          comments: [comment],
+        });
+      }
+    });
+
+    return groups;
+  }, [commentsWithReplies]);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -635,18 +799,13 @@ const TaskDetail = () => {
     }
 
     try {
-      console.log("Fetching task details for ID:", taskId);
-      // Use direct fetch instead of fetchData for better error handling
-      const response = await fetch(
-        buildApiUrl(`/task/${taskId}`),
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
-          },
-        }
-      );
+      const response = await fetch(buildApiUrl(`/task/${taskId}`), {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -676,41 +835,67 @@ const TaskDetail = () => {
   };
 
   const fetchComments = async () => {
+    setLoadingComments(true);
+    setCommentsError(null);
+
     try {
-      console.log("Fetching comments for task:", taskId);
-      const response = await fetch(
-        buildApiUrl(`/comment/task/${taskId}`),
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
-          },
-        }
-      );
+      const response = await fetch(buildApiUrl(`/comments/task/${taskId}`), {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Comments fetched:", data);
-        setComments(data.comments || []);
+        const topLevelComments = data.comments || [];
+        
+        const allComments = [...topLevelComments];
+        
+        for (const comment of topLevelComments) {
+          if (comment.hasReplies && comment.replyCount > 0) {
+            try {
+              const repliesResponse = await fetch(buildApiUrl(`/comments/${comment._id}/replies`), {
+                credentials: "include",
+                headers: {
+                  "Accept": "application/json",
+                  "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+                },
+              });
+              
+              if (repliesResponse.ok) {
+                const repliesData = await repliesResponse.json();
+                allComments.push(...(repliesData.replies || []));
+              }
+            } catch (replyError) {
+              console.error(`Failed to fetch replies for comment ${comment._id}:`, replyError);
+            }
+          }
+        }
+        
+        setComments(allComments);
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.message || `Failed to load comments (${response.status})`;
+        setCommentsError(errorMessage);
         console.error(
           "Failed to fetch comments:",
           response.status,
-          response.statusText
+          response.statusText,
+          errorData
         );
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Error details:", errorData);
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load comments";
+      setCommentsError(errorMessage);
       console.error("Failed to fetch comments:", error);
+    } finally {
+      setLoadingComments(false);
     }
   };
-
-  // In the TaskDetail component, add after fetchComments:
-  useEffect(() => {
-    console.log("Comments state updated:", comments);
-    console.log("Comments length:", comments?.length);
-  }, [comments]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
@@ -730,9 +915,13 @@ const TaskDetail = () => {
 
     try {
       setSavingHandover(true);
-      await postData(`/task/${task._id}/handover`, { handoverNotes });
+      const formData = new FormData();
+      formData.append("handoverNotes", handoverNotes || "");
+      handoverFiles.forEach((file) => formData.append("attachments", file));
+      await postMultipart(`/task/${task._id}/handover`, formData);
+      await fetchTaskDetails();
+      setHandoverFiles([]);
       toast.success("Handover notes saved successfully");
-      setTask({ ...task, handoverNotes });
     } catch (error) {
       console.error("Failed to save handover notes:", error);
       toast.error("Failed to save handover notes");
@@ -743,71 +932,54 @@ const TaskDetail = () => {
 
   // Chat functions
   const canComment = () => {
-    if (!currentUser || !task) return false;
-    return task.assignee._id === currentUser._id;
+    if (!activeUser || !task) {
+      return false;
+    }
+
+    const activeUserId = activeUser._id || activeUser.id;
+    return task.assignee._id === activeUserId;
   };
 
   const canReply = () => {
-    if (!currentUser) return false;
-    if (["super_admin", "admin"].includes(currentUser.role)) return true;
-    if (task?.assignee._id === currentUser._id) return true;
-
-    if (currentUser.workspaces?.length > 0) {
-      const workspace = currentUser.workspaces.find(
-        (ws: any) => ws.workspace.toString() === task?.workspace?.toString()
-      );
-      if (workspace?.role === "lead") return true;
+    if (!activeUser) {
+      return false;
     }
 
+    if (["super_admin", "admin"].includes(activeUser.role)) {
+      return true;
+    }
+
+    const activeUserId = activeUser._id || activeUser.id;
+    if (task?.assignee._id === activeUserId) {
+      return true;
+    }
+
+    if (activeUser.workspaces?.length > 0) {
+      const workspace = activeUser.workspaces.find(
+        (ws: any) => ws.workspace.toString() === task?.workspace?.toString()
+      );
+      if (workspace?.role === "lead") {
+        return true;
+      }
+    }
     return false;
   };
 
-  const handleReply = (comment: Comment) => {
-    if (!canReply()) return;
-    setReplyingTo(comment);
-    setTimeout(() => {
-      document.getElementById("comment-input")?.focus();
-    }, 100);
-  };
+  const handleReply = useCallback(
+    (comment: Comment) => {
+      if (!canReply()) return;
+      setReplyingTo(comment);
+      setTimeout(() => {
+        document.getElementById("comment-input")?.focus();
+      }, 100);
+    },
+    []
+  );
 
-  const cancelReply = () => {
+  const cancelReply = useCallback(() => {
     setReplyingTo(null);
     setSelectedFiles([]);
-  };
-
-  const toggleThread = (commentId: string) => {
-    const newExpanded = new Set(expandedThreads);
-    if (newExpanded.has(commentId)) {
-      newExpanded.delete(commentId);
-    } else {
-      newExpanded.add(commentId);
-    }
-    setExpandedThreads(newExpanded);
-  };
-
-  const loadReplies = async (commentId: string) => {
-    try {
-      const response = await fetch(
-        buildApiUrl(`/comment/${commentId}/replies`),
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setReplies((prev) => ({
-          ...prev,
-          [commentId]: data.replies,
-        }));
-      }
-    } catch (error) {
-      console.error("Error loading replies:", error);
-    }
-  };
+  }, []);
 
   const handleSubmitComment = async () => {
     if (!newComment.trim() && selectedFiles.length === 0) return;
@@ -827,11 +999,11 @@ const TaskDetail = () => {
         formData.append("attachments", file);
       });
 
-      const response = await fetch(buildApiUrl(`/comment`), {
+      const response = await fetch(buildApiUrl(`/comments`), {
         method: "POST",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "workspace-id": localStorage.getItem("currentWorkspace") || "",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
         },
         body: formData,
       });
@@ -860,18 +1032,15 @@ const TaskDetail = () => {
 
   const handleEditComment = async (commentId: string, content: string) => {
     try {
-      const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
-          },
-          body: JSON.stringify({ content }),
-        }
-      );
+      const response = await fetch(buildApiUrl(`/comments/${commentId}`), {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+        body: JSON.stringify({ content }),
+      });
 
       if (response.ok) {
         fetchComments();
@@ -890,16 +1059,13 @@ const TaskDetail = () => {
     if (!confirm("Are you sure you want to delete this comment?")) return;
 
     try {
-      const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
-          },
-        }
-      );
+      const response = await fetch(buildApiUrl(`/comments/${commentId}`), {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+      });
 
       if (response.ok) {
         fetchComments();
@@ -910,70 +1076,6 @@ const TaskDetail = () => {
       }
     } catch (error) {
       console.error("Error deleting comment:", error);
-      toast.error("Failed to delete comment");
-    }
-  };
-
-  // Keep existing comment functions for backward compatibility
-  const handleSubmitCommentOld = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    try {
-      setSubmittingComment(true);
-      await postData(`/comment/task/${taskId}`, { content: newComment });
-      setNewComment("");
-      await fetchComments();
-      toast.success("Comment added");
-    } catch (error) {
-      console.error("Failed to add comment:", error);
-      toast.error("Failed to add comment");
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
-
-  const handleEditCommentOld = async (commentId: string) => {
-    if (!editContent.trim()) return;
-
-    try {
-      await postData(`/comment/${commentId}`, {
-        content: editContent,
-        method: "PUT",
-      });
-      setEditingComment(null);
-      setEditContent("");
-      await fetchComments();
-      toast.success("Comment updated");
-    } catch (error) {
-      console.error("Failed to update comment:", error);
-      toast.error("Failed to update comment");
-    }
-  };
-
-  const handleDeleteCommentOld = async (commentId: string) => {
-    if (!window.confirm("Are you sure you want to delete this comment?")) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        await fetchComments();
-        toast.success("Comment deleted");
-      }
-    } catch (error) {
-      console.error("Failed to delete comment:", error);
       toast.error("Failed to delete comment");
     }
   };
@@ -993,15 +1095,6 @@ const TaskDetail = () => {
       month: "numeric",
       day: "numeric",
       year: "numeric",
-    });
-  };
-
-  const formatCommentTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
     });
   };
 
@@ -1200,6 +1293,20 @@ const TaskDetail = () => {
                   className="min-h-32"
                   disabled={savingHandover}
                 />
+                <div className="mt-3">
+                  <FileUpload
+                    selectedFiles={handoverFiles}
+                    onFilesSelect={setHandoverFiles}
+                  />
+                </div>
+                {task?.handoverAttachments &&
+                  (task.handoverAttachments as any).length > 0 && (
+                    <div className="mt-4">
+                      <FilePreview
+                        attachments={task.handoverAttachments as any}
+                      />
+                    </div>
+                  )}
                 <div className="flex justify-end mt-3">
                   <Button
                     size="sm"
@@ -1220,103 +1327,115 @@ const TaskDetail = () => {
             </Card>
           </div>
 
-          {/* Enhanced Chat Section */}
+          {/* WhatsApp Group Style Chat Section */}
           <div className="lg:col-span-1">
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="w-5 h-5" />
-                  <span>Task Chat</span>
+            <Card className="h-fit shadow-lg">
+              <CardHeader className="pb-3 bg-gray-100 border-b">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <MessageSquare className="w-5 h-5" />
+                    <span>Task Chat</span>
+                  </div>
                   {comments.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
+                    <Badge variant="secondary">
                       {comments.length}
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  {comments.length === 0 &&
-                    canComment() &&
-                    "Start the conversation"}
-                  {comments.length === 0 &&
-                    !canComment() &&
-                    "Only the task assignee can start the conversation"}
-                  {comments.length > 0 &&
-                    `${comments.length} message${comments.length === 1 ? "" : "s"}`}
-                </CardDescription>
               </CardHeader>
 
-              <CardContent className="p-0">
-                <ScrollArea className="h-80 px-4">
-                  {comments.length === 0 ? (
-                    <div className="py-8 text-center text-gray-500">
-                      <div className="text-4xl mb-4">💬</div>
-                      <p className="text-xs">
+              <CardContent className="p-0 bg-white">
+                <ScrollArea className="h-96">
+                  {loadingComments ? (
+                    <div className="py-12 text-center">
+                      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-sm text-gray-600">Loading messages...</p>
+                    </div>
+                  ) : commentsError ? (
+                    <div className="py-12 text-center">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                      <p className="text-sm text-red-600 mb-2">
+                        Failed to load messages
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fetchComments()}
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : comments.length === 0 ? (
+                    <div className="py-12 text-center px-4">
+                      <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="text-sm text-gray-600">
                         {canComment()
-                          ? "Start the conversation by posting the first message"
-                          : "Waiting for the task assignee to start the conversation"}
+                          ? "No messages yet. Start the conversation!"
+                          : "No messages yet."}
                       </p>
                     </div>
                   ) : (
-                    <div className="py-4 space-y-1">
-                      {comments && comments.length > 0 ? (
-                        comments.map((comment) => (
-                          <ChatMessage
-                            key={comment._id}
-                            comment={comment}
-                            currentUser={activeUser}
-                            canReply={canReply()}
-                            canEdit={canReply()}
-                            canDelete={canReply()}
-                            replies={replies[comment._id] || []}
-                            isExpanded={expandedThreads.has(comment._id)}
-                            onReply={handleReply}
-                            onEdit={handleEditComment}
-                            onDelete={handleDeleteComment}
-                            onToggleExpand={toggleThread}
-                            onLoadReplies={loadReplies}
-                          />
-                        ))
-                      ) : (
-                        <div className="py-4 text-center text-gray-500">
-                          <p className="text-xs">No comments available</p>
+                    <div className="py-2">
+                      {groupedCommentsWithReplies.map((group, groupIndex) => (
+                        <div key={groupIndex}>
+                          <DateHeader date={group.date} />
+                          {group.comments.map((comment) => (
+                            <ChatMessage
+                              key={comment._id}
+                              comment={comment}
+                              currentUser={activeUser}
+                              canReply={canReply()}
+                              canEdit={canReply()}
+                              canDelete={canReply()}
+                              onReply={handleReply}
+                              onEdit={handleEditComment}
+                              onDelete={handleDeleteComment}
+                            />
+                          ))}
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
                 </ScrollArea>
 
-                <Separator />
-
-                {/* Message Input */}
+                {/* Message input */}
                 {(comments.length === 0 ? canComment() : canReply()) && (
-                  <div className="p-3 bg-gray-50">
-                    {/* Reply Indicator */}
+                  <div className="p-3 bg-gray-50 border-t">
                     {replyingTo && (
-                      <div className="mb-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                      <div className="mb-3 p-3 bg-white border border-gray-200 rounded-lg">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-xs font-medium text-blue-900">
-                              Replying to {replyingTo.author.name}
-                            </div>
-                            <div className="text-xs text-blue-700 mt-1 line-clamp-2">
-                              {replyingTo.content}
+                          <div className="flex items-center space-x-2">
+                            <Reply className="w-4 h-4 text-blue-600" />
+                            <div className="text-sm text-gray-700">
+                              Replying to{" "}
+                              <span className="font-semibold">
+                                {replyingTo.author.name}
+                              </span>
                             </div>
                           </div>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={cancelReply}
-                            className="p-1 h-auto text-blue-600 hover:text-blue-800"
+                            className="p-1 h-auto"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-4 h-4" />
                           </Button>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600 italic">
+                          "{replyingTo.content.length > 60
+                            ? `${replyingTo.content.substring(0, 60)}...`
+                            : replyingTo.content}"
                         </div>
                       </div>
                     )}
 
-                    {/* File Upload */}
-                    {selectedFiles.length > 0 || replyingTo ? (
-                      <div className="mb-2">
+                    {selectedFiles.length > 0 && (
+                      <div className="mb-3 p-3 bg-white border border-gray-200 rounded-lg">
+                        <div className="text-sm font-medium text-gray-700 mb-2">
+                          <Upload className="w-4 h-4 inline mr-1" />
+                          Attachments ({selectedFiles.length})
+                        </div>
                         <FileUpload
                           selectedFiles={selectedFiles}
                           onFilesSelect={setSelectedFiles}
@@ -1324,17 +1443,19 @@ const TaskDetail = () => {
                           maxFileSize={5}
                         />
                       </div>
-                    ) : null}
+                    )}
 
-                    {/* Message Input */}
-                    <div className="flex space-x-2">
-                      <Avatar className="w-6 h-6 flex-shrink-0">
-                        <AvatarFallback className="text-xs">
-                          {activeUser?.name?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                    <div className="flex items-end space-x-2">
+                      <div className="flex-shrink-0">
+                        <FileUpload
+                          selectedFiles={selectedFiles}
+                          onFilesSelect={setSelectedFiles}
+                          maxFiles={3}
+                          maxFileSize={5}
+                        />
+                      </div>
 
-                      <div className="flex-1">
+                      <div className="flex-1 bg-white rounded-lg border border-gray-300">
                         <Textarea
                           id="comment-input"
                           value={newComment}
@@ -1344,8 +1465,8 @@ const TaskDetail = () => {
                               ? "Type your reply..."
                               : "Type a message..."
                           }
-                          className="text-xs p-2 border border-gray-300 rounded resize-none"
-                          rows={2}
+                          className="border-0 resize-none focus:ring-0 min-h-[40px] max-h-[120px] text-sm"
+                          rows={1}
                           onKeyPress={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
@@ -1353,35 +1474,24 @@ const TaskDetail = () => {
                             }
                           }}
                         />
+                      </div>
 
-                        <div className="flex items-center justify-between mt-1">
-                          <FileUpload
-                            selectedFiles={selectedFiles}
-                            onFilesSelect={setSelectedFiles}
-                            maxFiles={3}
-                            maxFileSize={5}
-                          />
-
-                          <Button
-                            onClick={handleSubmitComment}
-                            disabled={
-                              isSubmitting ||
-                              (!newComment.trim() && selectedFiles.length === 0)
-                            }
-                            size="sm"
-                            className="ml-2 h-6 px-3"
-                          >
-                            {isSubmitting ? (
-                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Send className="w-3 h-3" />
-                            )}
-                          </Button>
-                        </div>
-
-                        <div className="text-xs text-gray-500 mt-1">
-                          Press Enter to send, Shift+Enter for new line
-                        </div>
+                      <div className="flex-shrink-0">
+                        <Button
+                          onClick={handleSubmitComment}
+                          disabled={
+                            isSubmitting ||
+                            (!newComment.trim() && selectedFiles.length === 0)
+                          }
+                          size="sm"
+                          className="w-12 h-12 rounded-full p-0"
+                        >
+                          {isSubmitting ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Send className="w-5 h-5" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>

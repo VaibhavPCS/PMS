@@ -6,8 +6,8 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "dev:https": "react-router dev --https",
-    "start": "npx serve build/client -s",
-    "start:https": "npx serve build/client -s --ssl-cert ../PMS_BACKEND/certs/server.crt --ssl-key ../PMS_BACKEND/certs/server.key",
+    "start": "npx serve build/client -s -l 2000",
+    "start:https": "npx serve build/client -s -l 2000 --ssl-cert ../PMS_BACKEND/certs/server.crt --ssl-key ../PMS_BACKEND/certs/server.key",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
@@ -45,11 +45,13 @@
     "react-hook-form": "^7.63.0",
     "react-router": "^7.9.2",
     "recharts": "^2.15.4",
+    "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
     "@react-router/dev": "^7.9.2",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/eslint-plugin-query": "^5.91.0",

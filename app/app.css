@@ -133,13 +133,13 @@ body {
   }
 }
 
-/* Add to your CSS file */
+/* Radix UI z-index hierarchy */
 [data-radix-portal] {
-  z-index: 9999 !important;
+  z-index: 50 !important;
 }
 
 [role="dialog"] {
-  z-index: 10000 !important;
+  z-index: 60 !important;
   position: fixed !important;
 }
 
@@ -147,5 +147,11 @@ body {
   position: fixed !important;
   inset: 0 !important;
   background-color: rgba(0, 0, 0, 0.5) !important;
-  z-index: 9998 !important;
+  z-index: 50 !important;
+}
+
+/* Ensure dropdown and select content appear above dialogs */
+[data-slot="dropdown-menu-content"],
+[data-slot="select-content"] {
+  z-index: 70 !important;
 }

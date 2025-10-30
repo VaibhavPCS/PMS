@@ -1,0 +1,3 @@
+# Netlify/Vercel redirects for SPA
+# This ensures all routes serve index.html
+/*    /index.html   200

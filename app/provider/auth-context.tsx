@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import type { User } from '../types/index';
 import { fetchData, postData } from '@/lib/fetch-util';
+import { toast } from 'sonner';
+import { getCurrentPath, isPublicRoute } from '@/lib/route-utils';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({children}: {children: React.ReactNode}) => {
+    const navigate = useNavigate();
     const [user, setUser] = useState<User | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -48,19 +51,19 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     // Check for existing authentication on app startup
     useEffect(() => {
         const checkAuthStatus = async () => {
+            setIsLoading(true);
             setIsInitialized(false);
-            
+
             // Define public routes where we don't need to check auth
-            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = window.location.pathname;
-            
-            // Skip auth check on public routes
-            if (publicRoutes.includes(currentPath)) {
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+
+            // Use hash-aware path detection
+            if (isPublicRoute(publicRoutes)) {
                 setIsLoading(false);
                 setIsInitialized(true);
                 return;
             }
-            
+
             // Try to fetch user info - server will validate HTTP-only cookie
             try {
                 await fetchUserInfo();
@@ -68,9 +71,11 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
                 // If no valid cookie, user is not authenticated
                 setIsAuthenticated(false);
                 setUser(null);
+            } finally {
+                // Ensure loading and initialization states are always updated
+                setIsLoading(false);
+                setIsInitialized(true);
             }
-            setIsLoading(false);
-            setIsInitialized(true);
         };
 
         checkAuthStatus();
@@ -78,11 +83,10 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         // Listen for storage changes (when token is added/removed)
         const handleStorageChange = () => {
             // Define public routes where we don't need to check auth
-            const publicRoutes = ['/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
-            const currentPath = window.location.pathname;
-            
-            // Skip auth check on public routes
-            if (!publicRoutes.includes(currentPath)) {
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+
+            // Skip auth check on public routes using hash-aware detection
+            if (!isPublicRoute(publicRoutes)) {
                 checkAuthStatus();
             }
         };
@@ -93,20 +97,35 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
-            // Navigate to login page
-            window.location.href = '/sign-in';
+            toast.error('Your session has expired. Redirecting to home.');
+
+            // Avoid redirecting away from public routes (like '/')
+            const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
+
+            // Navigate to login page client-side to avoid server 404 on deep links
+            if (!isPublicRoute(publicRoutes)) {
+                navigate('/', { replace: true });
+            }
+        };
+
+        // Show feedback on network-level errors
+        const handleNetworkError = (e: any) => {
+            const message = e?.detail?.message ?? 'A network error occurred';
+            toast.error(`Network error: ${message}`);
         };
 
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('authStateChange', handleStorageChange);
         window.addEventListener('force-logout', handleForceLogout);
+        window.addEventListener('network-error', handleNetworkError as EventListener);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('authStateChange', handleStorageChange);
             window.removeEventListener('force-logout', handleForceLogout);
+            window.removeEventListener('network-error', handleNetworkError as EventListener);
         };
-    }, []);
+    }, [navigate]);
 
     const setAuthenticated = (value: boolean) => {
         setIsAuthenticated(value);
@@ -138,6 +157,8 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         setIsAuthenticated(false);
         setError(null);
         window.dispatchEvent(new Event('authStateChange'));
+        // Navigate to login after logout
+        navigate('/sign-in', { replace: true });
     }
 
     // Force auth check regardless of route (used after login/logout)

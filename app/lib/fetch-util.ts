@@ -5,21 +5,18 @@ import { getApiBaseUrl } from "./config";
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  headers: {
-    "Content-Type": "application/json",
-  },
-  withCredentials: true, // Enable cookies for HTTP-only authentication
+  // Do not set global Content-Type or Cache-Control to avoid unnecessary CORS preflights
+  withCredentials: true,
 });
 
-// ✅ ENHANCED REQUEST INTERCEPTOR
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Remove localStorage token handling - cookies are sent automatically
-  
-  // ✅ ADD WORKSPACE HEADER SUPPORT (Optional - for future use)
   const currentWorkspaceId = localStorage.getItem("currentWorkspaceId");
-  if (currentWorkspaceId && config.url?.includes('/workspace/')) {
+  // Always include workspace-id if available to ensure backend context
+  if (currentWorkspaceId) {
     if (config.headers) {
-      config.headers['workspace-id'] = currentWorkspaceId;
+      (config.headers as any)['workspace-id'] = currentWorkspaceId;
+    } else {
+      (config.headers as any) = { 'workspace-id': currentWorkspaceId };
     }
   }
   
@@ -33,35 +30,65 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       window.dispatchEvent(new Event("force-logout"));
     }
+    // Surface network/CORS errors more clearly
+    if (!error.response) {
+      // Axios network error (e.g., CORS/preflight failure, DNS, SSL)
+      window.dispatchEvent(new CustomEvent('network-error', { detail: { message: error.message } }));
+    }
     return Promise.reject(error);
   }
 );
 
 // ✅ ALL API METHODS USING AXIOS
 const postData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.post(url, data);
+  const response = await api.post(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return response.data;
+};
+
+// Multipart/form-data post helper for file uploads
+const postMultipart = async <T = any>(url: string, formData: FormData): Promise<T> => {
+  const response = await api.post(url, formData, {
+    // Let axios/browser set the correct Content-Type with boundary
+    headers: {},
+  });
   return response.data;
 };
 
 const putData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.put(url, data);
+  const response = await api.put(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
 const updateData = async <T = any>(url: string, data: unknown): Promise<T> => {
-  const response = await api.put(url, data);
+  const response = await api.put(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return response.data;
 };
 
 const fetchData = async <T = any>(url: string): Promise<T> => {
-  const response = await api.get<T>(url);
+  const response = await api.get<T>(url, {
+    // Keep GET simple to minimize preflights
+    headers: { 'Accept': 'application/json' },
+  });
   return response.data;
 };
 
 // ✅ CLEAN: Single deleteData function using axios
+const patchData = async <T = any>(url: string, data: unknown = {}): Promise<T> => {
+  const response = await api.patch(url, data, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return response.data;
+};
+
 const deleteData = async <T = any>(url: string): Promise<T> => {
   const response = await api.delete(url);
   return response.data;
 };
 
-export { postData, putData, updateData, fetchData, deleteData };
+export { postData, postMultipart, putData, updateData, patchData, fetchData, deleteData };

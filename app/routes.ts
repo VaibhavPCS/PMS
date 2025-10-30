@@ -22,8 +22,10 @@ export default [
     route("dashboard", "routes/dashboard/dashboard.tsx"),
     route("workspace", "routes/workspace/workspace.tsx"),
     route("tasks", "routes/tasks/tasks.tsx"),
+    route("meetings", "routes/meetings/meetings.tsx"),
     route("members", "routes/members/members.tsx"),
     route("archived", "routes/archived/archived.tsx"),
+    route("chat", "routes/chat/chat.tsx"),
     route("settings", "routes/settings/settings.tsx"),
     // Add project detail route here inside the dashboard layout
     route("project/:id", "routes/project/project-detail.tsx"),

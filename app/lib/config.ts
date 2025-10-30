@@ -1,27 +1,12 @@
-/**
- * Centralized configuration for backend API URLs
- * This ensures all API calls use the same base URL from environment variables
- */
-
-/**
- * Get the backend base URL from environment variables
- * Falls back to localhost:5000 if not configured
- */
 export const getBackendBaseUrl = (): string => {
-  // Always use environment variable if available
   const envApiUrl = import.meta.env.VITE_API_BASE_URL;
-  
   if (envApiUrl) {
     return envApiUrl;
   }
-  
-  // Simple fallback - no automatic protocol switching
+  // return 'https://pms.upda.co.in:5001';
   return 'http://localhost:5000';
 };
 
-/**
- * Get the full API URL with /api-v1 suffix
- */
 export const getApiBaseUrl = (): string => {
   return `${getBackendBaseUrl()}/api-v1`;
 };
