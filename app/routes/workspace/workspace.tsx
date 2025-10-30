@@ -1891,7 +1891,7 @@ const WorkspacePage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showInviteModal} onOpenChange={setShowInviteModal} modal={false}>
+      <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-3">
@@ -2014,7 +2014,7 @@ const WorkspacePage = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showProjectModal} onOpenChange={setShowProjectModal} modal={false}>
+      <Dialog open={showProjectModal} onOpenChange={setShowProjectModal}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-3">

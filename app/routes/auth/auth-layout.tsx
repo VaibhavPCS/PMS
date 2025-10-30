@@ -1,27 +1,43 @@
-import React from 'react'
-import { Navigate, Outlet } from 'react-router'
+import React, { useEffect } from 'react'
+import { Navigate, Outlet, useLocation } from 'react-router'
 
 // @ts-ignore
 import { useAuth } from '../../provider/auth-context';
 
 const AuthLayout = () => {
-  const { isAuthenticated, isLoading, isInitialized } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
-  // Wait for both loading to finish AND initialization to complete
-  if (isLoading || !isInitialized) {
+  // Handle hash routing for auth pages
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const desiredHash = `#${currentPath}`;
+    
+    // Update hash to maintain proper URL structure
+    if (window.location.hash !== desiredHash) {
+      window.history.replaceState(null, '', `${currentPath}${desiredHash}`);
+    }
+  }, [location.pathname]);
+
+  // Show loading state with proper styling
+  if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Authenticating...</p>
         </div>
       </div>
     );
   }
 
-  // Only redirect after initialization is complete
+  // Redirect authenticated users to dashboard with hash
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" />;
+    // Navigate to dashboard and update hash
+    setTimeout(() => {
+      window.history.replaceState(null, '', '/dashboard#/dashboard');
+    }, 0);
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

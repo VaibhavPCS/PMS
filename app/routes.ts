@@ -6,9 +6,11 @@ import {
 } from "@react-router/dev/routes";
 
 export default [
+  // Root redirect route
+  index("routes/root/redirect.tsx"),
+  
   // Auth routes (for non-authenticated users)
   layout("routes/auth/auth-layout.tsx", [
-    index("routes/root/home.tsx"),
     route("sign-in", "routes/auth/sign-in.tsx"),
     route("sign-up", "routes/auth/sign-up.tsx"),
     route("verify-otp", "routes/auth/verify-otp.tsx"),
@@ -25,6 +27,7 @@ export default [
     route("meetings", "routes/meetings/meetings.tsx"),
     route("members", "routes/members/members.tsx"),
     route("archived", "routes/archived/archived.tsx"),
+    route("chat", "routes/chat/chat.tsx"),
     route("settings", "routes/settings/settings.tsx"),
     // Add project detail route here inside the dashboard layout
     route("project/:id", "routes/project/project-detail.tsx"),

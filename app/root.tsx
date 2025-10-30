@@ -69,6 +69,10 @@ export default function App() {
       if (currentPath !== hashPath) {
         navigate(hashPath, { replace: true });
       }
+    } else if (location.pathname === '/' && !hash) {
+      // If we're at the root with no hash, let the redirect component handle it
+      // This ensures proper redirection to /sign-in#/sign-in
+      return;
     }
     // Run only on mount to handle initial page load with hash URLs
     // eslint-disable-next-line react-hooks/exhaustive-deps

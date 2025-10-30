@@ -49,6 +49,9 @@ type Pages = {
   "/archived": {
     params: {};
   };
+  "/chat": {
+    params: {};
+  };
   "/settings": {
     params: {};
   };
@@ -72,15 +75,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/settings" | "/project/:id" | "/task/:id" | "/*";
+    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/*";
+  };
+  "routes/root/redirect.tsx": {
+    id: "routes/root/redirect";
+    page: "/";
   };
   "routes/auth/auth-layout.tsx": {
     id: "routes/auth/auth-layout";
-    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email";
-  };
-  "routes/root/home.tsx": {
-    id: "routes/root/home";
-    page: "/";
+    page: "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email";
   };
   "routes/auth/sign-in.tsx": {
     id: "routes/auth/sign-in";
@@ -108,7 +111,7 @@ type RouteFiles = {
   };
   "components/layout/dashboard-layout.tsx": {
     id: "components/layout/dashboard-layout";
-    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/settings" | "/project/:id" | "/task/:id";
+    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id";
   };
   "routes/dashboard/dashboard.tsx": {
     id: "routes/dashboard/dashboard";
@@ -133,6 +136,10 @@ type RouteFiles = {
   "routes/archived/archived.tsx": {
     id: "routes/archived/archived";
     page: "/archived";
+  };
+  "routes/chat/chat.tsx": {
+    id: "routes/chat/chat";
+    page: "/chat";
   };
   "routes/settings/settings.tsx": {
     id: "routes/settings/settings";

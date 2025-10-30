@@ -916,7 +916,7 @@ const TaskCard = React.memo<{
       </Card>
 
       {/* ✅ NEW: Quick Edit Modal */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal} modal={false}>
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Quick Edit Task</DialogTitle>
@@ -2050,7 +2050,7 @@ const ProjectDetail = () => {
       )}
 
       {/* CREATE TASK MODAL */}
-      <Dialog open={showTaskModal} onOpenChange={setShowTaskModal} modal={false}>
+      <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
         <DialogContent
           className={cn(
             "max-h-[90vh]",

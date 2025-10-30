@@ -10,7 +10,7 @@ const ReactQueryProvider = ({ children }) => {
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
                 {children}
-                <Toaster position='top-right' richColors/>
+                {/* <Toaster position='top-right' richColors/> */}
             </AuthProvider>
         </QueryClientProvider>
     );
