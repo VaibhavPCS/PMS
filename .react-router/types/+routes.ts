@@ -43,6 +43,9 @@ type Pages = {
   "/meetings": {
     params: {};
   };
+  "/meetings": {
+    params: {};
+  };
   "/members": {
     params: {};
   };
@@ -124,6 +127,10 @@ type RouteFiles = {
   "routes/tasks/tasks.tsx": {
     id: "routes/tasks/tasks";
     page: "/tasks";
+  };
+  "routes/meetings/meetings.tsx": {
+    id: "routes/meetings/meetings";
+    page: "/meetings";
   };
   "routes/meetings/meetings.tsx": {
     id: "routes/meetings/meetings";
