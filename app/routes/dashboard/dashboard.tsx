@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../provider/auth-context";
-import { Navigate } from "react-router";
-import { fetchData } from "@/lib/fetch-util";
+import { Navigate, useNavigate } from "react-router";
+import { fetchData, postData } from "@/lib/fetch-util";
 import {
   Calendar,
   Clock,
@@ -13,20 +13,19 @@ import {
   Building2,
   Folder,
   ArrowRight,
+  Eye,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   PieChart,
   Pie,
@@ -39,11 +38,10 @@ import { cn } from "@/lib/utils";
 
 // ==================== INTERFACES ====================
 
-interface UserInfo {
-  id: string;
+interface Workspace {
+  _id: string;
   name: string;
-  email: string;
-  role: string;
+  description?: string;
 }
 
 interface ProjectStatistics {
@@ -55,21 +53,34 @@ interface ProjectStatistics {
 
 interface Project {
   _id: string;
-  propertyId: string;
+  propertyId?: string;
   title: string;
-  manager?: {
+  description?: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  creator?: {
     _id: string;
     name: string;
+    email: string;
   };
   projectType?: string;
   department?: {
     name: string;
   };
-  timeline?: {
-    startDate: string;
-    endDate: string;
-  };
-  status: string;
+  categories?: Array<{
+    name: string;
+    members: Array<{
+      userId: {
+        _id: string;
+        name: string;
+        email: string;
+      };
+      role: string;
+    }>;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Task {
@@ -86,7 +97,7 @@ interface Task {
 
 const Dashboard = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [projectStats, setProjectStats] = useState<ProjectStatistics>({
     totalProjects: 0,
@@ -96,22 +107,51 @@ const Dashboard = () => {
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [workspaceFilter, setWorkspaceFilter] = useState("all");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
 
   // ==================== DATA FETCHING ====================
 
-  const fetchUserInfo = useCallback(async () => {
+  const fetchWorkspaces = useCallback(async () => {
     try {
-      const response = await fetchData("/auth/me");
-      setUserInfo(response.user || response);
+      const response = await fetchData("/workspace");
+      // Extract workspace data from the nested structure
+      const workspaceList = response.workspaces?.map((w: any) => w.workspaceId).filter(Boolean) || [];
+      setWorkspaces(workspaceList);
+      setCurrentWorkspace(response.currentWorkspace || null);
+      // Store current workspace in localStorage for API calls
+      if (response.currentWorkspace) {
+        localStorage.setItem("currentWorkspaceId", response.currentWorkspace._id);
+      }
     } catch (error) {
-      toast.error("Failed to load user data");
+      console.error("Error fetching workspaces:", error);
+      toast.error("Failed to load workspaces");
     }
   }, []);
+
+  const handleSwitchWorkspace = async (workspaceId: string) => {
+    try {
+      await postData("/workspace/switch", { workspaceId });
+      // Update localStorage
+      localStorage.setItem("currentWorkspaceId", workspaceId);
+      // Update current workspace state
+      const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
+      setCurrentWorkspace(selectedWorkspace || null);
+      toast.success("Workspace switched successfully");
+      // Refresh data
+      await Promise.all([
+        fetchProjectStatistics(),
+        fetchRecentProjects(),
+        fetchTasks(),
+      ]);
+    } catch (error) {
+      console.error("Error switching workspace:", error);
+      toast.error("Failed to switch workspace");
+    }
+  };
 
   const fetchProjectStatistics = useCallback(async () => {
     try {
@@ -133,19 +173,40 @@ const Dashboard = () => {
   const fetchRecentProjects = useCallback(async () => {
     try {
       const params = new URLSearchParams({
-        status: "ongoing",
         limit: "25",
-        ...(searchQuery && { search: searchQuery }),
+        sortBy: "startDate",
+        ...(projectTypeFilter !== "all" && { projectType: projectTypeFilter }),
       });
+
       const response = await fetchData(`/project/recent?${params}`);
-      setRecentProjects(response.projects || []);
+      let projects = response.projects || [];
+
+      // Apply client-side date filtering based on startDate
+      if (dateRangeFilter.start || dateRangeFilter.end) {
+        projects = projects.filter((project: Project) => {
+          const startDate = new Date(project.startDate);
+          const filterStartDate = dateRangeFilter.start ? new Date(dateRangeFilter.start) : null;
+          const filterEndDate = dateRangeFilter.end ? new Date(dateRangeFilter.end) : null;
+
+          if (filterStartDate && filterEndDate) {
+            return startDate >= filterStartDate && startDate <= filterEndDate;
+          } else if (filterStartDate) {
+            return startDate >= filterStartDate;
+          } else if (filterEndDate) {
+            return startDate <= filterEndDate;
+          }
+          return true;
+        });
+      }
+
+      setRecentProjects(projects);
     } catch (error) {
       console.error("Error fetching recent projects:", error);
       toast.error("Failed to load recent projects");
       // Fallback to empty array on error
       setRecentProjects([]);
     }
-  }, [searchQuery]);
+  }, [projectTypeFilter, dateRangeFilter]);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -167,7 +228,7 @@ const Dashboard = () => {
       const loadData = async () => {
         setLoading(true);
         await Promise.all([
-          fetchUserInfo(),
+          fetchWorkspaces(),
           fetchProjectStatistics(),
           fetchRecentProjects(),
           fetchTasks(),
@@ -176,23 +237,25 @@ const Dashboard = () => {
       };
       loadData();
     }
-  }, [isAuthenticated, fetchUserInfo, fetchProjectStatistics, fetchRecentProjects, fetchTasks]);
+  }, [isAuthenticated, fetchWorkspaces, fetchProjectStatistics, fetchRecentProjects, fetchTasks]);
 
   // ==================== HELPER FUNCTIONS ====================
 
-  const getTaskStatusColor = (status: string) => {
-    switch (status) {
-      case "todo":
-        return "bg-blue-100 text-blue-800";
-      case "in_progress":
-        return "bg-green-100 text-green-800";
-      case "review":
-        return "bg-orange-100 text-orange-800";
-      case "done":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const calculateDaysBetween = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const handleViewProject = (projectId: string) => {
+    navigate(`/workspace/projects/${projectId}`);
   };
 
   // ==================== RENDER GUARDS ====================
@@ -435,7 +498,7 @@ const Dashboard = () => {
                     <div className="flex items-center gap-[16px]">
                       <div>
                         <h3 className="font-['Inter'] font-normal text-[16px] text-black leading-[20px]">
-                          Recent Ongoing Projects
+                          All Projects
                         </h3>
                         <p className="font-['Inter'] font-medium text-[20px] text-black leading-[20px] inline ml-2">
                           {recentProjects.length}
@@ -443,33 +506,146 @@ const Dashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-[15px]">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                      >
-                        <Building2 className="w-4 h-4" />
-                        Workspace
-                        <ChevronDown className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                      >
-                        <Folder className="w-4 h-4" />
-                        Project Type
-                        <ChevronDown className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                      >
-                        <Calendar className="w-4 h-4" />
-                        DD/MM/YYYY
-                        <ChevronDown className="w-3 h-3" />
-                      </Button>
+                      {/* Workspace Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                          >
+                            <Building2 className="w-4 h-4" />
+                            {currentWorkspace?.name || "Workspace"}
+                            <ChevronDown className="w-3 h-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[200px]">
+                          {workspaces.map((workspace) => (
+                            <DropdownMenuItem
+                              key={workspace._id}
+                              onClick={() => handleSwitchWorkspace(workspace._id)}
+                              className={cn(
+                                "cursor-pointer",
+                                currentWorkspace?._id === workspace._id && "bg-blue-50"
+                              )}
+                            >
+                              {workspace.name}
+                              {currentWorkspace?._id === workspace._id && (
+                                <span className="ml-auto text-blue-600">✓</span>
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Project Type Filter */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                          >
+                            <Folder className="w-4 h-4" />
+                            {projectTypeFilter === "all" ? "Project Type" : projectTypeFilter}
+                            <ChevronDown className="w-3 h-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[180px]">
+                          <DropdownMenuItem
+                            onClick={() => setProjectTypeFilter("all")}
+                            className={cn(
+                              "cursor-pointer",
+                              projectTypeFilter === "all" && "bg-blue-50"
+                            )}
+                          >
+                            All Types
+                            {projectTypeFilter === "all" && (
+                              <span className="ml-auto text-blue-600">✓</span>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setProjectTypeFilter("Development")}
+                            className={cn(
+                              "cursor-pointer",
+                              projectTypeFilter === "Development" && "bg-blue-50"
+                            )}
+                          >
+                            Development
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setProjectTypeFilter("Research")}
+                            className={cn(
+                              "cursor-pointer",
+                              projectTypeFilter === "Research" && "bg-blue-50"
+                            )}
+                          >
+                            Research
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setProjectTypeFilter("Marketing")}
+                            className={cn(
+                              "cursor-pointer",
+                              projectTypeFilter === "Marketing" && "bg-blue-50"
+                            )}
+                          >
+                            Marketing
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Date Filter */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                          >
+                            <Calendar className="w-4 h-4" />
+                            {dateRangeFilter.start || dateRangeFilter.end ? "Date Filtered" : "Start Date"}
+                            <ChevronDown className="w-3 h-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[250px] p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-medium text-gray-700 mb-1 block">
+                                Start Date From:
+                              </label>
+                              <Input
+                                type="date"
+                                value={dateRangeFilter.start}
+                                onChange={(e) =>
+                                  setDateRangeFilter({ ...dateRangeFilter, start: e.target.value })
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700 mb-1 block">
+                                Start Date To:
+                              </label>
+                              <Input
+                                type="date"
+                                value={dateRangeFilter.end}
+                                onChange={(e) =>
+                                  setDateRangeFilter({ ...dateRangeFilter, end: e.target.value })
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-xs"
+                              onClick={() => setDateRangeFilter({ start: "", end: "" })}
+                            >
+                              Clear Filter
+                            </Button>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                   <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
@@ -484,37 +660,37 @@ const Dashboard = () => {
                       <tr className="bg-[#d5e5ff]">
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px]">
                           <div className="flex items-center gap-2">
-                            Property ID
+                            Title
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Project Name
+                            Description
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Project Manager Name
+                            Status
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Project Type
+                            Start Date
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Department Name
+                            End Date
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Project Timeline
+                            Days
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
@@ -536,36 +712,45 @@ const Dashboard = () => {
                             key={project._id}
                             className={index % 2 === 1 ? "bg-[#f2f7ff]" : ""}
                           >
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px]">
-                              {project.propertyId}
-                            </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px]">
+                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] truncate">
                               {project.title}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px]">
-                              {project.manager?.name || "lorem Ipsum"}
+                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] truncate">
+                              {project.description || "No description"}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px]">
-                              {project.projectType || "lorem Ipsum"}
+                            <td className="px-[16px] py-[14px]">
+                              <Badge
+                                className={cn(
+                                  "text-[12px] font-['Inter'] font-normal",
+                                  project.status === "Completed" && "bg-[#479c39] hover:bg-[#479c39]",
+                                  project.status === "In Progress" && "bg-[#4a8cd7] hover:bg-[#4a8cd7]",
+                                  project.status === "Planning" && "bg-[#f2761b] hover:bg-[#f2761b]",
+                                  project.status === "On Hold" && "bg-[#f27944] hover:bg-[#f27944]",
+                                  project.status === "Cancelled" && "bg-[#cd2812] hover:bg-[#cd2812]"
+                                )}
+                              >
+                                {project.status}
+                              </Badge>
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px]">
-                              {project.department?.name || "lorem Ipsum"}
+                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px]">
+                              {formatDate(project.startDate)}
                             </td>
-                            <td className="px-[16px] py-[6px] text-[14px] font-['Work_Sans'] font-normal">
-                              {project.timeline ? (
-                                <div className="flex flex-col gap-[4px]">
-                                  <span className="text-[#1a932e]">{project.timeline.startDate}</span>
-                                  <span className="text-[#cd2812]">{project.timeline.endDate}</span>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col gap-[4px]">
-                                  <span className="text-[#1a932e]">05/10/2025</span>
-                                  <span className="text-[#cd2812]">05/10/2025</span>
-                                </div>
-                              )}
+                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px]">
+                              {formatDate(project.endDate)}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-[#344bfd] tracking-[0.5px]">
-                              <button className="hover:underline">View</button>
+                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-semibold text-black tracking-[0.5px]">
+                              {calculateDaysBetween(project.startDate, project.endDate)} days
+                            </td>
+                            <td className="px-[16px] py-[14px]">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto px-[10px] py-[5px] text-[14px] font-['Inter'] font-normal text-[#344bfd] hover:text-[#344bfd] hover:underline hover:bg-transparent"
+                                onClick={() => handleViewProject(project._id)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </Button>
                             </td>
                           </tr>
                         ))
