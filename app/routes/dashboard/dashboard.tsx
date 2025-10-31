@@ -151,12 +151,12 @@ const Dashboard = () => {
       // Update current workspace state
       const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
       setCurrentWorkspace(selectedWorkspace || null);
-      toast.success("Workspace switched successfully");
-      // Refresh data
+      // Refresh data including pie chart for current month
       await Promise.all([
         fetchProjectStatistics(),
         fetchRecentProjects(),
         fetchTasks(),
+        fetchMonthlyProjectStats(selectedMonth, selectedYear),
       ]);
     } catch (error) {
       console.error("Error switching workspace:", error);
@@ -386,7 +386,42 @@ const Dashboard = () => {
   // ==================== RENDER ====================
 
   return (
-    <div className="min-h-screen bg-[#f1f2f7] p-6">
+    <>
+      {/* CSS Keyframe Animations */}
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+        }
+
+        @keyframes slideInFromLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+
+      <div className="min-h-screen bg-[#f1f2f7] p-6">
       <div className="max-w-full mx-auto space-y-6">
         {/* Page Title */}
         <div>
@@ -589,17 +624,41 @@ const Dashboard = () => {
                         outerRadius={90}
                         paddingAngle={2}
                         dataKey="value"
+                        animationBegin={0}
+                        animationDuration={800}
+                        animationEasing="ease-in-out"
+                        isAnimationActive={true}
                       >
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.fill}
+                            style={{
+                              filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))',
+                              transition: 'all 0.3s ease-in-out'
+                            }}
+                          />
                         ))}
                       </Pie>
-                      <RechartsTooltip />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        }}
+                        itemStyle={{
+                          color: '#333',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center Text - Shows monthly total */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                    <p className="font-['Inter'] font-semibold text-[20px] text-black leading-[23px]">
+                  {/* Center Text - Shows monthly total with smooth animation */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-500 ease-in-out">
+                    <p className="font-['Inter'] font-semibold text-[20px] text-black leading-[23px] transition-all duration-300">
                       {monthlyProjectStats.total}
                     </p>
                     <p className="font-['Inter'] font-normal text-[12px] text-black leading-[12px] mt-1">
@@ -608,20 +667,29 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Legend */}
+                {/* Legend with animations */}
                 <div className="flex flex-col gap-[15px]">
-                  {chartData.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between gap-8 min-w-[120px]">
+                  {chartData.map((item, index) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between gap-8 min-w-[120px] transition-all duration-300 hover:scale-105"
+                      style={{
+                        animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
+                      }}
+                    >
                       <div className="flex items-center gap-[5px]">
                         <div
-                          className="w-[10px] h-[10px] rounded-full"
-                          style={{ backgroundColor: item.fill }}
+                          className="w-[10px] h-[10px] rounded-full transition-all duration-300 hover:scale-125"
+                          style={{
+                            backgroundColor: item.fill,
+                            boxShadow: `0 2px 6px ${item.fill}40`
+                          }}
                         />
                         <span className="font-['Inter'] font-semibold text-[12px] text-[#767676]">
                           {item.name}
                         </span>
                       </div>
-                      <span className="font-['Inter'] font-bold text-[12px] text-neutral-700">
+                      <span className="font-['Inter'] font-bold text-[12px] text-neutral-700 transition-all duration-300">
                         {item.value}
                       </span>
                     </div>
@@ -683,8 +751,8 @@ const Dashboard = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
 
-                      {/* Project Type Filter */}
-                      <DropdownMenu>
+                      {/* Project Type Filter - HIDDEN */}
+                      {/* <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
@@ -737,10 +805,10 @@ const Dashboard = () => {
                             Marketing
                           </DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu> */}
 
-                      {/* Date Filter */}
-                      <DropdownMenu>
+                      {/* Date Filter - HIDDEN */}
+                      {/* <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
@@ -790,7 +858,7 @@ const Dashboard = () => {
                             </Button>
                           </div>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu> */}
                     </div>
                   </div>
                   <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
@@ -1075,6 +1143,7 @@ const Dashboard = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
