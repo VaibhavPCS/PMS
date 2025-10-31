@@ -112,6 +112,17 @@ const Dashboard = () => {
   const [projectTypeFilter, setProjectTypeFilter] = useState("all");
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  // Calendar state for pie chart filtering
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [monthlyProjectStats, setMonthlyProjectStats] = useState({
+    planning: 0,
+    inProgress: 0,
+    onHold: 0,
+    completed: 0,
+    total: 0,
+  });
 
   // ==================== DATA FETCHING ====================
 
@@ -166,6 +177,60 @@ const Dashboard = () => {
         ongoingProjects: 0,
         completedProjects: 0,
         proposedProjects: 0,
+      });
+    }
+  }, []);
+
+  // Fetch monthly project statistics for pie chart
+  const fetchMonthlyProjectStats = useCallback(async (month: number, year: number) => {
+    try {
+      // Fetch all projects without limit to filter by month
+      const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
+      const allProjects = response.projects || [];
+
+      // Filter projects that are active in the selected month
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0); // Last day of the month
+
+      const projectsInMonth = allProjects.filter((project: Project) => {
+        const projectStart = new Date(project.startDate);
+        const projectEnd = new Date(project.endDate);
+
+        // Check if project overlaps with selected month
+        return projectStart <= monthEnd && projectEnd >= monthStart;
+      });
+
+      // Calculate stats by status
+      const stats = {
+        planning: 0,
+        inProgress: 0,
+        onHold: 0,
+        completed: 0,
+        total: projectsInMonth.length,
+      };
+
+      projectsInMonth.forEach((project: Project) => {
+        const status = project.status.toLowerCase();
+        if (status === "planning") {
+          stats.planning++;
+        } else if (status === "in progress" || status === "ongoing") {
+          stats.inProgress++;
+        } else if (status === "on hold") {
+          stats.onHold++;
+        } else if (status === "completed") {
+          stats.completed++;
+        }
+      });
+
+      setMonthlyProjectStats(stats);
+    } catch (error) {
+      console.error("Error fetching monthly project statistics:", error);
+      setMonthlyProjectStats({
+        planning: 0,
+        inProgress: 0,
+        onHold: 0,
+        completed: 0,
+        total: 0,
       });
     }
   }, []);
@@ -232,12 +297,13 @@ const Dashboard = () => {
           fetchProjectStatistics(),
           fetchRecentProjects(),
           fetchTasks(),
+          fetchMonthlyProjectStats(selectedMonth, selectedYear),
         ]);
         setLoading(false);
       };
       loadData();
     }
-  }, [isAuthenticated, fetchWorkspaces, fetchProjectStatistics, fetchRecentProjects, fetchTasks]);
+  }, [isAuthenticated, fetchWorkspaces, fetchProjectStatistics, fetchRecentProjects, fetchTasks, fetchMonthlyProjectStats, selectedMonth, selectedYear]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -256,6 +322,23 @@ const Dashboard = () => {
 
   const handleViewProject = (projectId: string) => {
     navigate(`/workspace/projects/${projectId}`);
+  };
+
+  // Format month and year for display
+  const formatMonthYear = (month: number, year: number): string => {
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    return `${monthNames[month]} ${year}`;
+  };
+
+  // Handle month change
+  const handleMonthChange = async (month: number, year: number) => {
+    setSelectedMonth(month);
+    setSelectedYear(year);
+    setShowMonthPicker(false);
+    await fetchMonthlyProjectStats(month, year);
   };
 
   // ==================== RENDER GUARDS ====================
@@ -280,18 +363,23 @@ const Dashboard = () => {
   const chartData = [
     {
       name: "Completed",
-      value: projectStats.completedProjects,
+      value: monthlyProjectStats.completed,
       fill: "#8a55d2",
     },
     {
-      name: "Proposed",
-      value: projectStats.proposedProjects,
+      name: "Planning",
+      value: monthlyProjectStats.planning,
       fill: "#f2761b",
     },
     {
-      name: "On Going",
-      value: projectStats.ongoingProjects,
+      name: "In Progress",
+      value: monthlyProjectStats.inProgress,
       fill: "#59c3c3",
+    },
+    {
+      name: "On Hold",
+      value: monthlyProjectStats.onHold,
+      fill: "#ff6b6b",
     },
   ];
 
@@ -419,15 +507,72 @@ const Dashboard = () => {
                 <CardTitle className="font-['Inter'] font-medium text-[16px] text-[#2e2e30]">
                   Project Statistics
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-[25px] rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[8px] flex items-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  April 2023
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
+                {/* Month/Year Picker */}
+                <DropdownMenu open={showMonthPicker} onOpenChange={setShowMonthPicker}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-[25px] rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[8px] flex items-center gap-2"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      {formatMonthYear(selectedMonth, selectedYear)}
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[280px] p-4">
+                    <div className="space-y-4">
+                      {/* Year Selector */}
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newYear = selectedYear - 1;
+                            setSelectedYear(newYear);
+                            handleMonthChange(selectedMonth, newYear);
+                          }}
+                          className="h-8 px-2"
+                        >
+                          ←
+                        </Button>
+                        <span className="text-sm font-semibold">{selectedYear}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newYear = selectedYear + 1;
+                            setSelectedYear(newYear);
+                            handleMonthChange(selectedMonth, newYear);
+                          }}
+                          className="h-8 px-2"
+                        >
+                          →
+                        </Button>
+                      </div>
+                      {/* Month Grid */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                        ].map((monthName, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs",
+                              selectedMonth === index && "bg-blue-100 border-blue-500"
+                            )}
+                            onClick={() => handleMonthChange(index, selectedYear)}
+                          >
+                            {monthName}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
@@ -452,10 +597,10 @@ const Dashboard = () => {
                       <RechartsTooltip />
                     </PieChart>
                   </ResponsiveContainer>
-                  {/* Center Text */}
+                  {/* Center Text - Shows monthly total */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                     <p className="font-['Inter'] font-semibold text-[20px] text-black leading-[23px]">
-                      {projectStats.totalProjects}
+                      {monthlyProjectStats.total}
                     </p>
                     <p className="font-['Inter'] font-normal text-[12px] text-black leading-[12px] mt-1">
                       Total Projects
@@ -658,6 +803,11 @@ const Dashboard = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-[#d5e5ff]">
+                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px] w-[60px]">
+                          <div className="flex items-center gap-2">
+                            S.No
+                          </div>
+                        </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px]">
                           <div className="flex items-center gap-2">
                             Title
@@ -702,7 +852,7 @@ const Dashboard = () => {
                     <tbody>
                       {recentProjects.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-[16px] py-[14px] text-center text-[14px] font-['Inter'] text-black">
+                          <td colSpan={8} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
                             No projects found
                           </td>
                         </tr>
@@ -712,10 +862,13 @@ const Dashboard = () => {
                             key={project._id}
                             className={index % 2 === 1 ? "bg-[#f2f7ff]" : ""}
                           >
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] truncate">
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
+                              {index + 1}
+                            </td>
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] truncate">
                               {project.title}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] truncate">
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] truncate">
                               {project.description || "No description"}
                             </td>
                             <td className="px-[16px] py-[14px]">
@@ -732,20 +885,20 @@ const Dashboard = () => {
                                 {project.status}
                               </Badge>
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px]">
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
                               {formatDate(project.startDate)}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px]">
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
                               {formatDate(project.endDate)}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[14px] font-['Inter'] font-semibold text-black tracking-[0.5px]">
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
                               {calculateDaysBetween(project.startDate, project.endDate)} days
                             </td>
                             <td className="px-[16px] py-[14px]">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-auto px-[10px] py-[5px] text-[14px] font-['Inter'] font-normal text-[#344bfd] hover:text-[#344bfd] hover:underline hover:bg-transparent"
+                                className="h-auto px-[10px] py-[5px] text-[12px] font-['Inter'] font-normal text-[#344bfd] hover:text-[#344bfd] hover:underline hover:bg-transparent"
                                 onClick={() => handleViewProject(project._id)}
                               >
                                 <Eye className="w-4 h-4 mr-1" />
