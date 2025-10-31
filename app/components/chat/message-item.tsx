@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
-import { MoreHorizontal, Reply, Edit, Trash2, Heart, ThumbsUp, Smile } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { formatDistanceToNow } from 'date-fns';
-import { Socket } from 'socket.io-client';
-import FilePreview from '@/components/ui/file-preview';
+import React, { useState } from "react";
+import {
+  MoreHorizontal,
+  Reply,
+  Edit,
+  Trash2,
+  Heart,
+  ThumbsUp,
+  Smile,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { formatDistanceToNow } from "date-fns";
+import { Socket } from "socket.io-client";
+import FilePreview from "@/components/ui/file-preview";
 
 interface Message {
   _id: string;
@@ -27,7 +35,7 @@ interface Message {
   attachments: Array<{
     fileName: string;
     fileUrl: string;
-    fileType: 'image' | 'document';
+    fileType: "image" | "document";
     fileSize: number;
     mimeType: string;
   }>;
@@ -65,7 +73,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   currentUser,
   showAvatar,
   onReply,
-  socket
+  socket,
 }) => {
   const [showActions, setShowActions] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -76,18 +84,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const handleReaction = (emoji: string) => {
     if (socket) {
       const existingReaction = message.reactions.find(
-        r => r.user === currentUser._id && r.emoji === emoji
+        (r) => r.user === currentUser._id && r.emoji === emoji
       );
 
       if (existingReaction) {
-        socket.emit('removeReaction', {
+        socket.emit("removeReaction", {
           messageId: message._id,
-          emoji
+          emoji,
         });
       } else {
-        socket.emit('addReaction', {
+        socket.emit("addReaction", {
           messageId: message._id,
-          emoji
+          emoji,
         });
       }
     }
@@ -95,25 +103,28 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   const handleEdit = () => {
     if (socket && editContent.trim() !== message.content) {
-      socket.emit('editMessage', {
+      socket.emit("editMessage", {
         messageId: message._id,
-        content: editContent.trim()
+        content: editContent.trim(),
       });
     }
     setIsEditing(false);
   };
 
   const handleDelete = () => {
-    if (socket && window.confirm('Are you sure you want to delete this message?')) {
-      socket.emit('deleteMessage', {
-        messageId: message._id
+    if (
+      socket &&
+      window.confirm("Are you sure you want to delete this message?")
+    ) {
+      socket.emit("deleteMessage", {
+        messageId: message._id,
       });
     }
   };
 
   const getReactionCounts = () => {
     const counts: { [emoji: string]: { count: number; users: string[] } } = {};
-    message.reactions.forEach(reaction => {
+    message.reactions.forEach((reaction) => {
       if (!counts[reaction.emoji]) {
         counts[reaction.emoji] = { count: 0, users: [] };
       }
@@ -127,35 +138,46 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   return (
     <div
-      className={`group flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+      className={`group flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <div className={`flex max-w-[70%] ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+      <div
+        className={`flex max-w-[70%] ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
+      >
         {/* Avatar */}
         {showAvatar && !isOwnMessage && (
           <Avatar className="w-8 h-8 mr-2 flex-shrink-0">
             {message.sender.profilePicture ? (
-              <img src={message.sender.profilePicture} alt={message.sender.name} />
+              <img
+                src={message.sender.profilePicture}
+                alt={message.sender.name}
+              />
             ) : null}
             <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
           </Avatar>
         )}
-        
+
         {!showAvatar && !isOwnMessage && (
           <div className="w-8 mr-2 flex-shrink-0" />
         )}
 
         {/* Message Content */}
-        <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+        <div
+          className={`flex flex-col ${isOwnMessage ? "items-end" : "items-start"}`}
+        >
           {/* Sender Name and Time */}
           {showAvatar && (
-            <div className={`flex items-center space-x-2 mb-1 ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
+            <div
+              className={`flex items-center space-x-2 mb-1 ${isOwnMessage ? "flex-row-reverse space-x-reverse" : ""}`}
+            >
               <span className="text-sm font-medium text-gray-900">
-                {isOwnMessage ? 'You' : message.sender.name}
+                {isOwnMessage ? "You" : message.sender.name}
               </span>
               <span className="text-xs text-gray-500">
-                {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
+                {formatDistanceToNow(new Date(message.createdAt), {
+                  addSuffix: true,
+                })}
               </span>
               {message.isEdited && (
                 <span className="text-xs text-gray-400">(edited)</span>
@@ -165,10 +187,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
           {/* Reply To */}
           {message.replyTo && (
-            <div className={`mb-2 p-2 bg-gray-100 rounded border-l-4 border-gray-300 text-sm ${
-              isOwnMessage ? 'bg-blue-100 border-blue-300' : ''
-            }`}>
-              <p className="text-xs text-gray-600 font-medium">{message.replyTo.sender.name}</p>
+            <div
+              className={`mb-2 p-2 bg-gray-100 rounded border-l-4 border-gray-300 text-sm ${
+                isOwnMessage ? "bg-blue-100 border-blue-300" : ""
+              }`}
+            >
+              <p className="text-xs text-gray-600 font-medium">
+                {message.replyTo.sender.name}
+              </p>
               <p className="text-gray-700">{message.replyTo.content}</p>
             </div>
           )}
@@ -178,8 +204,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
             <div
               className={`px-3 py-2 rounded-lg ${
                 isOwnMessage
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 text-gray-900"
               }`}
             >
               {isEditing ? (
@@ -192,8 +218,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     autoFocus
                   />
                   <div className="flex space-x-2">
-                    <Button size="sm" onClick={handleEdit}>Save</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+                    <Button size="sm" onClick={handleEdit}>
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsEditing(false)}
+                    >
                       Cancel
                     </Button>
                   </div>
@@ -205,11 +237,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
             {/* Action Buttons */}
             {showActions && !isEditing && (
-              <div className={`absolute top-0 ${isOwnMessage ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} flex items-center space-x-1 bg-white border rounded-lg shadow-lg p-1`}>
+              <div
+                className={`absolute top-0 ${isOwnMessage ? "left-0 -translate-x-full" : "right-0 translate-x-full"} flex items-center space-x-1 bg-white border rounded-lg shadow-lg p-1`}
+              >
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleReaction('👍')}
+                  onClick={() => handleReaction("👍")}
                   className="h-6 w-6 p-0"
                 >
                   <ThumbsUp className="w-3 h-3" />
@@ -217,7 +251,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleReaction('❤️')}
+                  onClick={() => handleReaction("❤️")}
                   className="h-6 w-6 p-0"
                 >
                   <Heart className="w-3 h-3" />
@@ -254,20 +288,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
             )}
           </div>
 
-          {/* Attachments */}
           {message.attachments.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {message.attachments.map((attachment, index) => (
-                <FilePreview
-                  key={index}
-                  fileName={attachment.fileName}
-                  fileUrl={attachment.fileUrl}
-                  fileType={attachment.fileType}
-                  fileSize={attachment.fileSize}
-                  mimeType={attachment.mimeType}
-                />
-              ))}
-            </div>
+            <FilePreview attachments={message.attachments} />
           )}
 
           {/* Reactions */}
@@ -281,8 +303,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     onClick={() => handleReaction(emoji)}
                     className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs border ${
                       hasReacted
-                        ? 'bg-blue-100 border-blue-300 text-blue-700'
-                        : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                        ? "bg-blue-100 border-blue-300 text-blue-700"
+                        : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     <span>{emoji}</span>
@@ -296,7 +318,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {/* Read Status */}
           {isOwnMessage && message.readBy.length > 0 && (
             <div className="text-xs text-gray-400 mt-1">
-              Read by {message.readBy.length} {message.readBy.length === 1 ? 'person' : 'people'}
+              Read by {message.readBy.length}{" "}
+              {message.readBy.length === 1 ? "person" : "people"}
             </div>
           )}
         </div>
