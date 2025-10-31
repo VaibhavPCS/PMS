@@ -86,11 +86,15 @@ interface Project {
 interface Task {
   _id: string;
   title: string;
-  description: string;
-  status: "todo" | "in_progress" | "review" | "done";
+  description?: string;
+  status: "to-do" | "in-progress" | "done";
   priority: "low" | "medium" | "high" | "urgent";
   dueDate: string;
-  assignees: Array<{ _id: string; name: string; email: string }>;
+  assignedTo?: { _id: string; name: string; email: string };
+  project?: { _id: string; title: string };
+  creator?: { _id: string; name: string; email: string };
+  createdAt: string;
+  serialNumber?: number;
 }
 
 // ==================== MAIN COMPONENT ====================
@@ -107,11 +111,13 @@ const Dashboard = () => {
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState("all");
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  const [taskSearchQuery, setTaskSearchQuery] = useState<string>("");
   // Calendar state for pie chart filtering
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -275,18 +281,38 @@ const Dashboard = () => {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        sortBy: "dueDate",
-        sortOrder: "asc",
-        ...(taskStatusFilter !== "all" && { status: taskStatusFilter }),
-      });
-
-      const response = await fetchData(`/workspace/tasks?${params}`);
-      setTasks(response.tasks || []);
+      const response = await fetchData("/workspace/all-tasks");
+      const tasksData = response.tasks || [];
+      setTasks(tasksData);
     } catch (error) {
+      console.error("Error fetching tasks:", error);
       toast.error("Failed to load tasks");
+      setTasks([]);
     }
-  }, [taskStatusFilter]);
+  }, []);
+
+  // Filter tasks based on status and search query
+  useEffect(() => {
+    let filtered = tasks;
+
+    // Filter by status
+    if (taskStatusFilter !== "all") {
+      filtered = filtered.filter(task => task.status === taskStatusFilter);
+    }
+
+    // Filter by search query
+    if (taskSearchQuery.trim()) {
+      const query = taskSearchQuery.toLowerCase();
+      filtered = filtered.filter(task => 
+        task.title.toLowerCase().includes(query) ||
+        (task.description && task.description.toLowerCase().includes(query)) ||
+        (task.assignedTo && task.assignedTo.name.toLowerCase().includes(query)) ||
+        (task.project && task.project.title.toLowerCase().includes(query))
+      );
+    }
+
+    setFilteredTasks(filtered);
+  }, [tasks, taskStatusFilter, taskSearchQuery]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -1010,10 +1036,12 @@ const Dashboard = () => {
                       <input
                         type="text"
                         placeholder="Search..."
+                        value={taskSearchQuery}
+                        onChange={(e) => setTaskSearchQuery(e.target.value)}
                         className="bg-transparent border-none outline-none text-[14px] font-['Inter'] text-[#040110] opacity-60 placeholder:text-[#040110] placeholder:opacity-60"
                       />
                     </div>
-                    <Filter className="w-4 h-4 text-[#040110]" />
+                    {/* <Filter className="w-4 h-4 text-[#040110]" /> */}
                   </div>
 
                   <div className="flex items-center gap-[10px]">
@@ -1029,10 +1057,10 @@ const Dashboard = () => {
                       All
                     </button>
                     <button
-                      onClick={() => setTaskStatusFilter("todo")}
+                      onClick={() => setTaskStatusFilter("to-do")}
                       className={cn(
                         "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "todo"
+                        taskStatusFilter === "to-do"
                           ? "border-b-[1px] border-[#f2761b] opacity-100"
                           : "opacity-60"
                       )}
@@ -1040,10 +1068,10 @@ const Dashboard = () => {
                       To Do
                     </button>
                     <button
-                      onClick={() => setTaskStatusFilter("in_progress")}
+                      onClick={() => setTaskStatusFilter("in-progress")}
                       className={cn(
                         "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "in_progress"
+                        taskStatusFilter === "in-progress"
                           ? "border-b-[1px] border-[#f2761b] opacity-100"
                           : "opacity-60"
                       )}
@@ -1067,67 +1095,67 @@ const Dashboard = () => {
                 {/* Task List */}
                 <ScrollArea className="h-[600px]">
                   <div className="space-y-[10px]">
-                    {tasks.length === 0 ? (
+                    {filteredTasks.length === 0 ? (
                       <div className="text-center py-8 text-[#717182] text-[14px] font-['Inter']">
-                        No tasks found
+                        {taskSearchQuery ? "No tasks match your search" : "No tasks found"}
                       </div>
                     ) : (
-                      tasks.map((task) => {
-                        const getTaskBgColor = (status: string) => {
-                          switch (status) {
-                            case "todo":
-                              return "bg-[rgba(74,140,215,0.3)]";
-                            case "in_progress":
-                              return "bg-[rgba(245,158,11,0.3)]";
-                            case "done":
-                              return "bg-[rgba(71,156,57,0.3)]";
-                            default:
-                              return "bg-[rgba(74,140,215,0.3)]";
-                          }
-                        };
-
-                        const getTaskBorderColor = (status: string) => {
-                          switch (status) {
-                            case "todo":
-                              return "bg-[#4a8cd7]";
-                            case "in_progress":
-                              return "bg-amber-500";
-                            case "done":
-                              return "bg-[#479c39]";
-                            default:
-                              return "bg-[#4a8cd7]";
-                          }
-                        };
-
+                      filteredTasks.map((task) => {
                         return (
                           <div
                             key={task._id}
                             className={cn(
-                              "rounded-[5px] flex gap-[10px] items-start px-[10px] py-[5px]",
-                              getTaskBgColor(task.status)
+                              "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300",
+                              "flex gap-3 items-start"
                             )}
                           >
-                            <div className={cn("w-[5px] h-full rounded-[4px] shrink-0", getTaskBorderColor(task.status))} />
-                            <div className="flex-1 flex flex-col gap-[8px]">
-                              <h4 className="font-['Inter'] font-normal text-[14px] text-black leading-[20px]">
-                                {task.title || "Task Title"}
+                            {/* Status indicator */}
+                            <div 
+                              className={cn(
+                                "w-1 h-16 rounded-full shrink-0 mt-1",
+                                task.status === "to-do" && "bg-blue-500",
+                                task.status === "in-progress" && "bg-amber-500", 
+                                task.status === "done" && "bg-green-500"
+                              )}
+                            />
+                            
+                            {/* Task content */}
+                            <div className="flex-1 min-w-0">
+                              {/* Task title */}
+                              <h4 className="font-medium text-gray-900 text-sm leading-5 mb-2 truncate">
+                                {task.title}
                               </h4>
-                              <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px]">
-                                Description: {task.description || "Lorem ipsum dolor sit amet, consectetur adipiscing elit,"}
-                              </p>
-                              <div className="flex items-center gap-[10px]">
-                                <div className="flex items-center gap-[5px]">
-                                  <User className="w-4 h-4 text-[#717182]" />
-                                  <span className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-normal">
-                                    {task.assignees[0]?.name || "Joe Smith"}
-                                  </span>
-                                </div>
-                                <div className="w-[1px] h-[14px] bg-[#717182] opacity-30" />
-                                <div className="flex items-center gap-[5px]">
-                                  <Clock className="w-4 h-4 text-[#717182]" />
-                                  <span className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-normal">
-                                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "24/10/2025 at 19:00"}
-                                  </span>
+                              
+                              {/* Task description */}
+                              {task.description && (
+                                <p className="text-gray-600 text-xs leading-4 mb-3 line-clamp-2">
+                                  {task.description}
+                                </p>
+                              )}
+                              
+                              {/* Task metadata */}
+                              <div className="flex items-center justify-between">
+                                {/* Assignee */}
+                                {task.assignedTo && (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                                      {task.assignedTo.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-gray-700 text-xs font-medium truncate max-w-24">
+                                      {task.assignedTo.name}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Status badge */}
+                                <div className={cn(
+                                  "px-2 py-1 rounded-full text-xs font-medium",
+                                  task.status === "to-do" && "bg-blue-100 text-blue-700",
+                                  task.status === "in-progress" && "bg-amber-100 text-amber-700",
+                                  task.status === "done" && "bg-green-100 text-green-700"
+                                )}>
+                                  {task.status === "to-do" ? "To Do" : 
+                                   task.status === "in-progress" ? "In Progress" : "Done"}
                                 </div>
                               </div>
                             </div>
