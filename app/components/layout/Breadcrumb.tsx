@@ -1,8 +1,19 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { ChevronRight, Home, Building, ChevronLeft, LayoutDashboard } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
-export function Breadcrumb() {
+interface BreadcrumbItem {
+  label: string;
+  icon?: React.ReactNode;
+  href?: string;
+  isActive?: boolean;
+}
+
+interface BreadcrumbProps {
+  items?: BreadcrumbItem[];
+}
+
+export function Breadcrumb({ items }: BreadcrumbProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -10,50 +21,117 @@ export function Breadcrumb() {
     navigate(-1);
   };
 
-  const isWorkspace = location.pathname.includes('/workspace');
-  const isDashboard = location.pathname === '/dashboard';
+  // Auto-detect breadcrumb items based on current route if not provided
+  const getBreadcrumbItems = (): BreadcrumbItem[] => {
+    if (items) return items;
+
+    const path = location.pathname;
+    const breadcrumbs: BreadcrumbItem[] = [
+      {
+        label: 'Dashboard',
+        icon: (
+          <img
+            src="/assets/4001ba5860d2858f2469e275a4ce7fe2c2c2a952.svg"
+            alt="Dashboard"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        href: '/dashboard',
+        isActive: path === '/dashboard'
+      }
+    ];
+
+    if (path.includes('/workspace')) {
+      breadcrumbs.push({
+        label: 'Workspace',
+        icon: (
+          <img
+            src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+            alt="Workspace"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        href: '/workspace',
+        isActive: path === '/workspace'
+      });
+    }
+
+    if (path.includes('/project/')) {
+      // Add workspace if not already added
+      if (!breadcrumbs.find(b => b.label === 'Workspace')) {
+        breadcrumbs.push({
+          label: 'Workspace',
+          icon: (
+            <img
+              src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+              alt="Workspace"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          href: '/workspace',
+          isActive: false
+        });
+      }
+      breadcrumbs.push({
+        label: 'Project Detail',
+        icon: (
+          <img
+            src="/assets/folder-project-icon.svg"
+            alt="Project"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        isActive: true
+      });
+    }
+
+    return breadcrumbs;
+  };
+
+  const breadcrumbItems = getBreadcrumbItems();
 
   return (
-    <div className="flex items-center text-[14px] text-[#717182] font-['Inter'] gap-[8px]">
+    <div className="flex items-center text-[14px] text-[#717182] font-['Inter'] gap-[10px]">
       {/* Back Button */}
-      <div className="flex items-center gap-[8px]">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[14px] font-['Inter'] hover:text-[#040110] transition-colors"
-        >
-          <ChevronLeft size={24} />
-          <span>Back</span>
-        </button>
-      </div>
+      <button
+        onClick={handleBack}
+        className="flex items-center gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[14px] font-['Inter'] hover:text-[#040110] transition-colors p-0"
+      >
+        <ArrowLeft size={16} strokeWidth={2} />
+        <span className="font-medium">Back</span>
+      </button>
 
       {/* Separator */}
-      <div className="w-[1px] h-[20px] bg-[#D1D5DB]" />
+      <span className="text-[#949291] text-[16px]">/</span>
 
-      {/* Dashboard Link */}
-      <div className="flex items-center gap-[8px]">
-        <a
-          href="/dashboard"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('/dashboard');
-          }}
-          className="flex items-center gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
-        >
-          <LayoutDashboard size={20} />
-          <span>Dashboard</span>
-        </a>
-      </div>
+      {/* Breadcrumb Items */}
+      {breadcrumbItems.map((item, index) => (
+        <React.Fragment key={index}>
+          {item.href && !item.isActive ? (
+            <a
+              href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(item.href!);
+              }}
+              className="flex items-center gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
+            >
+              {item.icon}
+              <span className="font-medium">{item.label}</span>
+            </a>
+          ) : (
+            <div className={`flex items-center gap-[8px] ${item.isActive ? 'text-[#040110]' : 'text-[#717182]'}`}>
+              {item.icon}
+              <span className="font-medium">{item.label}</span>
+            </div>
+          )}
 
-      {/* Workspace (if on workspace page) */}
-      {isWorkspace && (
-        <>
-          <ChevronRight size={20} className="text-[#949291]" />
-          <div className="flex items-center gap-[8px]">
-            <Building size={20} />
-            <span>Workspace</span>
-          </div>
-        </>
-      )}
+          {/* Separator between items (except last) */}
+          {index < breadcrumbItems.length - 1 && (
+            <span className="text-[#949291] text-[16px]">/</span>
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }

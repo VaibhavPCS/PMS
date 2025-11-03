@@ -80,6 +80,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
+import Breadcrumb from "@/components/layout/Breadcrumb";
 
 import {
   DndContext,
@@ -1527,17 +1528,12 @@ const ProjectDetail = () => {
     <div className="h-screen flex flex-col bg-gray-50">
       {/* MOBILE HEADER (unchanged) */}
       <div className="block md:hidden bg-white border-b p-3 sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/workspace")}
-            className="h-8 px-2"
-          >
-            <ArrowLeft className="w-3 h-3 mr-1" />
-            <span className="text-xs">Back</span>
-          </Button>
+        {/* Breadcrumb */}
+        <div className="mb-3">
+          <Breadcrumb />
+        </div>
 
+        <div className="flex items-center justify-end mb-3">
           <div className="flex gap-2">
             <Sheet>
               <SheetTrigger asChild>
@@ -1650,21 +1646,15 @@ const ProjectDetail = () => {
 
       {/* DESKTOP HEADER (unchanged) */}
       <div className="hidden md:block bg-white border-b px-4 py-3 sticky top-0 z-20">
+        {/* Breadcrumb */}
+        <div className="mb-3">
+          <Breadcrumb />
+        </div>
+
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/workspace")}
-              className="h-8 px-3"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-              <span className="text-sm">Back</span>
-            </Button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{project.title}</h1>
-              <p className="text-xs text-gray-600 truncate max-w-md">{project.description}</p>
-            </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">{project.title}</h1>
+            <p className="text-xs text-gray-600 truncate max-w-md">{project.description}</p>
           </div>
 
           <div className="flex items-center gap-3">
