@@ -1,40 +1,94 @@
+# ==============================================================================
+# React SPA (Single Page Application) Configuration for Apache
+# ==============================================================================
+
 <IfModule mod_rewrite.c>
-  # Enable the rewrite engine
   RewriteEngine On
-
-  # Set the base directory
   RewriteBase /
-  RewriteRule ^index\.html$ - [L]
 
-  # If the requested resource exists as a file or directory, serve it directly
+  # ------------------------------------------------------------------------------
+  # Optional: Force HTTPS (Uncomment if you want HTTP to redirect to HTTPS)
+  # Only enable this if you have SSL certificate configured
+  # ------------------------------------------------------------------------------
+  # RewriteCond %{HTTPS} off
+  # RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  # RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+  # ------------------------------------------------------------------------------
+  # SPA Routing: Serve index.html for all routes (client-side routing)
+  # ------------------------------------------------------------------------------
+
+  # Don't rewrite files or directories that exist
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
 
-  # Otherwise, serve index.html to let React Router handle the routing
-  RewriteRule . /index.html [L]
+  # Don't rewrite API calls (if your API is on same domain)
+  # Uncomment and adjust if needed:
+  # RewriteCond %{REQUEST_URI} !^/api-v1/
+
+  # Serve index.html for all other requests (React Router handles the rest)
+  RewriteRule ^ index.html [L]
 </IfModule>
 
-# Additional security and performance headers
+# ==============================================================================
+# Security Headers
+# ==============================================================================
 <IfModule mod_headers.c>
-  # Disable ETags for better caching control
+  # Prevent MIME type sniffing
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Prevent clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+
+  # Enable XSS protection
+  Header always set X-XSS-Protection "1; mode=block"
+
+  # Referrer Policy
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ==============================================================================
+# Caching Strategy
+# ==============================================================================
+<IfModule mod_headers.c>
+  # Disable ETags (we use Cache-Control instead)
   Header unset ETag
   FileETag None
 
-  # Cache static assets
-  <FilesMatch "\.(ico|jpg|jpeg|png|gif|svg|js|css|swf|eot|ttf|otf|woff|woff2)$">
-    Header set Cache-Control "max-age=31536000, public"
+  # Cache static assets for 1 year (they have hashed filenames)
+  <FilesMatch "\.(ico|jpg|jpeg|png|gif|svg|webp|js|css|woff|woff2|ttf|eot|otf)$">
+    Header set Cache-Control "max-age=31536000, public, immutable"
   </FilesMatch>
 
-  # Don't cache HTML files
+  # Never cache HTML files (always get fresh version)
   <FilesMatch "\.(html|htm)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
     Header set Pragma "no-cache"
-    Header set Expires 0
+    Header set Expires "0"
+  </FilesMatch>
+
+  # Cache JSON files briefly
+  <FilesMatch "\.(json)$">
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
   </FilesMatch>
 </IfModule>
 
-# Prevent directory browsing
-Options -Indexes
+# ==============================================================================
+# MIME Types (Ensure correct content types)
+# ==============================================================================
+<IfModule mod_mime.c>
+  AddType application/javascript js mjs
+  AddType text/css css
+  AddType image/svg+xml svg
+  AddType font/woff2 woff2
+</IfModule>
 
-# Custom error pages (optional)
+# ==============================================================================
+# Security: Disable directory browsing
+# ==============================================================================
+Options -Indexes -MultiViews
+
+# ==============================================================================
+# Error Handling: Serve index.html for 404 errors (SPA routing)
+# ==============================================================================
 ErrorDocument 404 /index.html

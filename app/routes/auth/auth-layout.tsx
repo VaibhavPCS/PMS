@@ -1,23 +1,11 @@
-import React, { useEffect } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router'
+import React from 'react'
+import { Navigate, Outlet } from 'react-router'
 
 // @ts-ignore
 import { useAuth } from '../../provider/auth-context';
 
 const AuthLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-
-  // Handle hash routing for auth pages
-  useEffect(() => {
-    const currentPath = location.pathname;
-    const desiredHash = `#${currentPath}`;
-    
-    // Update hash to maintain proper URL structure
-    if (window.location.hash !== desiredHash) {
-      window.history.replaceState(null, '', `${currentPath}${desiredHash}`);
-    }
-  }, [location.pathname]);
 
   // Show loading state with proper styling
   if (isLoading) {
@@ -31,12 +19,8 @@ const AuthLayout = () => {
     );
   }
 
-  // Redirect authenticated users to dashboard with hash
+  // Redirect authenticated users to dashboard
   if (isAuthenticated) {
-    // Navigate to dashboard and update hash
-    setTimeout(() => {
-      window.history.replaceState(null, '', '/dashboard#/dashboard');
-    }, 0);
     return <Navigate to="/dashboard" replace />;
   }
 

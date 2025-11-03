@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router';
+import React from 'react';
+import { Navigate, Outlet } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
 import { BadgeProvider } from '../../provider/badge-context';
 import VerticalSidebar from './vertical-sidebar';
@@ -7,18 +7,6 @@ import HorizontalNavbar from './horizontal-navbar';
 
 const DashboardLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-
-  // Handle hash routing for dashboard pages
-  useEffect(() => {
-    const currentPath = location.pathname;
-    const desiredHash = `#${currentPath}`;
-    
-    // Update hash to maintain proper URL structure for protected routes
-    if (window.location.hash !== desiredHash) {
-      window.history.replaceState(null, '', `${currentPath}${desiredHash}`);
-    }
-  }, [location.pathname]);
 
   if (isLoading) {
     return (
@@ -32,10 +20,6 @@ const DashboardLayout = () => {
   }
 
   if (!isAuthenticated) {
-    // Redirect to sign-in with proper hash structure
-    setTimeout(() => {
-      window.history.replaceState(null, '', '/sign-in#/sign-in');
-    }, 0);
     return <Navigate to="/sign-in" replace />;
   }
 
