@@ -1,0 +1,42 @@
+<IfModule mod_rewrite.c>
+  # Enable the rewrite engine
+  RewriteEngine On
+
+  # Set the base directory
+  RewriteBase /
+
+  # If the request is for index.html, don't do anything
+  RewriteRule ^index\.html$ - [L]
+
+  # If the requested resource exists as a file or directory, serve it directly
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Otherwise, serve index.html to let React Router handle the routing
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Additional security and performance headers
+<IfModule mod_headers.c>
+  # Disable ETags for better caching control
+  Header unset ETag
+  FileETag None
+
+  # Cache static assets
+  <FilesMatch "\.(ico|jpg|jpeg|png|gif|svg|js|css|swf|eot|ttf|otf|woff|woff2)$">
+    Header set Cache-Control "max-age=31536000, public"
+  </FilesMatch>
+
+  # Don't cache HTML files
+  <FilesMatch "\.(html|htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </FilesMatch>
+</IfModule>
+
+# Prevent directory browsing
+Options -Indexes
+
+# Custom error pages (optional)
+ErrorDocument 404 /index.html
