@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { postData } from '@/lib/fetch-util';
+import { postData, fetchData } from '@/lib/fetch-util';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -19,8 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar as CalendarIcon, X, Upload } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon, X, Upload, Plus, Trash2 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface AddProjectModalProps {
   open: boolean;
@@ -28,33 +35,114 @@ interface AddProjectModalProps {
   onProjectAdded: () => void;
 }
 
+interface WorkspaceMember {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface CategoryMember {
+  email: string;
+  name: string;
+  role: 'member' | 'lead';
+}
+
+interface Category {
+  name: string;
+  members: CategoryMember[];
+}
+
 export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Planning');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [categoryInput, setCategoryInput] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+  // Fetch workspace members
+  useEffect(() => {
+    if (open) {
+      fetchWorkspaceMembers();
+    }
+  }, [open]);
+
+  const fetchWorkspaceMembers = async () => {
+    try {
+      const response = await fetchData('/project/members');
+      setWorkspaceMembers(response.members || []);
+    } catch (error) {
+      console.error('Failed to load workspace members', error);
+    }
+  };
 
   const projectDuration = startDate && endDate
-    ? differenceInDays(new Date(endDate), new Date(startDate))
+    ? differenceInDays(endDate, startDate)
     : 0;
 
   const handleAddCategory = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && categoryInput.trim()) {
       e.preventDefault();
-      if (!categories.includes(categoryInput.trim())) {
-        setCategories([...categories, categoryInput.trim()]);
+      if (!categories.find(cat => cat.name === categoryInput.trim())) {
+        setCategories([...categories, { name: categoryInput.trim(), members: [] }]);
+        setExpandedCategory(categoryInput.trim());
       }
       setCategoryInput('');
     }
   };
 
-  const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove));
+  const handleRemoveCategory = (categoryName: string) => {
+    setCategories(categories.filter(cat => cat.name !== categoryName));
+    if (expandedCategory === categoryName) {
+      setExpandedCategory(null);
+    }
+  };
+
+  const handleAddMemberToCategory = (categoryName: string, member: WorkspaceMember, role: 'member' | 'lead') => {
+    setCategories(categories.map(cat => {
+      if (cat.name === categoryName) {
+        // Check if member already exists
+        if (!cat.members.find(m => m.email === member.email)) {
+          return {
+            ...cat,
+            members: [...cat.members, { email: member.email, name: member.name, role }]
+          };
+        }
+      }
+      return cat;
+    }));
+  };
+
+  const handleRemoveMemberFromCategory = (categoryName: string, memberEmail: string) => {
+    setCategories(categories.map(cat => {
+      if (cat.name === categoryName) {
+        return {
+          ...cat,
+          members: cat.members.filter(m => m.email !== memberEmail)
+        };
+      }
+      return cat;
+    }));
+  };
+
+  const handleChangeMemberRole = (categoryName: string, memberEmail: string, newRole: 'member' | 'lead') => {
+    setCategories(categories.map(cat => {
+      if (cat.name === categoryName) {
+        return {
+          ...cat,
+          members: cat.members.map(m =>
+            m.email === memberEmail ? { ...m, role: newRole } : m
+          )
+        };
+      }
+      return cat;
+    }));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,22 +166,56 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
       return;
     }
 
+    if (!startDate || !endDate) {
+      toast.error('Please select start and end dates');
+      return;
+    }
+
+    // Validate dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (startDate < today) {
+      toast.error('Start date cannot be in the past');
+      return;
+    }
+
+    if (endDate < startDate) {
+      toast.error('End date must be after start date');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Convert categories to backend format
-      const formattedCategories = categories.map(name => ({
-        name,
-        members: []
-      }));
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('status', status);
+      formData.append('startDate', startDate.toISOString());
+      formData.append('endDate', endDate.toISOString());
 
-      await postData('/project', {
-        title,
-        description,
-        status,
-        startDate,
-        endDate,
-        categories: formattedCategories,
+      // Add categories (send members with email and role)
+      formData.append('categories', JSON.stringify(categories));
+
+      // Add files
+      files.forEach((file) => {
+        formData.append('attachments', file);
       });
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api-v1/project`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'workspace-id': localStorage.getItem('currentWorkspaceId') || '',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create project');
+      }
 
       toast.success('Project created successfully!');
       onProjectAdded();
@@ -102,12 +224,13 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
       setTitle('');
       setDescription('');
       setStatus('Planning');
-      setStartDate('');
-      setEndDate('');
+      setStartDate(undefined);
+      setEndDate(undefined);
       setCategories([]);
       setFiles([]);
-    } catch (error) {
-      toast.error('Failed to create project');
+      setExpandedCategory(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create project');
     } finally {
       setIsSubmitting(false);
     }
@@ -115,9 +238,9 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[552px] p-0 gap-0 rounded-[16px]">
+      <DialogContent className="sm:max-w-[552px] p-0 gap-0 rounded-[16px] max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-white px-[24px] pt-[24px] pb-0">
+        <div className="bg-white px-[24px] pt-[24px] pb-0 shrink-0">
           <div className="flex items-start gap-[10px] mb-[10px]">
             <div className="w-[48px] h-[48px] rounded-[10px] bg-[rgba(27,89,248,0.1)] flex items-center justify-center shrink-0">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -137,8 +260,8 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
         </div>
 
         {/* Form Content - Scrollable */}
-        <form onSubmit={handleSubmit} className="flex flex-col">
-          <div className="px-[24px] pr-[14px] max-h-[430px] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-[24px] pr-[14px] overflow-y-auto flex-1">
             <div className="pr-[10px] space-y-[16px]">
               {/* Project Name */}
               <div className="space-y-[6px]">
@@ -175,33 +298,72 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                 </Select>
               </div>
 
-              {/* Start Date & Due Date */}
+              {/* Start Date & Due Date with Calendar Picker */}
               <div className="flex gap-[10px] flex-wrap">
                 <div className="flex-1 min-w-[221px] space-y-[6px]">
-                  <Label htmlFor="startDate" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
                     Start Date <span className="text-[#cd2818] font-['Work_Sans']">*</span>
                   </Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                    className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter']"
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal",
+                          !startDate && "text-[#717680]"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex-1 min-w-[221px] space-y-[6px]">
-                  <Label htmlFor="endDate" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
                     Due Date <span className="text-[#cd2818] font-['Work_Sans']">*</span>
                   </Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                    className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter']"
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal",
+                          !endDate && "text-[#717680]"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const start = startDate || today;
+                          return date < start;
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 {projectDuration > 0 && (
                   <div className="flex-1 min-w-[120px] px-0 py-[5px] flex items-center">
@@ -212,7 +374,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                 )}
               </div>
 
-              {/* Categories */}
+              {/* Categories with Members */}
               <div className="space-y-[6px]">
                 <Label htmlFor="categories" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
                   Categories <span className="text-[#cd2818] font-['Work_Sans']">*</span>
@@ -221,13 +383,19 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                   <div className="flex flex-wrap gap-[8px] items-center">
                     {categories.map((category) => (
                       <div
-                        key={category}
+                        key={category.name}
                         className="bg-[#f0f0f0] px-[8px] py-[4px] rounded-[6px] flex items-center gap-[6px]"
                       >
-                        <span className="text-[14px] font-['Inter'] text-[#414651]">{category}</span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveCategory(category)}
+                          onClick={() => setExpandedCategory(expandedCategory === category.name ? null : category.name)}
+                          className="text-[14px] font-['Inter'] text-[#414651] hover:text-[#1B59F8]"
+                        >
+                          {category.name} ({category.members.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCategory(category.name)}
                           className="text-[#717680] hover:text-[#414651]"
                         >
                           <X size={14} />
@@ -246,8 +414,104 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                   </div>
                 </div>
                 <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
-                  Press Enter to add category
+                  Press Enter to add category, click category to add members
                 </p>
+
+                {/* Category Member Management */}
+                {expandedCategory && (
+                  <div className="border border-[#d5d7da] rounded-[8px] p-[14px] mt-[8px] bg-[#f9fafb]">
+                    <div className="flex items-center justify-between mb-[12px]">
+                      <h4 className="text-[14px] font-semibold font-['Inter'] text-[#414651]">
+                        {expandedCategory} - Members
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCategory(null)}
+                        className="text-[#717680] hover:text-[#414651]"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Add Member Dropdown */}
+                    <div className="mb-[12px]">
+                      <Select
+                        onValueChange={(value) => {
+                          const [email, role] = value.split('|');
+                          const member = workspaceMembers.find(m => m.email === email);
+                          if (member) {
+                            handleAddMemberToCategory(expandedCategory, member, role as 'member' | 'lead');
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-[36px] text-[12px] font-['Inter'] border-[#d5d7da]">
+                          <SelectValue placeholder="+ Add Member" />
+                        </SelectTrigger>
+                        <SelectContent className="font-['Inter']">
+                          <div className="px-2 py-1.5 text-[11px] font-semibold text-[#717680]">As Member</div>
+                          {workspaceMembers.map((member) => (
+                            <SelectItem
+                              key={`${member.email}|member`}
+                              value={`${member.email}|member`}
+                              className="text-[12px]"
+                            >
+                              {member.name} ({member.email})
+                            </SelectItem>
+                          ))}
+                          <div className="px-2 py-1.5 text-[11px] font-semibold text-[#717680] mt-2">As Lead</div>
+                          {workspaceMembers.map((member) => (
+                            <SelectItem
+                              key={`${member.email}|lead`}
+                              value={`${member.email}|lead`}
+                              className="text-[12px]"
+                            >
+                              {member.name} ({member.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Member List */}
+                    <div className="space-y-[6px]">
+                      {categories.find(c => c.name === expandedCategory)?.members.map((member) => (
+                        <div
+                          key={member.email}
+                          className="flex items-center justify-between bg-white px-[10px] py-[6px] rounded-[6px] border border-[#e5e7eb]"
+                        >
+                          <div className="flex-1">
+                            <p className="text-[12px] font-medium font-['Inter'] text-[#414651]">{member.name}</p>
+                            <p className="text-[10px] font-normal font-['Inter'] text-[#717680]">{member.email}</p>
+                          </div>
+                          <div className="flex items-center gap-[6px]">
+                            <Select
+                              value={member.role}
+                              onValueChange={(value) => handleChangeMemberRole(expandedCategory, member.email, value as 'member' | 'lead')}
+                            >
+                              <SelectTrigger className="h-[28px] text-[11px] w-[90px] font-['Inter'] border-[#d5d7da]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="font-['Inter']">
+                                <SelectItem value="member" className="text-[11px]">Member</SelectItem>
+                                <SelectItem value="lead" className="text-[11px]">Lead</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMemberFromCategory(expandedCategory, member.email)}
+                              className="text-[#cd2818] hover:text-[#a01f10]"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {categories.find(c => c.name === expandedCategory)?.members.length === 0 && (
+                        <p className="text-[12px] text-center text-[#717680] py-[8px]">No members added yet</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Description */}
@@ -310,7 +574,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
           </div>
 
           {/* Footer Buttons */}
-          <div className="flex gap-[12px] px-[24px] py-[20px] border-t border-gray-100">
+          <div className="flex gap-[12px] px-[24px] py-[20px] border-t border-gray-100 shrink-0">
             <Button
               type="button"
               onClick={onClose}

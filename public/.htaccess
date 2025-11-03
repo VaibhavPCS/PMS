@@ -4,8 +4,6 @@
 
   # Set the base directory
   RewriteBase /
-
-  # If the request is for index.html, don't do anything
   RewriteRule ^index\.html$ - [L]
 
   # If the requested resource exists as a file or directory, serve it directly
