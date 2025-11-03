@@ -35,6 +35,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 // ==================== INTERFACES ====================
 
@@ -51,12 +52,14 @@ interface ProjectStatistics {
   proposedProjects: number;
 }
 
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+
 interface Project {
   _id: string;
   propertyId?: string;
   title: string;
   description?: string;
-  status: string;
+  status: ProjectStatus;
   startDate: string;
   endDate: string;
   creator?: {
@@ -966,18 +969,7 @@ const Dashboard = () => {
                               {project.description || "No description"}
                             </td>
                             <td className="px-[16px] py-[14px]">
-                              <Badge
-                                className={cn(
-                                  "text-[12px] font-['Inter'] font-normal",
-                                  project.status === "Completed" && "bg-[#479c39] hover:bg-[#479c39]",
-                                  project.status === "In Progress" && "bg-[#4a8cd7] hover:bg-[#4a8cd7]",
-                                  project.status === "Planning" && "bg-[#f2761b] hover:bg-[#f2761b]",
-                                  project.status === "On Hold" && "bg-[#f27944] hover:bg-[#f27944]",
-                                  project.status === "Cancelled" && "bg-[#cd2812] hover:bg-[#cd2812]"
-                                )}
-                              >
-                                {project.status}
-                              </Badge>
+                              <StatusBadge status={project.status} />
                             </td>
                             <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
                               {formatDate(project.startDate)}

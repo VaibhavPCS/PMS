@@ -79,6 +79,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 import {
   DndContext,
@@ -113,11 +114,13 @@ interface Task {
   createdAt: string;
 }
 
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+
 interface Project {
   _id: string;
   title: string;
   description: string;
-  status: string;
+  status: ProjectStatus;
   startDate: string;
   endDate: string;
   progress: number;
@@ -1612,9 +1615,7 @@ const ProjectDetail = () => {
             <h1 className="text-base font-bold text-gray-900 truncate flex-1 mr-2">
               {project.title}
             </h1>
-            <Badge variant="outline" className="text-xs h-5">
-              {project.status}
-            </Badge>
+            <StatusBadge status={project.status} />
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
