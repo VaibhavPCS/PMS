@@ -25,25 +25,26 @@ export function CreateWorkspaceModal({ open, onClose, onWorkspaceCreated }: Crea
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      await postData('/workspace', {
-        name,
-        description,
-      });
-      toast.success('Workspace created successfully!');
-      onWorkspaceCreated();
-      onClose();
-      // Reset form
-      setName('');
-      setDescription('');
-    } catch (error) {
-      toast.error('Failed to create workspace');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  e.preventDefault();
+  setIsSubmitting(true);
+  try {
+    await postData('/workspace', {  // ✅ Singular
+      name,
+      description,
+    });
+    toast.success('Workspace created successfully!');
+    onWorkspaceCreated();
+    onClose();
+    // Reset form
+    setName('');
+    setDescription('');
+  } catch (error) {
+    toast.error('Failed to create workspace');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

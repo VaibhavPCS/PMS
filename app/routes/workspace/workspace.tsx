@@ -70,15 +70,17 @@ const WorkspacePage = () => {
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
 
-  const fetchWorkspaces = useCallback(async () => {
-    try {
-      const response = await fetchData('/workspace');
-      setWorkspaces(response.workspaces);
-      setCurrentWorkspace(response.currentWorkspace);
-    } catch (error) {
-      console.error('Failed to load workspaces', error);
-    }
-  }, []);
+const fetchWorkspaces = useCallback(async () => {
+  try {
+    const response = await fetchData('/workspace'); // ✅ Keep singular (already correct)
+    const workspaceList = response.workspaces?.map((w: any) => w.workspaceId).filter(Boolean) || [];
+    setWorkspaces(workspaceList);
+    setCurrentWorkspace(response.currentWorkspace);
+  } catch (error) {
+    console.error('Failed to load workspaces', error);
+  }
+}, []);
+
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -97,18 +99,27 @@ const WorkspacePage = () => {
     }
   }, [isAuthenticated, fetchWorkspaces, fetchProjects]);
 
-  const switchWorkspace = async (workspaceId: string) => {
-    try {
-      await postData('/workspace/switch', { workspaceId });
-      fetchWorkspaces();
-      fetchProjects();
-    } catch (error) {
-      console.error('Failed to switch workspace', error);
-    }
-  };
+const switchWorkspace = async (workspaceId: string) => {
+  try {
+    await postData('/workspace/switch', { workspaceId }); // ✅ Change from '/workspaces/switch' to '/workspace/switch'
+    fetchWorkspaces();
+    fetchProjects();
+  } catch (error) {
+    console.error('Failed to switch workspace', error);
+  }
+};
+
 
   const handleCreateWorkspace = () => {
     setShowCreateWorkspaceModal(true);
+  };
+
+  const handleWorkspaceChange = (workspaceId: string) => {
+    if (workspaceId === 'create-new-workspace') {
+      handleCreateWorkspace();
+      return;
+    }
+    switchWorkspace(workspaceId);
   };
 
   const handleStatusChange = async (projectId: string, newStatus: ProjectStatus) => {
@@ -206,7 +217,7 @@ const WorkspacePage = () => {
             <WorkspaceSelector
               workspaces={workspaces}
               currentWorkspace={currentWorkspace}
-              onSwitchWorkspace={switchWorkspace}
+              onSwitchWorkspace={handleWorkspaceChange}
               onCreateWorkspaceClick={handleCreateWorkspace}
             />
           </div>
@@ -256,7 +267,7 @@ const WorkspacePage = () => {
             </Button>
 
             {/* Calendar Filter */}
-            <Popover>
+            {/* <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
@@ -277,7 +288,7 @@ const WorkspacePage = () => {
                   initialFocus
                 />
               </PopoverContent>
-            </Popover>
+            </Popover> */}
           </div>
         </div>
 

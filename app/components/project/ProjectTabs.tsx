@@ -23,7 +23,7 @@ export function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
             key={tab.value}
             value={tab.value}
             className="
-              px-[20px] py-[10px] rounded-none
+              px-[20px] py-[10px] rounded-tl-[10px] rounded-tr-[10px]
               text-[16px] font-normal font-['Inter']
               data-[state=active]:text-[#000D2A]
               data-[state=active]:border-b-[1px]
