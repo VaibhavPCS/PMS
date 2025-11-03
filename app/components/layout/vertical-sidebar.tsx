@@ -25,23 +25,23 @@ const navItems: NavItem[] = [
     href: '/workspace',
     icon: '/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg', // Building icon
   },
-  {
-    name: 'Meetings',
-    href: '/meetings',
-    icon: '/assets/f9c7d9cff49e119c3ec5f445cfc83669d39c4316.svg', // Meeting icon
-  },
-  {
-    name: 'Messages',
-    href: '/chat',
-    icon: '/assets/8fa45b78e2676154445cac574d31fb27521e2ea2.svg', // Message icon
-    badgeKey: 'messages',
-  },
-  {
-    name: 'Notifications',
-    href: '/notifications',
-    icon: '/assets/2d994bf0fad32811c48b4a9c7fec2f06e9e67362.svg', // Bell icon
-    badgeKey: 'notifications',
-  },
+  // {
+  //   name: 'Meetings',
+  //   href: '/meetings',
+  //   icon: '/assets/f9c7d9cff49e119c3ec5f445cfc83669d39c4316.svg', // Meeting icon
+  // },
+  // {
+  //   name: 'Messages',
+  //   href: '/chat',
+  //   icon: '/assets/8fa45b78e2676154445cac574d31fb27521e2ea2.svg', // Message icon
+  //   badgeKey: 'messages',
+  // }, 
+  // {
+  //   name: 'Notifications',
+  //   href: '/notifications',
+  //   icon: '/assets/2d994bf0fad32811c48b4a9c7fec2f06e9e67362.svg', // Bell icon
+  //   badgeKey: 'notifications',
+  // },
   {
     name: 'Administration',
     href: '/administration',
