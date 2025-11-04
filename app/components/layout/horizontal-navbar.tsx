@@ -144,9 +144,11 @@ const HorizontalNavbar: React.FC<HorizontalNavbarProps> = ({
                 <p className="font-['Work_Sans:Regular',sans-serif] font-normal text-[16px] leading-[normal] text-[#141414] whitespace-nowrap">
                   {userInfo?.name || 'Loading...'}
                 </p>
+                {/*
                 <p className="font-['Work_Sans:Regular',sans-serif] font-normal text-[12px] leading-[normal] text-gray-500 whitespace-nowrap">
                   {userInfo ? getRoleDisplay(userInfo.role) : 'USER'}
                 </p>
+                */}
               </div>
             </div>
           </button>

@@ -259,14 +259,16 @@ const switchWorkspace = async (workspaceId: string) => {
               </SelectContent>
             </Select>
 
-            {/* Add Project Button */}
-            <Button
-              onClick={() => setShowAddProjectModal(true)}
-              className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center gap-[10px]"
-            >
-              <Plus size={15} />
-              Add Project
-            </Button>
+            {/* Add Project Button (visible only to admin) */}
+            {user?.role === 'admin' && (
+              <Button
+                onClick={() => setShowAddProjectModal(true)}
+                className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center gap-[10px]"
+              >
+                <Plus size={15} />
+                Add Project
+              </Button>
+            )}
 
             {/* Calendar Filter */}
             {/* <Popover>
