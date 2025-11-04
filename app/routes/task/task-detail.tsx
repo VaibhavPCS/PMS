@@ -184,8 +184,8 @@ const FileUpload: React.FC<{
     onFilesSelect(newFiles);
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
+  const formatFileSize = (bytes: number | undefined) => {
+    if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -263,8 +263,8 @@ const FilePreview: React.FC<{
 }> = ({ attachments, canDelete = false, onDelete }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
+  const formatFileSize = (bytes: number | undefined) => {
+    if (!bytes || bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -294,7 +294,7 @@ const FilePreview: React.FC<{
       {attachments.map((attachment, index) => (
         <div key={index} className="relative">
           {attachment.fileType === "image" ? (
-            <div className="relative max-w-xs">
+            <div className="relative group">
               <img
                 src={buildBackendUrl(attachment.fileUrl)}
                 alt={attachment.fileName}
@@ -303,18 +303,42 @@ const FilePreview: React.FC<{
                   setPreviewImage(buildBackendUrl(attachment.fileUrl))
                 }
               />
-              <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                {attachment.fileName}
+              <div className="absolute bottom-2 left-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1.5 rounded flex items-center justify-between">
+                <span className="truncate">{attachment.fileName}</span>
+                <div className="flex gap-1 ml-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewImage(buildBackendUrl(attachment.fileUrl));
+                    }}
+                    className="h-5 w-5 p-0 hover:bg-white/20"
+                  >
+                    <span className="w-3 h-3 text-white">👁</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadFile(attachment);
+                    }}
+                    className="h-5 w-5 p-0 hover:bg-white/20"
+                  >
+                    <Download className="w-3 h-3 text-white" />
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between p-2 bg-gray-50 rounded border text-xs">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded border text-xs hover:bg-gray-100 transition-colors">
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <span className="text-lg flex-shrink-0">
                   {getFileIcon(attachment.mimeType)}
                 </span>
-                <div>
-                  <div className="font-medium">{attachment.fileName}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">{attachment.fileName}</div>
                   <div className="text-gray-500">
                     {formatFileSize(attachment.fileSize)}
                   </div>
@@ -324,9 +348,10 @@ const FilePreview: React.FC<{
                 size="sm"
                 variant="outline"
                 onClick={() => downloadFile(attachment)}
-                className="h-6 px-2"
+                className="h-7 px-2 ml-2 flex-shrink-0"
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3 h-3 mr-1" />
+                Download
               </Button>
             </div>
           )}
@@ -1058,7 +1083,7 @@ const TaskDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">

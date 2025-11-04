@@ -925,13 +925,7 @@ const Dashboard = () => {
                         </th>
                         <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                           <div className="flex items-center gap-2">
-                            Start Date
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          <div className="flex items-center gap-2">
-                            End Date
+                            Duration
                             <Filter className="w-3 h-3" />
                           </div>
                         </th>
@@ -949,7 +943,7 @@ const Dashboard = () => {
                     <tbody>
                       {recentProjects.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
+                          <td colSpan={7} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
                             No projects found
                           </td>
                         </tr>
@@ -971,11 +965,15 @@ const Dashboard = () => {
                             <td className="px-[16px] py-[14px]">
                               <StatusBadge status={project.status} />
                             </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
-                              {formatDate(project.startDate)}
-                            </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
-                              {formatDate(project.endDate)}
+                            <td className="px-[16px] py-[14px]">
+                              <div className="flex flex-col gap-1">
+                                <div className="text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
+                                  {formatDate(project.startDate)}
+                                </div>
+                                <div className="text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
+                                  {formatDate(project.endDate)}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
                               {calculateDaysBetween(project.startDate, project.endDate)} days
@@ -1096,8 +1094,9 @@ const Dashboard = () => {
                         return (
                           <div
                             key={task._id}
+                            onClick={() => navigate(`/task/${task._id}`)}
                             className={cn(
-                              "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300",
+                              "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer",
                               "flex gap-3 items-start"
                             )}
                           >
