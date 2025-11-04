@@ -1172,7 +1172,7 @@ const DroppableColumn = ({
           {count}
         </Badge>
       </div>
-      <div ref={setNodeRef} className="space-y-2 min-h-80 max-h-96 overflow-y-auto">
+      <div ref={setNodeRef} className="space-y-2 min-h-80">
         {children}
       </div>
     </div>
@@ -1802,7 +1802,7 @@ const ProjectDetail = () => {
           </div>
 
           {/* Center: Project Overview Panel (589px width = 620px * 0.95) */}
-          <div className="flex-1 max-w-[589px]">
+          <div className="w-[589px] mx-auto flex-shrink-0">
             <ProjectOverviewPanel
               projectManager={project.creator.name}
               description={project.description}
@@ -1836,9 +1836,8 @@ const ProjectDetail = () => {
       </div>
 
       {/* SCROLLABLE CONTENT */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className={cn("p-3", !isMobile && "p-4")}>
+      <div className="flex-1">
+          <div className={cn("p-3", !isMobile && "p-4")}> 
             <Tabs defaultValue="your-tasks" className="space-y-4">
               <div className="sticky top-0 bg-gray-50 pb-3 z-5">
                 <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
@@ -2044,7 +2043,7 @@ const ProjectDetail = () => {
                                   </div>
                                 </CardHeader>
                                 <CardContent className="p-3 pt-0">
-                                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                                  <div className="space-y-2">
                                     {statusTasks.map((task) => (
                                       <TaskCard
                                         key={task._id}
@@ -2176,7 +2175,6 @@ const ProjectDetail = () => {
               </TabsContent>
             </Tabs>
           </div>
-        </ScrollArea>
       </div>
 
       {/* MOBILE FAB */}
