@@ -57,7 +57,7 @@ interface Workspace {
 }
 
 const WorkspacePage = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
@@ -122,10 +122,10 @@ const switchWorkspace = async (workspaceId: string) => {
     switchWorkspace(workspaceId);
   };
 
-  const handleStatusChange = async (projectId: string, newStatus: ProjectStatus) => {
+  const handleStatusChange = async (projectId: string, newStatus: ProjectStatus, newProgress: number) => {
     setProjects(prevProjects =>
       prevProjects.map(p =>
-        p._id === projectId ? { ...p, status: newStatus } : p
+        p._id === projectId ? { ...p, status: newStatus, progress: newProgress } : p
       )
     );
   };
@@ -208,18 +208,20 @@ const switchWorkspace = async (workspaceId: string) => {
               <h1 className="text-[24px] font-bold text-[#040110] font-['Inter']">
                 {sortedProjects.length} Projects
               </h1>
-              <p className="text-[14px] text-[#040110] opacity-60 font-normal font-['Work_Sans']">
+              <p className="text-[14px] text-[#040110] opacity-60 font-normal">
                 Ensure timely completion with organized task tracking.
               </p>
             </div>
 
-            {/* Right: Workspace Selector */}
-            <WorkspaceSelector
-              workspaces={workspaces}
-              currentWorkspace={currentWorkspace}
-              onSwitchWorkspace={handleWorkspaceChange}
-              onCreateWorkspaceClick={handleCreateWorkspace}
-            />
+            {/* Right: Workspace Selector (visible only to admin) */}
+            {user?.role === 'admin' && (
+              <WorkspaceSelector
+                workspaces={workspaces}
+                currentWorkspace={currentWorkspace}
+                onSwitchWorkspace={handleWorkspaceChange}
+                onCreateWorkspaceClick={handleCreateWorkspace}
+              />
+            )}
           </div>
 
           {/* Tabs */}

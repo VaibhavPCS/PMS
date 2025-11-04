@@ -36,7 +36,7 @@ interface Project {
 
 interface ProjectCardProps {
   project: Project;
-  onStatusChange?: (projectId: string, newStatus: ProjectStatus) => Promise<void>;
+  onStatusChange?: (projectId: string, newStatus: ProjectStatus, newProgress: number) => Promise<void>;
   onDelete?: (projectId: string) => Promise<void>;
 }
 
@@ -49,11 +49,11 @@ const statusBorderColors: Record<ProjectStatus, string> = {
 };
 
 const statusProgressColors: Record<ProjectStatus, string> = {
-  'Planning': 'bg-[#CD2812]',
-  'In Progress': 'bg-[#344BFD]',
-  'On Hold': 'bg-[#F59E0B]',
-  'Completed': 'bg-[#1A932E]',
-  'Cancelled': 'bg-gray-400'
+  'Planning': 'bg-[#2965DD]',
+  'In Progress': 'bg-[#F59E0B]',
+  'On Hold': 'bg-[#CD2812]',
+  'Completed': 'bg-[#479C39]',
+  'Cancelled': 'bg-gray-500'
 };
 
 export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardProps) {
@@ -78,10 +78,19 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
     if (isUpdating) return;
     setIsUpdating(true);
     try {
-      await putData(`/project/${project._id}`, { status: newStatus });
+      const response = await putData(`/project/${project._id}`, { status: newStatus });
+      const updated = (response as any).project ?? {};
+      const statusProgressMap: Record<ProjectStatus, number> = {
+        'Planning': 10,
+        'In Progress': 50,
+        'On Hold': 30,
+        'Completed': 100,
+        'Cancelled': 0
+      };
+      const newProgress = typeof updated.progress === 'number' ? updated.progress : statusProgressMap[newStatus];
       toast.success(`Project status updated to ${newStatus}`);
       if (onStatusChange) {
-        await onStatusChange(project._id, newStatus);
+        await onStatusChange(project._id, newStatus, newProgress);
       }
     } catch (error) {
       toast.error('Failed to update project status');
