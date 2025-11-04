@@ -47,6 +47,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -81,6 +82,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Breadcrumb from "@/components/layout/Breadcrumb";
+import { TeamAvatars } from "@/components/project/TeamAvatars";
+import { InviteMembersButton } from "@/components/project/InviteMembersButton";
+import { ProjectOverviewPanel } from "@/components/project/ProjectOverviewPanel";
+import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
+import { FilePreviewModal } from "@/components/project/FilePreviewModal";
+import { AttachmentUpload } from "@/components/project/AttachmentUpload";
+import { usePermissions } from "@/hooks/use-permissions";
 
 import {
   DndContext,
@@ -133,6 +141,14 @@ interface Project {
     }>;
   }>;
   creator: { _id: string; name: string; email: string };
+  attachments?: Array<{
+    _id: string;
+    filename: string;
+    originalName: string;
+    size?: number;
+    mimeType?: string;
+    path: string;
+  }>;
 }
 
 interface AssignableMember {
@@ -1167,6 +1183,7 @@ const ProjectDetail = () => {
   const { id: projectId } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const permissions = usePermissions();
 
   // All existing state variables (unchanged)
   const [project, setProject] = useState<Project | null>(null);
@@ -1180,6 +1197,10 @@ const ProjectDetail = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Attachment state
+  const [previewAttachment, setPreviewAttachment] = useState<NonNullable<Project['attachments']>[0] | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const [filters, setFilters] = useState<FilterType>({
     search: "",
@@ -1598,7 +1619,7 @@ const ProjectDetail = () => {
             </Sheet>
 
             {canCreateTask && (
-              <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 px-2">
+              <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 px-2 bg-[#f2761b] hover:bg-[#f2761b]/90">
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 <span className="text-xs">Task</span>
               </Button>
@@ -1628,61 +1649,189 @@ const ProjectDetail = () => {
           </div>
         </div>
 
-        {/* MOBILE STATS */}
+        {/* MOBILE STATS - Figma Style */}
         <div className="grid grid-cols-4 gap-2 mt-3">
           {[
-            { label: "Total", value: taskStats.total, color: "text-blue-600" },
-            { label: "Done", value: taskStats.completed, color: "text-green-600" },
-            { label: "Active", value: taskStats.inProgress, color: "text-orange-600" },
-            { label: "Overdue", value: taskStats.overdue, color: "text-red-600" },
+            {
+              label: "Total",
+              value: taskStats.total,
+              bg: "#E0E7FF",
+              stripe: "#6366F1",
+            },
+            {
+              label: "Done",
+              value: taskStats.completed,
+              bg: "#D1FAE5",
+              stripe: "#10B981",
+            },
+            {
+              label: "Active",
+              value: taskStats.inProgress,
+              bg: "#FEF3C7",
+              stripe: "#F59E0B",
+            },
+            {
+              label: "Overdue",
+              value: taskStats.overdue,
+              bg: "#FED7AA",
+              stripe: "#F97316",
+            },
           ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className={cn("text-sm font-bold", stat.color)}>{stat.value}</div>
-              <div className="text-xs text-gray-500">{stat.label}</div>
+            <div
+              key={stat.label}
+              className="relative rounded-[6px] py-2 px-1 text-center"
+              style={{ backgroundColor: stat.bg }}
+            >
+              <div
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-[2px]"
+                style={{ backgroundColor: stat.stripe }}
+              />
+              <div className="text-sm font-bold text-[#040110]">{stat.value}</div>
+              <div className="text-xs text-[#040110] opacity-70">{stat.label}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* DESKTOP HEADER (unchanged) */}
-      <div className="hidden md:block bg-white border-b px-4 py-3 sticky top-0 z-20">
+      {/* DESKTOP HEADER */}
+      <div className="hidden md:block bg-white border-b px-4 py-3">
         {/* Breadcrumb */}
         <div className="mb-3">
           <Breadcrumb />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">{project.title}</h1>
-            <p className="text-xs text-gray-600 truncate max-w-md">{project.description}</p>
+        {/* Header: Title, Progress, Team Avatars, Invite Button */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-[5px]">
+            <h1 className="text-[24px] font-bold font-['Inter'] text-[#040110] leading-normal">{project.title}</h1>
+            <p className="text-[14px] font-normal font-['Work_Sans'] text-[#040110] opacity-60 leading-normal truncate max-w-md">{project.description}</p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-semibold">{project.progress}%</span>
-              <Progress value={project.progress} className="w-20 h-1.5" />
+          <div className="flex items-center gap-[11px]">
+            {/* Progress Bar - Figma Style */}
+            <div className="flex flex-col gap-[5px] items-end">
+              <div className="flex items-center justify-between w-[150px] text-[14px] font-normal font-['Inter'] text-neutral-700">
+                <span>Progress</span>
+                <span>{project.progress}%</span>
+              </div>
+              <div className="bg-[#e9edf0] h-[10px] w-[150px] rounded-[8px] relative">
+                <div
+                  className="absolute bg-[#3a5afe] h-[10px] left-0 top-0 rounded-[8px]"
+                  style={{ width: `${project.progress}%` }}
+                />
+              </div>
             </div>
-            {canCreateTask && (
-              <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 px-3">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                <span className="text-sm">Task</span>
-              </Button>
-            )}
+
+            {/* Team Avatars */}
+            <TeamAvatars categories={project.categories} maxVisible={3} />
+
+            {/* Invite Members Button */}
+            <InviteMembersButton
+              projectId={project._id}
+              categories={project.categories}
+              onInviteSuccess={fetchProjectDetails}
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 mt-3">
-          {[
-            { label: "Total", value: taskStats.total, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Done", value: taskStats.completed, color: "text-green-600", bg: "bg-green-50" },
-            { label: "Active", value: taskStats.inProgress, color: "text-orange-600", bg: "bg-orange-50" },
-            { label: "Overdue", value: taskStats.overdue, color: "text-red-600", bg: "bg-red-50" },
-          ].map((stat) => (
-            <div key={stat.label} className={cn("rounded-md p-2 text-center", stat.bg)}>
-              <div className={cn("text-base font-bold", stat.color)}>{stat.value}</div>
-              <div className="text-xs text-gray-600">{stat.label}</div>
+        {/* Project Overview Heading */}
+        <div className="mb-3">
+          <h2 className="text-[18px] font-semibold font-['Inter'] text-[#040110]">
+            Project Overview
+          </h2>
+        </div>
+
+        {/* Three Column Layout: Metrics + Overview Panel + Attachments */}
+        <div className="flex gap-4">
+          {/* Left: Metric Cards (2x2 grid, 238px width = 250px * 0.95) */}
+          <div className="w-[238px] flex-shrink-0">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: "Total Task",
+                  value: taskStats.total,
+                  bg: "#E0E7FF",
+                  stripe: "#6366F1",
+                  textColor: "#040110"
+                },
+                {
+                  label: "Completed",
+                  value: taskStats.completed,
+                  bg: "#D1FAE5",
+                  stripe: "#10B981",
+                  textColor: "#040110"
+                },
+                {
+                  label: "Active",
+                  value: taskStats.inProgress,
+                  bg: "#FEF3C7",
+                  stripe: "#F59E0B",
+                  textColor: "#040110"
+                },
+                {
+                  label: "Overdue",
+                  value: taskStats.overdue,
+                  bg: "#FED7AA",
+                  stripe: "#F97316",
+                  textColor: "#040110"
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="relative rounded-[8px] h-[114px] flex flex-col justify-center pl-[19px] pr-[14px]"
+                  style={{ backgroundColor: stat.bg }}
+                >
+                  {/* 5px Vertical Stripe */}
+                  <div
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[28px] rounded-r-[4px]"
+                    style={{ backgroundColor: stat.stripe }}
+                  />
+
+                  {/* Label */}
+                  <div className="text-[14px] font-normal font-['Inter'] mb-[4px]" style={{ color: stat.textColor }}>
+                    {stat.label}
+                  </div>
+
+                  {/* Number */}
+                  <div className="text-[34px] font-bold font-['Inter'] leading-none" style={{ color: stat.textColor }}>
+                    {stat.value}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Center: Project Overview Panel (589px width = 620px * 0.95) */}
+          <div className="flex-1 max-w-[589px]">
+            <ProjectOverviewPanel
+              projectManager={project.creator.name}
+              description={project.description}
+              startDate={project.startDate}
+              endDate={project.endDate}
+              status={project.status}
+            />
+          </div>
+
+          {/* Right: Attachments Sidebar (238px width = 250px * 0.95) */}
+          <div className="w-[238px] flex-shrink-0">
+            <AttachmentsSidebar
+              attachments={project.attachments || []}
+              canDelete={permissions.isAdmin}
+              onDelete={async (id) => {
+                try {
+                  await deleteData(`/project/${project._id}/attachments/${id}`);
+                  toast.success('Attachment deleted successfully');
+                  fetchProjectDetails();
+                } catch (error: any) {
+                  toast.error(error.message || 'Failed to delete attachment');
+                }
+              }}
+              onPreview={(file) => {
+                setPreviewAttachment(file);
+              }}
+              onUploadClick={() => setShowUploadDialog(true)}
+            />
+          </div>
         </div>
       </div>
 
@@ -1779,7 +1928,7 @@ const ProjectDetail = () => {
                           : "No tasks assigned yet."}
                       </p>
                       {canCreateTask && (
-                        <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8">
+                        <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90">
                           <Plus className="w-3.5 h-3.5 mr-1" />
                           Create Task
                         </Button>
@@ -2034,7 +2183,7 @@ const ProjectDetail = () => {
       {isMobile && canCreateTask && (
         <Button
           onClick={() => setShowTaskModal(true)}
-          className="fixed bottom-4 right-4 w-11 h-11 rounded-full shadow-lg z-30 p-0"
+          className="fixed bottom-4 right-4 w-11 h-11 rounded-full shadow-lg z-30 p-0 bg-[#f2761b] hover:bg-[#f2761b]/90"
         >
           <Plus className="w-5 h-5" />
         </Button>
@@ -2173,7 +2322,7 @@ const ProjectDetail = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submittingTask} className="flex-1 h-9 text-sm">
+                <Button type="submit" disabled={submittingTask} className="flex-1 h-9 text-sm bg-[#f2761b] hover:bg-[#f2761b]/90">
                   {submittingTask ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                   ) : (
@@ -2184,6 +2333,37 @@ const ProjectDetail = () => {
               </div>
             </form>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        attachment={previewAttachment}
+        open={!!previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
+
+      {/* Attachment Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[18px] font-semibold font-['Inter']">
+              Upload Attachments
+            </DialogTitle>
+            <DialogDescription className="text-[14px] text-gray-500 font-['Inter'] mt-1">
+              Upload files to this project (max 10 total)
+            </DialogDescription>
+          </DialogHeader>
+
+          <AttachmentUpload
+            projectId={project?._id || ''}
+            currentAttachmentCount={project?.attachments?.length || 0}
+            onUploadSuccess={() => {
+              fetchProjectDetails();
+              setShowUploadDialog(false);
+              toast.success('Attachments uploaded successfully');
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>

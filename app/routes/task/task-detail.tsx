@@ -636,14 +636,14 @@ const TaskDetail = () => {
 
     try {
       console.log("Fetching task details for ID:", taskId);
-      // Use direct fetch instead of fetchData for better error handling
+      // Use direct fetch with cookie-based authentication
       const response = await fetch(
         buildApiUrl(`/task/${taskId}`),
         {
+          credentials: 'include', // Send HTTP-only cookies
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
         }
       );
@@ -679,11 +679,11 @@ const TaskDetail = () => {
     try {
       console.log("Fetching comments for task:", taskId);
       const response = await fetch(
-        buildApiUrl(`/comment/task/${taskId}`),
+        buildApiUrl(`/comments/task/${taskId}`),
         {
+          credentials: 'include', // Send HTTP-only cookies
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
         }
       );
@@ -788,11 +788,11 @@ const TaskDetail = () => {
   const loadReplies = async (commentId: string) => {
     try {
       const response = await fetch(
-        buildApiUrl(`/comment/${commentId}/replies`),
+        buildApiUrl(`/comments/${commentId}/replies`),
         {
+          credentials: 'include',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
         }
       );
@@ -829,8 +829,8 @@ const TaskDetail = () => {
 
       const response = await fetch(buildApiUrl(`/comment`), {
         method: "POST",
+        credentials: 'include',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "workspace-id": localStorage.getItem("currentWorkspace") || "",
         },
         body: formData,
@@ -861,13 +861,13 @@ const TaskDetail = () => {
   const handleEditComment = async (commentId: string, content: string) => {
     try {
       const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
+        buildApiUrl(`/comments/${commentId}`),
         {
           method: "PUT",
+          credentials: 'include',
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
           body: JSON.stringify({ content }),
         }
@@ -891,12 +891,12 @@ const TaskDetail = () => {
 
     try {
       const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
+        buildApiUrl(`/comments/${commentId}`),
         {
           method: "DELETE",
+          credentials: 'include',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "workspace-id": localStorage.getItem("currentWorkspace") || "",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
         }
       );
@@ -921,7 +921,7 @@ const TaskDetail = () => {
 
     try {
       setSubmittingComment(true);
-      await postData(`/comment/task/${taskId}`, { content: newComment });
+      await postData(`/comments/task/${taskId}`, { content: newComment });
       setNewComment("");
       await fetchComments();
       toast.success("Comment added");
@@ -937,7 +937,7 @@ const TaskDetail = () => {
     if (!editContent.trim()) return;
 
     try {
-      await postData(`/comment/${commentId}`, {
+      await postData(`/comments/${commentId}`, {
         content: editContent,
         method: "PUT",
       });
@@ -958,11 +958,11 @@ const TaskDetail = () => {
 
     try {
       const response = await fetch(
-        buildApiUrl(`/comment/${commentId}`),
+        buildApiUrl(`/comments/${commentId}`),
         {
           method: "DELETE",
+          credentials: 'include',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         }
