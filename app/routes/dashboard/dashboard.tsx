@@ -103,7 +103,7 @@ interface Task {
 // ==================== MAIN COMPONENT ====================
 
 const Dashboard = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [projectStats, setProjectStats] = useState<ProjectStatistics>({
@@ -350,7 +350,7 @@ const Dashboard = () => {
   };
 
   const handleViewProject = (projectId: string) => {
-    navigate(`/workspace/projects/${projectId}`);
+    navigate(`/project/${projectId}`);
   };
 
   // Format month and year for display
@@ -748,37 +748,39 @@ const Dashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-[15px]">
-                      {/* Workspace Dropdown */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                          >
-                            <Building2 className="w-4 h-4" />
-                            {currentWorkspace?.name || "Workspace"}
-                            <ChevronDown className="w-3 h-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[200px]">
-                          {workspaces.map((workspace) => (
-                            <DropdownMenuItem
-                              key={workspace._id}
-                              onClick={() => handleSwitchWorkspace(workspace._id)}
-                              className={cn(
-                                "cursor-pointer",
-                                currentWorkspace?._id === workspace._id && "bg-blue-50"
-                              )}
+                      {/* Workspace Dropdown (visible only to global admin) */}
+                      {user?.role === "admin" ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
                             >
-                              {workspace.name}
-                              {currentWorkspace?._id === workspace._id && (
-                                <span className="ml-auto text-blue-600">✓</span>
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                              <Building2 className="w-4 h-4" />
+                              {currentWorkspace?.name || "Workspace"}
+                              <ChevronDown className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-[200px]">
+                            {workspaces.map((workspace) => (
+                              <DropdownMenuItem
+                                key={workspace._id}
+                                onClick={() => handleSwitchWorkspace(workspace._id)}
+                                className={cn(
+                                  "cursor-pointer",
+                                  currentWorkspace?._id === workspace._id && "bg-blue-50"
+                                )}
+                              >
+                                {workspace.name}
+                                {currentWorkspace?._id === workspace._id && (
+                                  <span className="ml-auto text-blue-600">✓</span>
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
 
                       {/* Project Type Filter - HIDDEN */}
                       {/* <DropdownMenu>
