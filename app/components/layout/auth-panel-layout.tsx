@@ -26,8 +26,8 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
           <div className="absolute left-1/2 -translate-x-1/2 top-7 flex items-center gap-6 z-10">
             <div className="w-[60px] h-[60px] relative">
               <img
-                src="/assets/a8ebdf5975d6d9ab7f5064a60b7a388fe436a8bb.png"
-                alt="Mathura Vrindavan Development Authority Logo"
+                src="/pcs_logo.jpg"
+                alt="PCS Logo"
                 className="w-full h-full object-contain"
               />
             </div>

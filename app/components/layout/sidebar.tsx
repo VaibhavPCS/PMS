@@ -433,7 +433,7 @@ const Sidebar = () => {
               <div className="flex items-center space-x-3 flex-1 px-6">
                 <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gray-100">
                   <img 
-                    src="/pcs_logo.jpg" 
+                    src="/assets/a8ebdf5975d6d9ab7f5064a60b7a388fe436a8bb.png" 
                     alt="PCS Logo" 
                     className="w-full h-full object-cover"
                     onError={(e) => {

@@ -96,7 +96,7 @@ const VerticalSidebar = () => {
         <div className="flex items-center gap-[12px]">
           <img
             src="/pcs_logo.jpg"
-            alt="MVDA Logo"
+            alt="PCS Logo"
             className="w-[40px] h-[40px] rounded-[8px] object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
