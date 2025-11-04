@@ -19,7 +19,7 @@ interface HorizontalNavbarProps {
 }
 
 const HorizontalNavbar: React.FC<HorizontalNavbarProps> = ({
-  title = 'Project Management Information System',
+  title = 'PMS',
   subtitle = 'Centralized project tracking and monitoring',
 }) => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);

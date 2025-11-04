@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { ChevronDown } from 'lucide-react';
 import { useBadges } from '../../provider/badge-context';
+import { useAuth } from '../../provider/auth-context';
 
 // Navigation item type
 interface NavItem {
@@ -58,6 +59,10 @@ const VerticalSidebar = () => {
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const { badgeCounts } = useBadges();
+  const { user } = useAuth();
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const visibleNavItems = navItems.filter((item) => item.name !== 'Administration' || isAdmin);
 
   const isActive = (href: string, hasDropdown?: boolean, subItems?: { name: string; href: string }[]) => {
     // For dropdown items, only consider them active if we're exactly on that route
@@ -126,7 +131,7 @@ const VerticalSidebar = () => {
 
       {/* Navigation Items */}
       <nav className="flex-1 px-[12px] space-y-[4px]">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = isActive(item.href, item.hasDropdown, item.subItems);
           const isExpanded = expandedItems.has(item.name);
 

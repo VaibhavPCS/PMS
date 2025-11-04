@@ -32,6 +32,13 @@ export const links = () => [
   },
 ];
 
+// Ensure the browser tab title always displays PMS
+export function meta() {
+  return [
+    { title: "PMS" },
+  ];
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
