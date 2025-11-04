@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchData, postData } from '@/lib/fetch-util';
+import { fetchData, patchData } from '@/lib/fetch-util';
 import { Button } from '@/components/ui/button';
 import { Bell, X } from 'lucide-react';
 import { useBadges } from '../../provider/badge-context';
@@ -61,9 +61,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await postData(`/notification/${notificationId}/read`, {});
-      setNotifications(
-        notifications.map((n) =>
+      await patchData(`/notification/${notificationId}/read`, {});
+      setNotifications((prev) =>
+        prev.map((n) =>
           n._id === notificationId
             ? { ...n, isRead: true, readAt: new Date().toISOString() }
             : n
@@ -78,13 +78,14 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
 
   const markAllAsRead = async () => {
     try {
-      await postData('/notification/read-all', {});
-      const updatedNotifications = notifications.map((n) => ({
-        ...n,
-        isRead: true,
-        readAt: new Date().toISOString(),
-      }));
-      setNotifications(updatedNotifications);
+      await patchData('/notification/read-all', {});
+      setNotifications((prev) =>
+        prev.map((n) => ({
+          ...n,
+          isRead: true,
+          readAt: new Date().toISOString(),
+        }))
+      );
       // Refresh badge counts across the app
       refreshBadgeCounts();
     } catch (error) {

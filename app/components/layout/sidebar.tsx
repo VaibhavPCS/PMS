@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
-import { fetchData, postData } from '@/lib/fetch-util';
+import { fetchData, patchData } from '@/lib/fetch-util';
 import {
   Home,
   Building2,
@@ -120,9 +120,9 @@ const Sidebar = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await postData(`/notification/${notificationId}/read`, {});
+      await patchData(`/notification/${notificationId}/read`, {});
       
-      setNotifications(notifications.map(n => 
+      setNotifications(prev => prev.map(n => 
         n._id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
       ));
       
@@ -134,15 +134,13 @@ const Sidebar = () => {
 
   const markAllAsRead = async () => {
     try {
-      await postData('/notification/read-all', {});
+      await patchData('/notification/read-all', {});
       
-      const updatedNotifications = notifications.map(n => ({
+      setNotifications(prev => prev.map(n => ({
         ...n,
         isRead: true,
         readAt: new Date().toISOString()
-      }));
-      
-      setNotifications(updatedNotifications);
+      })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);

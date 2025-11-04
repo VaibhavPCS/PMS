@@ -11,37 +11,50 @@ interface Member {
 }
 
 interface TeamAvatarsProps {
-  categories: Array<{
+  categories?: Array<{
     name: string;
     members: Member[];
   }>;
+  members?: Member[];
   maxVisible?: number;
 }
 
-export function TeamAvatars({ categories, maxVisible = 3 }: TeamAvatarsProps) {
+export function TeamAvatars({ categories, members, maxVisible = 3 }: TeamAvatarsProps) {
   // Extract and deduplicate all members from all categories
   const allMembers = React.useMemo(() => {
     const memberMap = new Map();
 
-    categories.forEach((category) => {
-      category.members.forEach((member) => {
-        const userId = member.userId._id;
-        if (!memberMap.has(userId)) {
-          memberMap.set(userId, {
-            _id: userId,
-            name: member.userId.name,
-            email: member.userId.email,
-            role: member.role,
-          });
-        }
-      });
+    const safeMembersFromProps = Array.isArray(members) ? members : [];
+    const safeCategories = Array.isArray(categories) ? categories : [];
+
+    // Prefer direct members if provided, else flatten from categories
+    const sourceMembers = safeMembersFromProps.length > 0
+      ? safeMembersFromProps
+      : safeCategories.flatMap((category) => Array.isArray(category?.members) ? category.members : []);
+
+    sourceMembers.forEach((member) => {
+      const userId = (member && member.userId && (member.userId as any)._id) || undefined;
+      if (!userId) {
+        // Skip if we cannot determine a stable id
+        return;
+      }
+      if (!memberMap.has(userId)) {
+        const name = (member?.userId as any)?.name || "";
+        const email = (member?.userId as any)?.email || "";
+        memberMap.set(userId, {
+          _id: userId,
+          name,
+          email,
+          role: member?.role || "",
+        });
+      }
     });
 
     return Array.from(memberMap.values());
-  }, [categories]);
+  }, [categories, members]);
 
   const visibleMembers = allMembers.slice(0, maxVisible);
-  const overflowCount = allMembers.length - maxVisible;
+  const overflowCount = Math.max(0, allMembers.length - maxVisible);
 
   // Generate gradient background for avatars
   const getGradientColors = (index: number) => {
@@ -65,7 +78,11 @@ export function TeamAvatars({ categories, maxVisible = 3 }: TeamAvatarsProps) {
             <div className={`absolute inset-0 bg-gradient-to-b ${getGradientColors(index)}`} />
             <Avatar className="w-full h-full border-2 border-white">
               <AvatarFallback className="bg-transparent text-white font-semibold text-sm">
-                {member.name.charAt(0).toUpperCase()}
+                {(
+                  (member.name && member.name.trim().charAt(0)) ||
+                  (member.email && member.email.trim().charAt(0)) ||
+                  "?"
+                ).toUpperCase()}
               </AvatarFallback>
             </Avatar>
           </div>

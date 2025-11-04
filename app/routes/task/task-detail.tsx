@@ -81,6 +81,19 @@ interface Task {
   completedAt?: string;
   handoverNotes?: string;
   workspace?: string;
+  approvalStatus?: "not-required" | "pending-approval" | "approved" | "rejected";
+  completedBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  approvedBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  approvedAt?: string;
+  rejectionReason?: string;
 }
 
 interface Comment {
@@ -612,6 +625,12 @@ const TaskDetail = () => {
   const [replies, setReplies] = useState<Record<string, Comment[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Approval workflow states
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -764,6 +783,55 @@ const TaskDetail = () => {
     } finally {
       setSavingHandover(false);
     }
+  };
+
+  const handleApproveTask = async () => {
+    if (!task) return;
+
+    try {
+      setIsApproving(true);
+      await postData(`/task/${task._id}/approve`, {});
+      toast.success("Task approved successfully");
+      // Refresh task details
+      await fetchTaskDetails();
+    } catch (error: any) {
+      console.error("Failed to approve task:", error);
+      toast.error(error.message || "Failed to approve task");
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleRejectTask = async () => {
+    if (!task) return;
+    if (!rejectionReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+
+    try {
+      setIsRejecting(true);
+      await postData(`/task/${task._id}/reject`, { reason: rejectionReason });
+      toast.success("Task rejected with feedback");
+      setShowRejectDialog(false);
+      setRejectionReason("");
+      // Refresh task details
+      await fetchTaskDetails();
+    } catch (error: any) {
+      console.error("Failed to reject task:", error);
+      toast.error(error.message || "Failed to reject task");
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const canApproveTask = () => {
+    if (!currentUser || !task) return false;
+    // Check if user is admin or super admin
+    if (["super_admin", "admin"].includes(currentUser.role)) return true;
+    // Check if user is project head (would need to fetch project details or add to task response)
+    // For now, we'll rely on backend permission check
+    return task.status === "done" && task.approvalStatus === "pending-approval";
   };
 
   // Chat functions
@@ -1111,6 +1179,45 @@ const TaskDetail = () => {
                 {task.priority} priority
               </Badge>
 
+              {task.approvalStatus && task.approvalStatus !== "not-required" && (
+                <Badge
+                  variant="outline"
+                  className={
+                    task.approvalStatus === "pending-approval"
+                      ? "bg-orange-100 text-orange-800 border-orange-200"
+                      : task.approvalStatus === "approved"
+                      ? "bg-green-100 text-green-800 border-green-200"
+                      : "bg-red-100 text-red-800 border-red-200"
+                  }
+                >
+                  {task.approvalStatus === "pending-approval" && "Pending Approval"}
+                  {task.approvalStatus === "approved" && "Approved"}
+                  {task.approvalStatus === "rejected" && "Rejected"}
+                </Badge>
+              )}
+
+              {task.status === "done" && task.approvalStatus === "pending-approval" && canApproveTask() && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={handleApproveTask}
+                    disabled={isApproving}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isApproving ? "Approving..." : "Approve"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowRejectDialog(true)}
+                    disabled={isRejecting}
+                    className="border-red-600 text-red-600 hover:bg-red-50"
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+
               <Select value={task.status} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-40">
                   <div className="flex items-center space-x-2">
@@ -1206,6 +1313,18 @@ const TaskDetail = () => {
                     </div>
                   )}
                 </div>
+
+                {task.rejectionReason && task.approvalStatus === "rejected" && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-900">Rejection Feedback</p>
+                        <p className="text-sm text-red-700 mt-1">{task.rejectionReason}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1416,6 +1535,57 @@ const TaskDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Rejection Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <span>Reject Task</span>
+            </DialogTitle>
+            <DialogDescription>
+              Please provide feedback explaining why this task needs more work.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Reason for Rejection <span className="text-red-500">*</span>
+              </label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Explain what needs to be improved or corrected..."
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                The assignee will receive this feedback and the task will be moved back to in-progress.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRejectDialog(false);
+                setRejectionReason("");
+              }}
+              disabled={isRejecting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRejectTask}
+              disabled={isRejecting || !rejectionReason.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isRejecting ? "Rejecting..." : "Reject Task"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

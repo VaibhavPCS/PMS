@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { MoreVertical, Users, Edit, Trash2, CheckCircle2, PlayCircle, Pause, XCircle } from 'lucide-react';
@@ -25,9 +27,19 @@ interface Project {
   description: string;
   status: ProjectStatus;
   progress: number;
-  categories: {
-    members: any[];
-  }[];
+  projectHead: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  members: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    addedAt: string;
+  }>;
   budget?: {
     allocated: number;
     spent: number;
@@ -60,10 +72,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
   const navigate = useNavigate();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const totalMembers = project.categories.reduce(
-    (acc, category) => acc + category.members.length,
-    0
-  );
+  // Count project head + all members
+  const totalMembers = 1 + (project.members?.length || 0);
 
   const projectId = project.propertyId || `PID${project._id.slice(-5)}`;
 
@@ -76,10 +86,25 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (isUpdating) return;
+    // Defensive checks
+    const allowedStatuses: ProjectStatus[] = ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    if (!project || !project._id) {
+      toast.error('Invalid project reference.');
+      return;
+    }
+    if (!allowedStatuses.includes(newStatus)) {
+      toast.error('Invalid status selection.');
+      return;
+    }
+    if (newStatus === project.status) {
+      toast.info('Status is already set to this value.');
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const response = await putData(`/project/${project._id}`, { status: newStatus });
-      const updated = (response as any).project ?? {};
+      const updated = (response as any)?.project ?? {};
       const statusProgressMap: Record<ProjectStatus, number> = {
         'Planning': 10,
         'In Progress': 50,
@@ -92,8 +117,22 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
       if (onStatusChange) {
         await onStatusChange(project._id, newStatus, newProgress);
       }
-    } catch (error) {
-      toast.error('Failed to update project status');
+    } catch (error: any) {
+      let errMsg = 'Failed to update project status';
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const serverMsg = (error.response?.data as any)?.message;
+        if (status === 403) {
+          errMsg = serverMsg || "You don't have permission to update this project";
+        } else if (status === 404) {
+          errMsg = serverMsg || 'Project not found';
+        } else if (status) {
+          errMsg = serverMsg || `Server error (${status})`;
+        } else {
+          errMsg = error.message;
+        }
+      }
+      toast.error(errMsg);
     } finally {
       setIsUpdating(false);
     }
@@ -108,8 +147,22 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
         await onDelete(project._id);
       }
       toast.success('Project deleted successfully');
-    } catch (error) {
-      toast.error('Failed to delete project');
+    } catch (error: any) {
+      let errMsg = 'Failed to delete project';
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const serverMsg = (error.response?.data as any)?.message;
+        if (status === 403) {
+          errMsg = serverMsg || "You don't have permission to delete this project";
+        } else if (status === 404) {
+          errMsg = serverMsg || 'Project not found';
+        } else if (status) {
+          errMsg = serverMsg || `Server error (${status})`;
+        } else {
+          errMsg = error.message;
+        }
+      }
+      toast.error(errMsg);
     } finally {
       setIsUpdating(false);
     }
@@ -129,12 +182,15 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
           <StatusBadge status={project.status} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="p-1 h-7 w-7 hover:bg-gray-100 rounded transition-colors"
                 onClick={(e) => e.stopPropagation()}
+                disabled={isUpdating}
               >
-                <MoreVertical size={24} className="text-[#717182]" />
-              </button>
+                <MoreVertical size={18} className="text-[#717182]" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
@@ -147,7 +203,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               {/* Status Change Options */}
               {project.status !== 'Planning' && (
                 <DropdownMenuItem
-                  onClick={(e) => {
+                  onSelect={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handleStatusChange('Planning');
                   }}
@@ -159,7 +216,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               )}
               {project.status !== 'In Progress' && (
                 <DropdownMenuItem
-                  onClick={(e) => {
+                  onSelect={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handleStatusChange('In Progress');
                   }}
@@ -171,7 +229,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               )}
               {project.status !== 'On Hold' && (
                 <DropdownMenuItem
-                  onClick={(e) => {
+                  onSelect={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handleStatusChange('On Hold');
                   }}
@@ -183,7 +242,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               )}
               {project.status !== 'Completed' && (
                 <DropdownMenuItem
-                  onClick={(e) => {
+                  onSelect={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handleStatusChange('Completed');
                   }}
@@ -197,7 +257,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={(e) => {
+                onSelect={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   navigate(`/project/${project._id}`);
                 }}
@@ -208,7 +269,8 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               </DropdownMenuItem>
 
               <DropdownMenuItem
-                onClick={(e) => {
+                onSelect={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   handleDelete();
                 }}

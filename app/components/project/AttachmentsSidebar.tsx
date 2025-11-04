@@ -1,6 +1,7 @@
 import React from "react";
 import { Eye, Trash2, Image as ImageIcon, FileText, Upload } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { buildBackendUrl } from "@/lib/config";
 
 interface Attachment {
   _id: string;
@@ -80,8 +81,30 @@ export function AttachmentsSidebar({
                   key={file._id}
                   className="flex items-center justify-between h-[44px] hover:bg-white/50 transition-colors rounded-md px-[10px] py-[5px] group"
                 >
-                  {/* Left: Icon + File Info */}
-                  <div className="flex items-center gap-[10px] flex-1 min-w-0">
+                  {/* Left: Icon + File Info (click to open in new tab) */}
+                  <div
+                    className="flex items-center gap-[10px] flex-1 min-w-0 cursor-pointer"
+                    onClick={() => {
+                      const rawPath = file.path || (isImageFile(file)
+                        ? `/uploads/projects/images/${file.filename}`
+                        : `/uploads/projects/documents/${file.filename}`);
+                      const safePath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                      const fullUrl = buildBackendUrl(safePath);
+                      window.open(fullUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        const rawPath = file.path || (isImageFile(file)
+                          ? `/uploads/projects/images/${file.filename}`
+                          : `/uploads/projects/documents/${file.filename}`);
+                        const safePath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                        const fullUrl = buildBackendUrl(safePath);
+                        window.open(fullUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                  >
                     {/* File Icon */}
                     {isImageFile(file) ? (
                       <ImageIcon className="w-[24px] h-[24px] text-blue-500 flex-shrink-0" strokeWidth={1.5} />
@@ -104,7 +127,7 @@ export function AttachmentsSidebar({
                   <div className="flex items-center gap-[6px] opacity-0 group-hover:opacity-100 transition-opacity">
                     {onPreview && (
                       <button
-                        onClick={() => onPreview(file)}
+                        onClick={(e) => { e.stopPropagation(); onPreview(file); }}
                         className="p-1 hover:bg-gray-200 rounded transition-colors"
                         title="Preview"
                       >
@@ -113,7 +136,7 @@ export function AttachmentsSidebar({
                     )}
                     {onDelete && canDelete && (
                       <button
-                        onClick={() => onDelete(file._id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(file._id); }}
                         className="p-1 hover:bg-red-100 rounded transition-colors"
                         title="Delete (Admin only)"
                       >

@@ -7,36 +7,28 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
-import { fetchData } from "@/lib/fetch-util";
-
-interface Category {
-  name: string;
-  members: any[];
-}
+import { fetchData, postData } from "@/lib/fetch-util";
 
 interface InviteMembersButtonProps {
   projectId: string;
-  categories: Category[];
-  onInviteSuccess?: () => void;
+  // Optional categories prop to align with usage in project-detail
+  categories?: Array<{
+    name: string;
+    members: Array<{
+      userId: { _id: string; name: string; email: string };
+      role: string;
+    }>;
+  }>;
+  onInviteSuccess?: () => void | Promise<void>;
 }
 
 export function InviteMembersButton({
   projectId,
-  categories,
   onInviteSuccess
 }: InviteMembersButtonProps) {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
-  const [categoryName, setCategoryName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -44,8 +36,6 @@ export function InviteMembersButton({
   const handleInviteClick = () => {
     setShowInviteDialog(true);
     setEmail("");
-    setRole("");
-    setCategoryName("");
     setError(null);
     setSuccess(null);
   };
@@ -56,33 +46,18 @@ export function InviteMembersButton({
       setError("Please enter a valid email address");
       return;
     }
-    if (!role) {
-      setError("Please select a role");
-      return;
-    }
-    if (!categoryName) {
-      setError("Please select a category");
-      return;
-    }
 
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      await fetchData(`/project/${projectId}/members`, {
-        method: 'POST',
-        body: JSON.stringify({
-          categoryName,
-          memberEmail: email,
-          role
-        })
+      await postData(`/project/${projectId}/members`, {
+        memberEmail: email
       });
 
-      setSuccess("Member invited successfully!");
+      setSuccess("Member added successfully!");
       setEmail("");
-      setRole("");
-      setCategoryName("");
 
       // Wait a bit to show success message
       setTimeout(() => {
@@ -93,7 +68,7 @@ export function InviteMembersButton({
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message || "Failed to invite member");
+      setError(err.message || "Failed to add member");
     } finally {
       setLoading(false);
     }
@@ -107,11 +82,11 @@ export function InviteMembersButton({
       >
         <UserPlus className="w-[15px] h-[15px] text-[#040110]" strokeWidth={2} />
         <span className="font-['Inter'] font-medium text-[14px] text-[#040110] whitespace-nowrap">
-          Invite members
+          Add member
         </span>
       </button>
 
-      {/* Invite Dialog */}
+      {/* Add Member Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -121,10 +96,10 @@ export function InviteMembersButton({
               </div>
               <div>
                 <DialogTitle className="text-[18px] font-semibold font-['Inter']">
-                  Invite to Project
+                  Add Member to Project
                 </DialogTitle>
                 <DialogDescription className="text-[14px] text-gray-500 font-['Inter'] mt-1">
-                  Invite a team member to join this project
+                  Add a workspace member to this project
                 </DialogDescription>
               </div>
             </div>
@@ -140,46 +115,13 @@ export function InviteMembersButton({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter Email"
+                placeholder="Enter workspace member email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3a5afe] text-[14px] font-['Inter']"
                 disabled={loading}
               />
-            </div>
-
-            {/* Category Select */}
-            <div>
-              <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
-                Category<span className="text-red-500">*</span>
-              </label>
-              <Select value={categoryName} onValueChange={setCategoryName} disabled={loading}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.name} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Role Select */}
-            <div>
-              <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
-                Role<span className="text-red-500">*</span>
-              </label>
-              <Select value={role} onValueChange={setRole} disabled={loading}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Lead">Lead</SelectItem>
-                  <SelectItem value="Member">Member</SelectItem>
-                  <SelectItem value="Viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="text-[12px] font-normal font-['Inter'] text-[#717680] mt-1">
+                Member must already be part of the workspace
+              </p>
             </div>
 
             {/* Error Message */}
@@ -212,7 +154,7 @@ export function InviteMembersButton({
               disabled={loading}
               className="bg-[#f2761b] hover:bg-[#d96816] text-white font-['Inter']"
             >
-              {loading ? "Sending..." : "Send Invite"}
+              {loading ? "Adding..." : "Add Member"}
             </Button>
           </div>
         </DialogContent>

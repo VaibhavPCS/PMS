@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../provider/auth-context';
 import { Navigate } from 'react-router';
 import { fetchData, postData, deleteData } from '@/lib/fetch-util';
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Search, Calendar as CalendarIcon, Settings as SettingsIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -26,6 +26,7 @@ import Breadcrumb from '../../components/layout/Breadcrumb';
 import { ProjectTabs } from '../../components/project/ProjectTabs';
 import { ProjectCard } from '../../components/project/ProjectCard';
 import { WorkspaceSelector } from '../../components/workspace/WorkspaceSelector';
+import { WorkspaceSettingsModal } from '../../components/workspace/WorkspaceSettingsModal';
 import { AddProjectModal } from '../../components/project/AddProjectModal';
 import { CreateWorkspaceModal } from '../../components/layout/CreateWorkspaceModal';
 import { ProjectCardSkeleton } from '../../components/project/project-card-skeleton';
@@ -39,11 +40,21 @@ interface Project {
   description: string;
   status: ProjectStatus;
   progress: number;
+  projectHead: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  members: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    addedAt?: string;
+  }>;
   startDate: string;
   endDate: string;
-  categories: {
-    members: any[];
-  }[];
   budget?: {
     allocated: number;
     spent: number;
@@ -69,6 +80,13 @@ const WorkspacePage = () => {
   const [sortOption, setSortOption] = useState('title-asc');
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
+  const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
+
+  // Keep a live snapshot of projects for rollback on refresh failure
+  const projectsRef = useRef<Project[]>([]);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
 
 const fetchWorkspaces = useCallback(async () => {
   try {
@@ -123,11 +141,25 @@ const switchWorkspace = async (workspaceId: string) => {
   };
 
   const handleStatusChange = async (projectId: string, newStatus: ProjectStatus, newProgress: number) => {
+    // Snapshot before optimistic update for rollback if refresh fails
+    const previousSnapshot = projectsRef.current.map(p => ({ ...p }));
+
+    // Optimistic update
     setProjects(prevProjects =>
       prevProjects.map(p =>
         p._id === projectId ? { ...p, status: newStatus, progress: newProgress } : p
       )
     );
+
+    // Re-fetch to ensure consistency with backend; rollback if it fails
+    try {
+      await fetchProjects();
+    } catch (err) {
+      console.error('Failed to refresh projects after status change', err);
+      // Roll back to previous snapshot to avoid stale UI
+      setProjects(previousSnapshot);
+      toast.error('Could not refresh projects. Reverted the status change.');
+    }
   };
 
   const handleDelete = async (projectId: string) => {
@@ -215,12 +247,28 @@ const switchWorkspace = async (workspaceId: string) => {
 
             {/* Right: Workspace Selector (visible only to admin) */}
             {user?.role === 'admin' && (
-              <WorkspaceSelector
-                workspaces={workspaces}
-                currentWorkspace={currentWorkspace}
-                onSwitchWorkspace={handleWorkspaceChange}
-                onCreateWorkspaceClick={handleCreateWorkspace}
-              />
+              <div className="flex items-center gap-[10px]">
+                <WorkspaceSelector
+                  workspaces={workspaces}
+                  currentWorkspace={currentWorkspace}
+                  onSwitchWorkspace={handleWorkspaceChange}
+                  onCreateWorkspaceClick={handleCreateWorkspace}
+                />
+                {/* Workspace Settings Button */}
+                {user?.role === 'admin' && currentWorkspace && (
+                  <button
+                    type="button"
+                    aria-label="Workspace settings"
+                    aria-haspopup="dialog"
+                    onClick={() => setShowWorkspaceSettings(true)}
+                    className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3a5afe]"
+                    title="Workspace settings"
+                  >
+                    {/* svg: purely visual settings icon */}
+                    <SettingsIcon className="w-[20px] h-[20px] text-[#717182]" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -301,7 +349,13 @@ const switchWorkspace = async (workspaceId: string) => {
           {sortedProjects.map((project) => (
             <ProjectCard
               key={project._id}
-              project={project}
+              project={{
+                ...project,
+                members: project.members.map(m => ({
+                  userId: m.userId,
+                  addedAt: m.addedAt ?? new Date().toISOString()
+                }))
+              }}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
             />
@@ -331,6 +385,23 @@ const switchWorkspace = async (workspaceId: string) => {
         onWorkspaceCreated={() => {
           fetchWorkspaces();
           setShowCreateWorkspaceModal(false);
+        }}
+      />
+      {/* Workspace Settings Modal */}
+      {/* button: admin-only settings; updates current workspace instantly via callback */}
+      <WorkspaceSettingsModal
+        open={showWorkspaceSettings}
+        onClose={() => setShowWorkspaceSettings(false)}
+        workspace={currentWorkspace}
+        onWorkspaceUpdated={(updated) => {
+          // Reflect name/description changes instantly in page and switcher list
+          setCurrentWorkspace((prev) => {
+            if (!prev) return prev;
+            return prev._id === updated._id ? { ...prev, name: updated.name, description: updated.description } : prev;
+          });
+          setWorkspaces((prev) => prev.map((w: any) => (
+            w._id === updated._id ? { ...w, name: updated.name, description: updated.description } : w
+          )));
         }}
       />
     </>

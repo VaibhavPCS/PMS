@@ -25,6 +25,22 @@ export function AttachmentUpload({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
+    // Allowed MIME types/extensions aligned with backend
+    const allowedMimes = new Set([
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    ]);
+    const allowedImage = (type: string) => type.startsWith('image/');
+
+    // Filter invalid files and report
+    const invalid = files.filter(
+      (f) => !(allowedImage(f.type) || allowedMimes.has(f.type))
+    );
+    if (invalid.length > 0) {
+      setError('Only images (jpg, png, gif) and PDF or DOCX documents are allowed.');
+      return;
+    }
+
     // Check if adding these files would exceed the limit
     if (files.length + currentAttachmentCount > maxAttachments) {
       setError(`Maximum ${maxAttachments} attachments allowed. You can only add ${remainingSlots} more.`);
@@ -46,6 +62,19 @@ export function AttachmentUpload({
     setError(null);
 
     try {
+      // Defensive check: ensure only allowed types
+      const allowedMimes = new Set([
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ]);
+      for (const f of selectedFiles) {
+        if (!(f.type.startsWith('image/') || allowedMimes.has(f.type))) {
+          setError('Only images (jpg, png, gif) and PDF or DOCX documents are allowed.');
+          setUploading(false);
+          return;
+        }
+      }
+
       const formData = new FormData();
       selectedFiles.forEach(file => {
         formData.append('attachments', file);
@@ -93,6 +122,7 @@ export function AttachmentUpload({
           onChange={handleFileSelect}
           className="hidden"
           id="attachment-upload"
+          accept="image/*,.pdf,.docx"
           disabled={uploading || remainingSlots === 0}
         />
         <label

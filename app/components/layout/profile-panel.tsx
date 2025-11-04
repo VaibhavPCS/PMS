@@ -85,24 +85,24 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({
             </div>
 
             {/* Edit Icon */}
-            <button
+            {/* <button
               onClick={handleProfileClick}
               className="w-[20px] h-[20px] flex items-center justify-center hover:bg-gray-100 rounded transition-colors"
               aria-label="Edit profile"
             >
               <Pencil className="w-[16px] h-[16px] text-gray-600" />
-            </button>
+            </button> */}
           </div>
 
           {/* Profile Link */}
-          <button
+          {/* <button
             onClick={handleProfileClick}
             className="w-full text-left px-[6px] py-[8px] mb-[7px] hover:bg-gray-50 rounded transition-colors"
           >
             <span className="font-['Work_Sans:Regular',sans-serif] text-[14px] leading-[17px] text-[#141414]">
               Profile
             </span>
-          </button>
+          </button> */}
 
           {/* Logout Button */}
           <Button

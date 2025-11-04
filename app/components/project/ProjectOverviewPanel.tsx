@@ -5,6 +5,7 @@ type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Can
 
 interface ProjectOverviewPanelProps {
   projectManager: string;
+  projectHead?: string;
   description: string;
   startDate: string;
   endDate: string;
@@ -13,6 +14,7 @@ interface ProjectOverviewPanelProps {
 
 export function ProjectOverviewPanel({
   projectManager,
+  projectHead,
   description,
   startDate,
   endDate,
@@ -51,9 +53,10 @@ export function ProjectOverviewPanel({
 
   return (
     <div className="bg-[#E5EFFF] rounded-[10px] p-[20px] w-full">
-      {/* Row 1: Project Manager */}
+      {/* Row 1: Project Manager & Project Head */}
       <div className="grid grid-cols-3 gap-x-[16px] gap-y-[12px] mb-[12px]">
         <FieldGroup label="Project Manager" value={projectManager} />
+        <FieldGroup label="Project Head" value={projectHead || '—'} />
       </div>
 
       {/* Row 2: Description */}

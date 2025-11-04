@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { X, Download } from "lucide-react";
-import { getApiBaseUrl } from "@/lib/config";
+import { buildBackendUrl } from "@/lib/config";
 
 interface Attachment {
   _id: string;
@@ -29,10 +29,10 @@ export function FilePreviewModal({ attachment, open, onClose }: FilePreviewModal
 
   const isImage = attachment.mimeType?.startsWith('image/');
   const isPDF = attachment.mimeType === 'application/pdf';
-  const apiBaseUrl = getApiBaseUrl();
 
-  // Construct file URL
-  const fileUrl = `${apiBaseUrl}/uploads/${attachment.filename}`;
+  // Construct file URL based on saved path (served via /uploads)
+  const safePath = attachment.path?.startsWith('/') ? attachment.path : `/${attachment.path}`;
+  const fileUrl = buildBackendUrl(safePath);
 
   const handleDownload = () => {
     const link = document.createElement('a');

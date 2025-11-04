@@ -8,7 +8,9 @@
     "dev:https": "react-router dev --https",
     "start": "npx serve build/client -s -l 2000",
     "start:https": "npx serve build/client -s -l 2000 --ssl-cert ../PMS_BACKEND/certs/server.crt --ssl-key ../PMS_BACKEND/certs/server.key",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "test": "vitest run",
+    "test:ui": "vitest"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
