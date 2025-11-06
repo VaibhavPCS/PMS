@@ -54,6 +54,20 @@ const HorizontalNavbar: React.FC<HorizontalNavbarProps> = ({
     return role.toUpperCase().replace('_', ' ');
   };
 
+  // Helper to limit visible words and append ellipsis (same as dashboard)
+  const limitWords = (text: string, maxWords: number) => {
+    if (!text) return '';
+    const words = text.trim().split(/\s+/);
+    if (words.length <= maxWords) return text;
+    return words.slice(0, maxWords).join(' ') + '...';
+  };
+
+  // Show only first name without ellipsis, leveraging the same limiter
+  const getFirstName = (name: string) => {
+    const limited = limitWords(name, 1);
+    return limited.replace(/\.\.\.$/, '');
+  };
+
   return (
     <div
       className="bg-[#f1f2f7] flex flex-col gap-[20px] items-start justify-end"
@@ -142,7 +156,7 @@ const HorizontalNavbar: React.FC<HorizontalNavbarProps> = ({
                 style={{ width: '96px' }}
               >
                 <p className="font-['Work_Sans:Regular',sans-serif] font-normal text-[16px] leading-[normal] text-[#141414] whitespace-nowrap">
-                  {userInfo?.name || 'Loading...'}
+                  {getFirstName(userInfo?.name || 'Loading...')}
                 </p>
                 {/*
                 <p className="font-['Work_Sans:Regular',sans-serif] font-normal text-[12px] leading-[normal] text-gray-500 whitespace-nowrap">

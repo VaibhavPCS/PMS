@@ -877,7 +877,8 @@ const TaskCard = React.memo<{
                   className="h-6 px-2"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (canManageTask) {
+                    // Allow assignment if user is Admin or Project Lead (button visible) or can manage
+                    if (canAssignVisible || canManageTask) {
                       setSelectedAssigneeId(task.assignee?._id || "");
                       setShowAssignModal(true);
                     } else {
@@ -1340,7 +1341,7 @@ const ProjectDetail = () => {
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
 
   // Derived role flags
-  const isAdmin = useMemo(() => ["admin", "super-admin"].includes(userRole), [userRole]);
+  const isAdmin = useMemo(() => ["admin", "super_admin", "super-admin"].includes(userRole), [userRole]);
   const isProjectLead = useMemo(() => {
     const currentId = (currentUser?.id || currentUser?._id || "").toString();
     const leadId = (project?.projectHead?._id || "").toString();
@@ -1400,17 +1401,16 @@ const ProjectDetail = () => {
 
     let tasksToShow = allTasks;
 
-    if (["admin", "super-admin"].includes(currentUser.role || userRole)) {
+    if (["admin", "super_admin", "super-admin"].includes(currentUser.role || userRole)) {
       tasksToShow = allTasks;
     } else if ((currentUser.role || userRole) === "lead" && isProjectMember) {
       tasksToShow = allTasks;
     } else if ((project?.projectHead?._id || "").toString() === currentUserIdStr) {
       tasksToShow = allTasks;
     } else {
+      // Members should only see tasks assigned to them
       tasksToShow = allTasks.filter(
-        (task) =>
-          (task.assignee?._id?.toString() || "") === currentUserIdStr ||
-          (task.creator?._id?.toString() || "") === currentUserIdStr
+        (task) => (task.assignee?._id?.toString() || "") === currentUserIdStr
       );
     }
 
@@ -1434,7 +1434,7 @@ const ProjectDetail = () => {
       (project?.projectHead?._id || "").toString() === currentUserIdStr
     );
 
-    const relevantTasks = ["admin", "super-admin"].includes(userRole)
+    const relevantTasks = ["admin", "super_admin", "super-admin"].includes(userRole)
       ? allTasks
       : ((userRole === "lead" && isProjectMember) || (project?.projectHead?._id || "").toString() === currentUserIdStr)
       ? kanbanFilteredTasks
@@ -1453,7 +1453,7 @@ const ProjectDetail = () => {
   const canViewKanban = useMemo(() => {
     if (!currentUser || !project) return false;
 
-    if (["admin", "super-admin"].includes(currentUser.role || userRole)) return true;
+    if (["admin", "super_admin", "super-admin"].includes(currentUser.role || userRole)) return true;
     if (project?.creator?._id === (currentUser.id || currentUser._id)) return true;
 
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
@@ -1471,7 +1471,7 @@ const ProjectDetail = () => {
     );
 
     return (
-      ["admin", "super-admin"].includes(userRole) ||
+      ["admin", "super_admin", "super-admin"].includes(userRole) ||
       isProjectMember ||
       project?.creator._id === currentUser?._id
     );

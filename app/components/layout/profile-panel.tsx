@@ -21,6 +21,19 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({
   anchorEl,
   userInfo,
 }) => {
+  // Helper to limit visible words and append ellipsis (same as dashboard)
+  const limitWords = (text: string, maxWords: number) => {
+    if (!text) return '';
+    const words = text.trim().split(/\s+/);
+    if (words.length <= maxWords) return text;
+    return words.slice(0, maxWords).join(' ') + '...';
+  };
+
+  // Show only first name without ellipsis, leveraging the same limiter
+  const getFirstName = (name: string) => {
+    const limited = limitWords(name, 1);
+    return limited.replace(/\.\.\.$/, '');
+  };
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -76,7 +89,7 @@ const ProfilePanel: React.FC<ProfilePanelProps> = ({
               {/* User Details */}
               <div className="flex flex-col">
                 <p className="font-['Work_Sans:Medium',sans-serif] font-medium text-[16px] leading-[19px] text-[#141414]">
-                  {userInfo?.name || 'User'}
+                  {getFirstName(userInfo?.name || 'User')}
                 </p>
                 <p className="font-['Work_Sans:Regular',sans-serif] font-normal text-[12px] leading-[15px] text-[#6b7280] mt-[1px]">
                   {userInfo?.email || 'user@example.com'}

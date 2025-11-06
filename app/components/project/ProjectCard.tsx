@@ -96,6 +96,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
   const userRole = (user as any)?.role || '';
   const isAdmin = ['admin', 'super_admin', 'super-admin'].includes(userRole);
   const isProjectLead = !!project?.projectHead?._id && project.projectHead._id === currentUserId;
+  const isProjectMember = isProjectLead || (project?.members || []).some(m => m?.userId?._id === currentUserId);
 
 
   // Count project head + all members
@@ -200,6 +201,11 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
     }
   };
 
+
+  // Restrict rendering: show only to project members or admins
+  if (!isAdmin && !isProjectMember) {
+    return null;
+  }
 
   return (
     <>

@@ -140,6 +140,13 @@ const Dashboard = () => {
     completed: 0,
     total: 0,
   });
+  const [accessibleProjects, setAccessibleProjects] = useState<Project[]>([]);
+  const [accessibleProjectIds, setAccessibleProjectIds] = useState<Set<string>>(new Set());
+
+  const currentUserId = (user as any)?.id || (user as any)?._id || "";
+  const userRole = (user as any)?.role || "";
+  const isAdmin = ["admin", "super_admin", "super-admin"].includes(userRole);
+  const isLead = userRole === "lead";
 
   // ==================== DATA FETCHING ====================
 
@@ -185,12 +192,36 @@ const Dashboard = () => {
 
   const fetchProjectStatistics = useCallback(async () => {
     try {
-      const response = await fetchData("/project/statistics/overview");
-      setProjectStats(response);
+      const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
+      const allProjects: Project[] = response.projects || [];
+      const membershipFiltered = isAdmin
+        ? allProjects
+        : allProjects.filter((p: any) => {
+            const inMembers = Array.isArray(p.members)
+              ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+              : Array.isArray(p.categories)
+              ? p.categories.some(
+                  (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+                )
+              : false;
+            const isHead = p?.projectHead?._id === currentUserId;
+            const isCreator = p?.creator?._id === currentUserId;
+            return inMembers || isHead || isCreator;
+          });
+
+      const totals = {
+        totalProjects: membershipFiltered.length,
+        ongoingProjects: membershipFiltered.filter(
+          (p: any) => (p?.status || "").toLowerCase() === "in progress" || (p?.status || "").toLowerCase() === "ongoing"
+        ).length,
+        completedProjects: membershipFiltered.filter((p: any) => (p?.status || "").toLowerCase() === "completed").length,
+        proposedProjects: membershipFiltered.filter((p: any) => (p?.status || "").toLowerCase() === "planning").length,
+      };
+
+      setProjectStats(totals);
     } catch (error) {
-      console.error("Error fetching project statistics:", error);
+      console.error("Error computing project statistics:", error);
       toast.error("Failed to load project statistics");
-      // Fallback to empty stats on error
       setProjectStats({
         totalProjects: 0,
         ongoingProjects: 0,
@@ -198,7 +229,37 @@ const Dashboard = () => {
         proposedProjects: 0,
       });
     }
-  }, []);
+  }, [isAdmin, currentUserId]);
+
+  const fetchAccessibleProjects = useCallback(async () => {
+    try {
+      const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
+      const allProjects = response.projects || [];
+      if (isAdmin) {
+        setAccessibleProjects(allProjects);
+        setAccessibleProjectIds(new Set(allProjects.map((p: any) => p._id)));
+        return;
+      }
+      const filtered = allProjects.filter((p: any) => {
+        const inMembers = Array.isArray(p.members)
+          ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+          : Array.isArray(p.categories)
+          ? p.categories.some(
+              (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+            )
+          : false;
+        const isHead = p?.projectHead?._id === currentUserId;
+        const isCreator = p?.creator?._id === currentUserId;
+        return inMembers || isHead || isCreator;
+      });
+      setAccessibleProjects(filtered);
+      setAccessibleProjectIds(new Set(filtered.map((p: any) => p._id)));
+    } catch (error) {
+      console.error("Error fetching accessible projects:", error);
+      setAccessibleProjects([]);
+      setAccessibleProjectIds(new Set());
+    }
+  }, [isAdmin, currentUserId]);
 
   // Fetch monthly project statistics for pie chart
   const fetchMonthlyProjectStats = useCallback(async (month: number, year: number) => {
@@ -207,11 +268,26 @@ const Dashboard = () => {
       const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
       const allProjects = response.projects || [];
 
+      const membershipFiltered: Project[] = isAdmin
+        ? allProjects
+        : allProjects.filter((p: any) => {
+            const inMembers = Array.isArray(p.members)
+              ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+              : Array.isArray(p.categories)
+              ? p.categories.some(
+                  (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+                )
+              : false;
+            const isHead = p?.projectHead?._id === currentUserId;
+            const isCreator = p?.creator?._id === currentUserId;
+            return inMembers || isHead || isCreator;
+          });
+
       // Filter projects that are active in the selected month
       const monthStart = new Date(year, month, 1);
       const monthEnd = new Date(year, month + 1, 0); // Last day of the month
 
-      const projectsInMonth = allProjects.filter((project: Project) => {
+      const projectsInMonth = membershipFiltered.filter((project: Project) => {
         const projectStart = new Date(project.startDate);
         const projectEnd = new Date(project.endDate);
 
@@ -265,7 +341,6 @@ const Dashboard = () => {
       const response = await fetchData(`/project/recent?${params}`);
       let projects = response.projects || [];
 
-      // Apply client-side date filtering based on startDate
       if (dateRangeFilter.start || dateRangeFilter.end) {
         projects = projects.filter((project: Project) => {
           const startDate = new Date(project.startDate);
@@ -283,26 +358,49 @@ const Dashboard = () => {
         });
       }
 
+      if (!isAdmin) {
+        projects = projects.filter((p: any) => {
+          const inMembers = Array.isArray(p.members)
+            ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+            : Array.isArray(p.categories)
+            ? p.categories.some(
+                (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+              )
+            : false;
+          const isHead = p?.projectHead?._id === currentUserId;
+          const isCreator = p?.creator?._id === currentUserId;
+          return inMembers || isHead || isCreator;
+        });
+      }
+
       setRecentProjects(projects);
     } catch (error) {
       console.error("Error fetching recent projects:", error);
       toast.error("Failed to load recent projects");
-      // Fallback to empty array on error
       setRecentProjects([]);
     }
-  }, [projectTypeFilter, dateRangeFilter]);
+  }, [projectTypeFilter, dateRangeFilter, isAdmin, currentUserId]);
 
   const fetchTasks = useCallback(async () => {
     try {
       const response = await fetchData("/workspace/all-tasks");
-      const tasksData = response.tasks || [];
+      let tasksData = response.tasks || [];
+
+      if (!isAdmin) {
+        if (isLead && accessibleProjectIds && accessibleProjectIds.size > 0) {
+          tasksData = tasksData.filter((t: any) => t?.project?._id && accessibleProjectIds.has(t.project._id));
+        } else {
+          tasksData = tasksData.filter((t: any) => t?.assignedTo?._id === currentUserId);
+        }
+      }
+
       setTasks(tasksData);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       toast.error("Failed to load tasks");
       setTasks([]);
     }
-  }, []);
+  }, [isAdmin, isLead, accessibleProjectIds, currentUserId]);
 
   // Filter tasks based on status and search query
   useEffect(() => {
@@ -331,19 +429,29 @@ const Dashboard = () => {
     if (isAuthenticated) {
       const loadData = async () => {
         setLoading(true);
-        // Ensure workspaces are loaded and currentWorkspace is set before fetching dependent data
         await fetchWorkspaces();
+        await fetchAccessibleProjects();
         await Promise.all([
           fetchProjectStatistics(),
           fetchRecentProjects(),
-          fetchTasks(),
           fetchMonthlyProjectStats(selectedMonth, selectedYear),
         ]);
+        await fetchTasks();
         setLoading(false);
       };
       loadData();
     }
-  }, [isAuthenticated, fetchWorkspaces, fetchProjectStatistics, fetchRecentProjects, fetchTasks, fetchMonthlyProjectStats, selectedMonth, selectedYear]);
+  }, [
+    isAuthenticated,
+    fetchWorkspaces,
+    fetchAccessibleProjects,
+    fetchProjectStatistics,
+    fetchRecentProjects,
+    fetchTasks,
+    fetchMonthlyProjectStats,
+    selectedMonth,
+    selectedYear,
+  ]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -469,6 +577,7 @@ const Dashboard = () => {
         </div>
 
         {/* TOP ROW: Statistics Cards + Project Chart Side by Side */}
+        {(isAdmin || (accessibleProjectIds && accessibleProjectIds.size > 0)) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left: Project Statistics Cards */}
           <div className="grid grid-cols-2 gap-[15px]">
@@ -739,6 +848,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* BOTTOM ROW: Recent Projects Table + Task Overview Side by Side */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

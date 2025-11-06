@@ -110,15 +110,18 @@ const fetchWorkspaces = useCallback(async () => {
       const response = await fetchData('/project');
       const list: Project[] = response.projects || [];
       const currentUserId = (user as any)?.id || (user as any)?._id;
-      const role = (user as any)?.role || '';
-      const isAdmin = ['admin', 'super_admin', 'super-admin'].includes(role);
-      const filtered = !isAdmin && currentUserId
-        ? list.filter((p: any) => (
-            p?.creator?._id === currentUserId ||
-            p?.projectHead?._id === currentUserId ||
-            (Array.isArray(p?.members) && p.members.some((m: any) => m?.userId?._id === currentUserId))
-          ))
-        : list;
+      const filtered = list.filter((p: any) => {
+        const isCreator = p?.creator?._id === currentUserId;
+        const isHead = p?.projectHead?._id === currentUserId;
+        const inMembers = Array.isArray(p?.members)
+          ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+          : Array.isArray(p?.categories)
+          ? p.categories.some(
+              (c: any) => Array.isArray(c.members) && c.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+            )
+          : false;
+        return isCreator || isHead || inMembers;
+      });
       setProjects(filtered);
     } catch (error) {
       console.error('Failed to load projects', error);
@@ -261,7 +264,7 @@ const switchWorkspace = async (workspaceId: string) => {
             {/* Left: Title */}
             <div className="flex flex-col gap-[5px]">
               <h1 className="text-[24px] font-bold text-[#040110] font-['Inter']">
-                {sortedProjects.length} Projects
+                {projects.length} Projects
               </h1>
               <p className="text-[14px] text-[#040110] opacity-60 font-normal">
                 Ensure timely completion with organized task tracking.
