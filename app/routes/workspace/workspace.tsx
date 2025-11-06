@@ -103,11 +103,22 @@ const fetchWorkspaces = useCallback(async () => {
   const fetchProjects = useCallback(async () => {
     try {
       const response = await fetchData('/project');
-      setProjects(response.projects);
+      const list: Project[] = response.projects || [];
+      const currentUserId = (user as any)?.id || (user as any)?._id;
+      const role = (user as any)?.role || '';
+      const isAdmin = ['admin', 'super_admin', 'super-admin'].includes(role);
+      const filtered = !isAdmin && currentUserId
+        ? list.filter((p: any) => (
+            p?.creator?._id === currentUserId ||
+            p?.projectHead?._id === currentUserId ||
+            (Array.isArray(p?.members) && p.members.some((m: any) => m?.userId?._id === currentUserId))
+          ))
+        : list;
+      setProjects(filtered);
     } catch (error) {
       console.error('Failed to load projects', error);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -358,6 +369,7 @@ const switchWorkspace = async (workspaceId: string) => {
               }}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
+              onUpdated={fetchProjects}
             />
           ))}
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
-import { fetchData, patchData } from '@/lib/fetch-util';
+import { fetchData, patchData, postData } from '@/lib/fetch-util';
 import {
   Home,
   Building2,
