@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { fetchData, patchData } from '@/lib/fetch-util';
+import { fetchData, patchData, postData } from '@/lib/fetch-util';
 import { Button } from '@/components/ui/button';
 import { Bell, X } from 'lucide-react';
 import { useBadges } from '../../provider/badge-context';
@@ -73,11 +73,16 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       onClose();
 
       const { data } = notification;
-      // Persist workspace context for backend requests if provided
+      // Persist and switch workspace on backend if provided
       if (data.workspaceId) {
         try {
           localStorage.setItem('currentWorkspaceId', data.workspaceId);
         } catch {}
+        try {
+          await postData('/workspace/switch', { workspaceId: data.workspaceId });
+        } catch (err) {
+          console.error('Failed to switch workspace from notification:', err);
+        }
       }
 
       // Decide the most specific target route first

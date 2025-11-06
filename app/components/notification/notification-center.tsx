@@ -106,11 +106,16 @@ const NotificationCenter = () => {
 
     // Navigate based on notification data
     const { data } = notification;
-    // Persist workspace context for backend requests if provided
+    // Persist and switch workspace on backend if provided
     if (data.workspaceId) {
       try {
         localStorage.setItem('currentWorkspaceId', data.workspaceId);
       } catch {}
+      try {
+        await postData('/workspace/switch', { workspaceId: data.workspaceId });
+      } catch (err) {
+        console.error('Failed to switch workspace from notification:', err);
+      }
     }
 
     // Route selection: task > project > workspace > meetings > invite > dashboard
