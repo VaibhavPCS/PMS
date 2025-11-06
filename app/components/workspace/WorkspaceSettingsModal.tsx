@@ -60,7 +60,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
 
   const [deleting, setDeleting] = useState(false);
   
-  // Determine current user's role within this workspace for permission gating
+  // Determine current user's role within this workspace for permission gating (used for display only)
   const currentUserRole = members.find((m) => m._id === user?._id)?.role || 'member';
   
 
@@ -186,10 +186,6 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
     // Block owner removal at UI level; backend also enforces this
     if (member.role === 'owner') {
       toast.error('Cannot remove the owner. Transfer ownership first.');
-      return;
-    }
-    if (currentUserRole !== 'owner' && currentUserRole !== 'admin') {
-      toast.error('You do not have permission to remove members');
       return;
     }
     const confirmRemove = window.confirm(`Remove ${member.name} (${member.email}) from workspace?`);
@@ -368,7 +364,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
                             variant="ghost"
                             className="px-2 h-[34px] text-red-600 hover:text-red-700"
                             aria-label={`Remove ${member.name}`}
-                            disabled={member.role === 'owner' || !(['owner', 'admin'].includes(currentUserRole))}
+                            disabled={member.role === 'owner'}
                             onClick={() => handleRemoveMember(member)}
                           >
                             <Trash2 className="w-4 h-4" />

@@ -153,6 +153,7 @@ const Dashboard = () => {
       // Store current workspace in localStorage for API calls
       if (response.currentWorkspace) {
         localStorage.setItem("currentWorkspaceId", response.currentWorkspace._id);
+        localStorage.setItem("workspace-id", response.currentWorkspace._id);
       }
     } catch (error) {
       console.error("Error fetching workspaces:", error);
@@ -165,6 +166,7 @@ const Dashboard = () => {
       await postData("/workspace/switch", { workspaceId });
       // Update localStorage
       localStorage.setItem("currentWorkspaceId", workspaceId);
+      localStorage.setItem("workspace-id", workspaceId);
       // Update current workspace state
       const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
       setCurrentWorkspace(selectedWorkspace || null);
@@ -329,8 +331,9 @@ const Dashboard = () => {
     if (isAuthenticated) {
       const loadData = async () => {
         setLoading(true);
+        // Ensure workspaces are loaded and currentWorkspace is set before fetching dependent data
+        await fetchWorkspaces();
         await Promise.all([
-          fetchWorkspaces(),
           fetchProjectStatistics(),
           fetchRecentProjects(),
           fetchTasks(),

@@ -19,13 +19,15 @@ interface WorkspaceSelectorProps {
   currentWorkspace: Workspace | null;
   onSwitchWorkspace: (workspaceId: string) => void;
   onCreateWorkspaceClick: () => void;
+  canCreateWorkspace?: boolean;
 }
 
 export function WorkspaceSelector({
   workspaces,
   currentWorkspace,
   onSwitchWorkspace,
-  onCreateWorkspaceClick
+  onCreateWorkspaceClick,
+  canCreateWorkspace = false
 }: WorkspaceSelectorProps) {
   return (
     <Select value={currentWorkspace?._id || ''} onValueChange={onSwitchWorkspace}>
@@ -67,10 +69,14 @@ export function WorkspaceSelector({
             </div>
           </SelectItem>
         ))}
-        <SelectSeparator />
-        <SelectItem value="create-new-workspace" onSelect={onCreateWorkspaceClick} className="font-['Inter'] text-[#F2761B] font-medium">
-          + Create New Workspace
-        </SelectItem>
+        {canCreateWorkspace && (
+          <>
+            <SelectSeparator />
+            <SelectItem value="create-new-workspace" onSelect={onCreateWorkspaceClick} className="font-['Inter'] text-[#F2761B] font-medium">
+              + Create New Workspace
+            </SelectItem>
+          </>
+        )}
       </SelectContent>
     </Select>
   );
