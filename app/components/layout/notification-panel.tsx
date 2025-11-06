@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { fetchData, patchData } from '@/lib/fetch-util';
 import { Button } from '@/components/ui/button';
 import { Bell, X } from 'lucide-react';
@@ -36,6 +37,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
   onClose,
   anchorEl,
 }) => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const { refreshBadgeCounts } = useBadges();
@@ -56,6 +58,48 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       setNotifications([]);
     } finally {
       setLoadingNotifications(false);
+    }
+  };
+
+  // Navigate to relevant page for a notification and mark as read
+  const handleNotificationClick = async (notification: Notification) => {
+    try {
+      if (!notification.isRead) {
+        await markAsRead(notification._id);
+      }
+
+      // Close the panel
+      onClose();
+
+      const { data } = notification;
+      let targetPath = '';
+      let targetElement = '';
+
+      if (data.workspaceId && data.projectId && data.taskId) {
+        targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+        targetElement = `task-${data.taskId}`;
+      } else if (data.workspaceId && data.projectId) {
+        targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+      } else if (data.workspaceId) {
+        targetPath = `/workspace/${data.workspaceId}`;
+      } else if (data.inviteId) {
+        targetPath = '/invitations';
+      } else {
+        targetPath = '/dashboard';
+      }
+
+      navigate(targetPath);
+
+      if (targetElement) {
+        setTimeout(() => {
+          const el = document.getElementById(targetElement);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 400);
+      }
+    } catch (err) {
+      console.error('Notification navigation error:', err);
     }
   };
 
@@ -196,7 +240,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
                       ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100'
                       : 'hover:bg-gray-50'
                   }`}
-                  onClick={() => !notification.isRead && markAsRead(notification._id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="text-lg flex-shrink-0">

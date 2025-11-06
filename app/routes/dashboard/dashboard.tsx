@@ -893,7 +893,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
-                    Latest Projects Under Development and Execution
+                    Complete project profile including milestones and task details
                   </p>
                 </div>
               </CardHeader>

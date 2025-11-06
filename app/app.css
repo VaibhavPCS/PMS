@@ -88,6 +88,13 @@ body {
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  /* Figma Design Colors */
+  --primary-orange: #FF6B2C;
+  --text-tertiary: #a1a1a1;
+  --border-light: #f5f5f5;
+  --status-ongoing: #3B82F6;
+  --priority-high: #DC2626;
 }
 
 .dark {
@@ -154,4 +161,44 @@ body {
 [data-slot="dropdown-menu-content"],
 [data-slot="select-content"] {
   z-index: 70 !important;
+}
+
+/* Custom Scrollbar Styling - Figma Design */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--border-light);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #717182;
+}
+
+/* Apply to ScrollArea components */
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: var(--border-light);
+  border-radius: 2px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 2px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background: #717182;
 }

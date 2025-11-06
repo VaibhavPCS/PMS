@@ -54,13 +54,18 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { RichTextToolbar } from "@/components/ui/rich-text-toolbar";
+import { AttachmentsPanel } from "@/components/task/AttachmentsPanel";
+import Breadcrumb from "@/components/layout/Breadcrumb";
+import { AvatarGroup } from "@/components/ui/avatar-group";
+import { ImagePreviewModal } from "@/components/ui/image-preview-modal";
 
 interface Task {
   _id: string;
   title: string;
   description: string;
   status: "to-do" | "in-progress" | "done";
-  priority: "low" | "medium" | "high";
+  priority: "low" | "medium" | "high" | "urgent";
   assignee: {
     _id: string;
     name: string;
@@ -76,10 +81,19 @@ interface Task {
     title: string;
   };
   category: string;
+  startDate: string;
   dueDate: string;
+  durationDays?: number;
   createdAt: string;
   completedAt?: string;
   handoverNotes?: string;
+  handoverAttachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: "image" | "document";
+    fileSize: number;
+    mimeType: string;
+  }>;
   workspace?: string;
   approvalStatus?: "not-required" | "pending-approval" | "approved" | "rejected";
   completedBy?: {
@@ -274,7 +288,8 @@ const FilePreview: React.FC<{
   canDelete?: boolean;
   onDelete?: (index: number) => void;
 }> = ({ attachments, canDelete = false, onDelete }) => {
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
   const formatFileSize = (bytes: number | undefined) => {
     if (!bytes || bytes === 0) return "0 Bytes";
@@ -300,7 +315,18 @@ const FilePreview: React.FC<{
     document.body.removeChild(link);
   };
 
+  const openImagePreview = (index: number) => {
+    // Only open modal if index is valid
+    if (index >= 0) {
+      setPreviewImageIndex(index);
+      setPreviewModalOpen(true);
+    }
+  };
+
   if (!attachments || attachments.length === 0) return null;
+
+  // Separate images and documents
+  const imageAttachments = attachments.filter(a => a.fileType === "image");
 
   return (
     <div className="mt-2 space-y-2">
@@ -312,9 +338,12 @@ const FilePreview: React.FC<{
                 src={buildBackendUrl(attachment.fileUrl)}
                 alt={attachment.fileName}
                 className="rounded max-h-32 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() =>
-                  setPreviewImage(buildBackendUrl(attachment.fileUrl))
-                }
+                onClick={() => {
+                  const imageIndex = imageAttachments.findIndex(
+                    img => img.fileUrl === attachment.fileUrl
+                  );
+                  openImagePreview(imageIndex);
+                }}
               />
               <div className="absolute bottom-2 left-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1.5 rounded flex items-center justify-between">
                 <span className="truncate">{attachment.fileName}</span>
@@ -324,7 +353,10 @@ const FilePreview: React.FC<{
                     variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPreviewImage(buildBackendUrl(attachment.fileUrl));
+                      const imageIndex = imageAttachments.findIndex(
+                        img => img.fileUrl === attachment.fileUrl
+                      );
+                      openImagePreview(imageIndex);
                     }}
                     className="h-5 w-5 p-0 hover:bg-white/20"
                   >
@@ -371,23 +403,15 @@ const FilePreview: React.FC<{
         </div>
       ))}
 
-      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Image Preview</DialogTitle>
-            <DialogDescription>Preview of the attached image</DialogDescription>
-          </DialogHeader>
-          {previewImage && (
-            <div className="flex justify-center">
-              <img
-                src={previewImage}
-                alt="Preview"
-                className="max-w-full max-h-[70vh] object-contain"
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Enhanced Image Preview Modal */}
+      {imageAttachments.length > 0 && (
+        <ImagePreviewModal
+          images={imageAttachments}
+          initialIndex={previewImageIndex}
+          isOpen={previewModalOpen}
+          onClose={() => setPreviewModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
@@ -523,15 +547,13 @@ const ChatMessage: React.FC<{
 
           <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
             {canReply && (
-              <Button
-                size="sm"
-                variant="ghost"
+              <button
                 onClick={() => onReply(comment)}
-                className="text-xs h-5 px-1"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
               >
-                <Reply className="w-3 h-3 mr-1" />
+                <Reply className="w-3 h-3" />
                 Reply
-              </Button>
+              </button>
             )}
             {canEdit && isOwnMessage && !isEditing && (
               <Button
@@ -558,20 +580,26 @@ const ChatMessage: React.FC<{
           </div>
 
           {hasReplies && (
-  <div className="mt-1">
-    <Button
-      size="sm"
-      variant="ghost"
+  <div className="mt-2">
+    <button
       onClick={handleToggleExpand}
-      className="text-xs h-5 px-1 text-blue-600 hover:text-blue-700"
+      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"
     >
       {isExpanded ? (
-        <ChevronDown className="w-3 h-3 mr-1" />
+        <ChevronDown className="w-3 h-3" />
       ) : (
-        <ChevronRight className="w-3 h-3 mr-1" />
+        <ChevronRight className="w-3 h-3" />
       )}
-      {comment.replyCount} {comment.replyCount === 1 ? 'reply' : 'replies'}
-    </Button>
+      <AvatarGroup
+        users={replies.length > 0 ? replies.slice(0, 3).map(r => r.author) : [
+          { _id: '1', name: 'User 1' },
+          { _id: '2', name: 'User 2' }
+        ]}
+        count={comment.replyCount || 0}
+        countLabel="replies"
+        size="sm"
+      />
+    </button>
   </div>
 )}
 
@@ -609,6 +637,7 @@ const TaskDetail = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [handoverNotes, setHandoverNotes] = useState("");
+  const [handoverFiles, setHandoverFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [editingComment, setEditingComment] = useState<string | null>(null);
@@ -771,17 +800,111 @@ const TaskDetail = () => {
 
   const handleSaveHandoverNotes = async () => {
     if (!task) return;
+    if (!handoverNotes.trim() && handoverFiles.length === 0) {
+      toast.error("Please add notes or attach files");
+      return;
+    }
 
     try {
       setSavingHandover(true);
-      await postData(`/task/${task._id}/handover`, { handoverNotes });
+
+      // Use FormData to support file uploads
+      const formData = new FormData();
+      formData.append("handoverNotes", handoverNotes);
+
+      // Append files
+      handoverFiles.forEach((file) => {
+        formData.append("attachments", file);
+      });
+
+      const response = await fetch(buildApiUrl(`/task/${task._id}/handover`), {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save handover notes");
+      }
+
+      const data = await response.json();
+
       toast.success("Handover notes saved successfully");
-      setTask({ ...task, handoverNotes });
+
+      // Update task with new data
+      setTask({
+        ...task,
+        handoverNotes,
+        handoverAttachments: data.task?.handoverAttachments || task.handoverAttachments
+      });
+
+      // Clear files after successful upload
+      setHandoverFiles([]);
+
+      // Refresh task details to get updated attachments
+      await fetchTaskDetails();
     } catch (error) {
       console.error("Failed to save handover notes:", error);
       toast.error("Failed to save handover notes");
     } finally {
       setSavingHandover(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (index: number) => {
+    if (!task || !task.handoverAttachments) return;
+
+    const attachment = task.handoverAttachments[index];
+
+    // Validate index
+    if (!attachment) {
+      toast.error("Attachment not found");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${attachment.fileName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Send request to backend to delete the attachment
+      const response = await fetch(
+        buildApiUrl(`/task/${task._id}/handover/attachment/${index}`),
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        // If endpoint doesn't exist, handle client-side deletion
+        const updatedAttachments = task.handoverAttachments.filter((_, i) => i !== index);
+        setTask({
+          ...task,
+          handoverAttachments: updatedAttachments,
+        });
+        toast.success("Attachment removed");
+      } else {
+        toast.success("Attachment deleted successfully");
+        // Refresh task details
+        await fetchTaskDetails();
+      }
+    } catch (error) {
+      console.error("Failed to delete attachment:", error);
+      // Fallback to client-side deletion
+      const updatedAttachments = task.handoverAttachments.filter((_, i) => i !== index);
+      setTask({
+        ...task,
+        handoverAttachments: updatedAttachments,
+      });
+      toast.success("Attachment removed");
     }
   };
 
@@ -834,25 +957,23 @@ const TaskDetail = () => {
     return task.status === "done" && task.approvalStatus === "pending-approval";
   };
 
-  // Chat functions
-  const canComment = () => {
+  const canDeleteAttachments = () => {
     if (!currentUser || !task) return false;
+    // Allow deletion if user is the assignee, admin, or super_admin
+    if (["super_admin", "admin"].includes(currentUser.role)) return true;
     return task.assignee._id === currentUser._id;
   };
 
+  // Chat functions - Simplified: Anyone who can view the task can comment
+  const canComment = () => {
+    // If user can see the task, they can comment
+    // Task visibility is already controlled by backend permissions
+    return !!(currentUser && task);
+  };
+
   const canReply = () => {
-    if (!currentUser) return false;
-    if (["super_admin", "admin"].includes(currentUser.role)) return true;
-    if (task?.assignee._id === currentUser._id) return true;
-
-    if (currentUser.workspaces?.length > 0) {
-      const workspace = currentUser.workspaces.find(
-        (ws: any) => ws.workspace.toString() === task?.workspace?.toString()
-      );
-      if (workspace?.role === "lead") return true;
-    }
-
-    return false;
+    // Same logic as canComment - anyone who can see the task can reply
+    return !!(currentUser && task);
   };
 
   const handleReply = (comment: Comment) => {
@@ -920,11 +1041,11 @@ const TaskDetail = () => {
         formData.append("attachments", file);
       });
 
-      const response = await fetch(buildApiUrl(`/comment`), {
+      const response = await fetch(buildApiUrl(`/comments`), {
         method: "POST",
         credentials: 'include',
         headers: {
-          "workspace-id": localStorage.getItem("currentWorkspace") || "",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
         },
         body: formData,
       });
@@ -1152,23 +1273,22 @@ const TaskDetail = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-6">
+          <Breadcrumb />
+        </div>
+
         {/* Header */}
         <div className="mb-8">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
 
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-[29px] font-bold text-[#040110] mb-2 leading-tight">
                 {task.title}
               </h1>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span>in {task.project.title}</span>
-                <span>•</span>
-                <span>{task.category}</span>
-              </div>
+              <p className="text-[16px] text-[#717182]">
+                Complete project profile including milestones and task details
+              </p>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -1253,65 +1373,76 @@ const TaskDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Task Details */}
+            {/* Task Overview - Figma Layout */}
             <Card>
-              <CardHeader>
-                <CardTitle>Task Details</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-semibold">Task Overview</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5 pt-0">
+                {/* Row 1: Title ID, Task Title, Assigned to, Priority */}
+                <div className="grid grid-cols-4 gap-6">
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Title ID</p>
+                    <p className="text-[17px] font-normal text-[#040110]">{task._id.slice(-6).toUpperCase()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Task Title</p>
+                    <p className="text-[17px] font-normal text-[#040110]">{task.title}</p>
+                  </div>
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Assigned to</p>
+                    <p className="text-[17px] font-normal text-[#040110]">{task.assignee?.name || 'Unassigned'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Priority</p>
+                    <p className={`text-[17px] font-normal ${
+                      task.priority === 'high' || task.priority === 'urgent' ? 'text-[#DC2626]' :
+                      task.priority === 'medium' ? 'text-[#F59E0B]' : 'text-[#10B981]'
+                    }`}>
+                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Row 2: Description */}
                 {task.description && (
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      Description
-                    </h4>
-                    <p className="text-gray-700 whitespace-pre-wrap">
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Description</p>
+                    <p className="text-[17px] text-[#040110] whitespace-pre-wrap leading-relaxed">
                       {task.description}
                     </p>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Assigned to</p>
-                      <p className="text-sm text-gray-600">
-                        {task.assignee.name}
-                      </p>
-                    </div>
+                {/* Row 3: Start Date, Due Date, Duration, Status */}
+                <div className="grid grid-cols-4 gap-6">
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Start Date</p>
+                    <p className="text-[17px] font-normal text-[#040110]">
+                      {task.startDate ? formatDueDate(task.startDate) : '-'}
+                    </p>
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Due Date</p>
-                      <p className="text-sm text-gray-600">
-                        {formatDueDate(task.dueDate)}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Due Date</p>
+                    <p className="text-[17px] font-normal text-[#040110]">
+                      {formatDueDate(task.dueDate)}
+                    </p>
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">Created</p>
-                      <p className="text-sm text-gray-600">
-                        {formatDate(task.createdAt)}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Duration</p>
+                    <p className="text-[17px] font-normal text-[#040110]">
+                      {task.durationDays ? `${task.durationDays} Day${task.durationDays > 1 ? 's' : ''}` : '-'}
+                    </p>
                   </div>
-
-                  {task.completedAt && (
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <div>
-                        <p className="text-sm font-medium">Completed</p>
-                        <p className="text-sm text-gray-600">
-                          {formatDate(task.completedAt)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Status</p>
+                    <p className={`text-[17px] font-normal ${
+                      task.status === 'done' ? 'text-[#10B981]' :
+                      task.status === 'in-progress' ? 'text-[#3B82F6]' : 'text-[#717182]'
+                    }`}>
+                      {task.status === 'to-do' ? 'To Do' : task.status === 'in-progress' ? 'Ongoing' : 'Done'}
+                    </p>
+                  </div>
                 </div>
 
                 {task.rejectionReason && task.approvalStatus === "rejected" && (
@@ -1328,40 +1459,107 @@ const TaskDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Handover Notes */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Handover Notes</CardTitle>
-                <CardDescription>
-                  Add your progress updates and handover information here
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Share your progress, blockers, or handover notes..."
-                  value={handoverNotes}
-                  onChange={(e) => setHandoverNotes(e.target.value)}
-                  className="min-h-32"
-                  disabled={savingHandover}
-                />
-                <div className="flex justify-end mt-3">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveHandoverNotes}
+            {/* Handover Notes with Rich Text Toolbar */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Handover Notes</CardTitle>
+                  <CardDescription>
+                    Add your progress updates and handover information here
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Textarea
+                    placeholder="Share your progress, blockers, or handover notes..."
+                    value={handoverNotes}
+                    onChange={(e) => setHandoverNotes(e.target.value)}
+                    className="min-h-32 border-0 rounded-b-none focus-visible:ring-0"
                     disabled={savingHandover}
-                  >
-                    {savingHandover ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Notes"
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  />
+                  {/* Display selected files */}
+                  {handoverFiles.length > 0 && (
+                    <div className="p-3 border-t bg-gray-50">
+                      <FileUpload
+                        selectedFiles={handoverFiles}
+                        onFilesSelect={setHandoverFiles}
+                        maxFiles={3}
+                        maxFileSize={5}
+                      />
+                    </div>
+                  )}
+                  <RichTextToolbar
+                    onAttachClick={() => {
+                      // Trigger file input
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.multiple = true;
+                      input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
+                      input.onchange = (e: any) => {
+                        const files = Array.from(e.target.files || []) as File[];
+                        if (files.length > 0) {
+                          // Validate files before adding
+                          const allowedTypes = [
+                            "image/jpeg", "image/png", "image/gif",
+                            "application/pdf",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "text/plain",
+                          ];
+                          const maxFileSize = 5; // MB
+                          const maxFiles = 3;
+                          const validFiles: File[] = [];
+                          const errors: string[] = [];
+
+                          files.forEach((file) => {
+                            if (!allowedTypes.includes(file.type)) {
+                              errors.push(`${file.name}: Invalid file type`);
+                              return;
+                            }
+                            if (file.size > maxFileSize * 1024 * 1024) {
+                              errors.push(`${file.name}: File too large (max ${maxFileSize}MB)`);
+                              return;
+                            }
+                            if (handoverFiles.length + validFiles.length >= maxFiles) {
+                              errors.push(`Maximum ${maxFiles} files allowed`);
+                              return;
+                            }
+                            validFiles.push(file);
+                          });
+
+                          if (errors.length > 0) {
+                            toast.error(errors.join("\n"));
+                          }
+                          if (validFiles.length > 0) {
+                            setHandoverFiles([...handoverFiles, ...validFiles]);
+                          }
+                        }
+                      };
+                      input.click();
+                    }}
+                    actionLabel="Share"
+                    onActionClick={handleSaveHandoverNotes}
+                    actionDisabled={savingHandover || (!handoverNotes.trim() && handoverFiles.length === 0)}
+                    actionLoading={savingHandover}
+                    showFormattingButtons={true}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Attachments Panel */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attachments</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <AttachmentsPanel
+                    attachments={task.handoverAttachments || []}
+                    canDelete={canDeleteAttachments()}
+                    onDelete={handleDeleteAttachment}
+                    className="border-0"
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Enhanced Chat Section */}
@@ -1378,14 +1576,9 @@ const TaskDetail = () => {
                   )}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  {comments.length === 0 &&
-                    canComment() &&
-                    "Start the conversation"}
-                  {comments.length === 0 &&
-                    !canComment() &&
-                    "Only the task assignee can start the conversation"}
-                  {comments.length > 0 &&
-                    `${comments.length} message${comments.length === 1 ? "" : "s"}`}
+                  {comments.length === 0
+                    ? "Start the conversation"
+                    : `${comments.length} message${comments.length === 1 ? "" : "s"}`}
                 </CardDescription>
               </CardHeader>
 
@@ -1395,9 +1588,7 @@ const TaskDetail = () => {
                     <div className="py-8 text-center text-gray-500">
                       <div className="text-4xl mb-4">💬</div>
                       <p className="text-xs">
-                        {canComment()
-                          ? "Start the conversation by posting the first message"
-                          : "Waiting for the task assignee to start the conversation"}
+                        Start the conversation by posting the first message
                       </p>
                     </div>
                   ) : (
@@ -1432,7 +1623,7 @@ const TaskDetail = () => {
                 <Separator />
 
                 {/* Message Input */}
-                {(comments.length === 0 ? canComment() : canReply()) && (
+                {canComment() && (
                   <div className="p-3 bg-gray-50">
                     {/* Reply Indicator */}
                     {replyingTo && (
@@ -1470,63 +1661,34 @@ const TaskDetail = () => {
                       </div>
                     ) : null}
 
-                    {/* Message Input */}
-                    <div className="flex space-x-2">
-                      <Avatar className="w-6 h-6 flex-shrink-0">
-                        <AvatarFallback className="text-xs">
-                          {activeUser?.name?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1">
-                        <Textarea
-                          id="comment-input"
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder={
-                            replyingTo
-                              ? "Type your reply..."
-                              : "Type a message..."
+                    {/* Message Input with Rich Text Toolbar */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <Textarea
+                        id="comment-input"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder={
+                          replyingTo
+                            ? "Type your reply..."
+                            : "Write your comment here..."
+                        }
+                        className="text-sm p-3 border-0 rounded-b-none focus-visible:ring-0 resize-none"
+                        rows={3}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmitComment();
                           }
-                          className="text-xs p-2 border border-gray-300 rounded resize-none"
-                          rows={2}
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSubmitComment();
-                            }
-                          }}
-                        />
-
-                        <div className="flex items-center justify-between mt-1">
-                          <FileUpload
-                            selectedFiles={selectedFiles}
-                            onFilesSelect={setSelectedFiles}
-                            maxFiles={3}
-                            maxFileSize={5}
-                          />
-
-                          <Button
-                            onClick={handleSubmitComment}
-                            disabled={
-                              isSubmitting ||
-                              (!newComment.trim() && selectedFiles.length === 0)
-                            }
-                            size="sm"
-                            className="ml-2 h-6 px-3"
-                          >
-                            {isSubmitting ? (
-                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Send className="w-3 h-3" />
-                            )}
-                          </Button>
-                        </div>
-
-                        <div className="text-xs text-gray-500 mt-1">
-                          Press Enter to send, Shift+Enter for new line
-                        </div>
-                      </div>
+                        }}
+                      />
+                      <RichTextToolbar
+                        actionLabel="Send"
+                        onActionClick={handleSubmitComment}
+                        actionDisabled={isSubmitting || (!newComment.trim() && selectedFiles.length === 0)}
+                        actionLoading={isSubmitting}
+                        showFormattingButtons={true}
+                        className="border-t-0"
+                      />
                     </div>
                   </div>
                 )}

@@ -1,5 +1,6 @@
 import React from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TruncatedTextModal } from "@/components/ui/truncated-text-modal";
 
 type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
 
@@ -51,6 +52,8 @@ export function ProjectOverviewPanel({
     </div>
   );
 
+  
+
   return (
     <div className="bg-[#E5EFFF] rounded-[10px] p-[20px] w-full">
       {/* Row 1: Project Manager & Project Lead */}
@@ -64,9 +67,13 @@ export function ProjectOverviewPanel({
         <FieldGroup
           label="Description"
           value={
-            <div className="leading-[1.5] max-h-[73px] overflow-hidden">
-              {description}
-            </div>
+            <TruncatedTextModal 
+              text={description}
+              lines={3}
+              ellipsisClassName="text-[#040110] bg-[#E5EFFF]"
+              modalBgClassName="bg-[#E5EFFF]"
+              modalTitle="Description"
+            />
           }
           fullWidth
         />

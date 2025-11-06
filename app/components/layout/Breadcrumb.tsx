@@ -81,6 +81,67 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
             className="w-[20px] h-[20px]"
           />
         ),
+        isActive: !path.includes('/task/')
+      });
+    }
+
+    if (path.includes('/task/')) {
+      // Add workspace and project if not already added
+      if (!breadcrumbs.find(b => b.label === 'Workspace')) {
+        breadcrumbs.push({
+          label: 'Workspace',
+          icon: (
+            <img
+              src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+              alt="Workspace"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          href: '/workspace',
+          isActive: false
+        });
+      }
+      if (!breadcrumbs.find(b => b.label === 'Project Detail')) {
+        breadcrumbs.push({
+          label: 'Project Detail',
+          icon: (
+            <img
+              src="/assets/folder-project-icon.svg"
+              alt="Project"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          isActive: false
+        });
+      }
+      breadcrumbs.push({
+        label: 'Task Details',
+        icon: (
+          <svg
+            className="w-[20px] h-[20px]"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M6 10L9 13L14 7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <rect
+              x="3"
+              y="3"
+              width="14"
+              height="14"
+              rx="2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+            />
+          </svg>
+        ),
         isActive: true
       });
     }

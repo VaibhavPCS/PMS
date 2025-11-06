@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreVertical, Users, Edit, Trash2, CheckCircle2, PlayCircle, Pause, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router';
+import { TruncatedTextModal } from '@/components/ui/truncated-text-modal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -288,9 +289,12 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
           <p className="text-[16px] text-black font-normal font-['Inter']">
             {project.title}
           </p>
-          <p className="text-[14px] text-[#717182] font-normal font-['Inter'] line-clamp-4 leading-[normal]">
-            {project.description}
-          </p>
+          <TruncatedTextModal
+            text={project.description}
+            lines={3}
+            textClassName="text-[14px] text-[#717182] font-normal font-['Inter'] leading-[normal]"
+            modalTitle="Description"
+          />
         </div>
 
         {/* Progress */}

@@ -18,6 +18,8 @@ interface AttachmentsSidebarProps {
   onPreview?: (attachment: Attachment) => void;
   onUploadClick?: () => void;
   canDelete?: boolean; // Admin-only permission
+  canPreview?: boolean; // Admin or Project Lead permission
+  canUpload?: boolean; // Admin or Project Lead permission
 }
 
 export function AttachmentsSidebar({
@@ -26,6 +28,8 @@ export function AttachmentsSidebar({
   onPreview,
   onUploadClick,
   canDelete = false,
+  canPreview = false,
+  canUpload = false,
 }: AttachmentsSidebarProps) {
   // Determine if file is an image based on mimetype or extension
   const isImageFile = (attachment: Attachment) => {
@@ -42,13 +46,13 @@ export function AttachmentsSidebar({
   };
 
   return (
-    <div className="bg-[#E5EFFF] rounded-[10px] w-[238px] flex flex-col">
+    <div className="bg-[#E5EFFF] rounded-[10px] w-full min-w-0 flex flex-col">
       {/* Header with Upload Button */}
       <div className="p-[10px] border-b border-gray-200 flex items-center justify-between">
         <h3 className="text-[18px] font-semibold font-['Inter'] text-[#040110]">
           Attachments
         </h3>
-        {onUploadClick && attachments.length < 10 && (
+        {onUploadClick && canUpload && attachments.length < 10 && (
           <button
             onClick={onUploadClick}
             className="p-1.5 hover:bg-white/50 rounded transition-colors"
@@ -125,15 +129,16 @@ export function AttachmentsSidebar({
 
                   {/* Right: Action Buttons */}
                   <div className="flex items-center gap-[6px] opacity-0 group-hover:opacity-100 transition-opacity">
-                    {onPreview && (
+                    {/* Eye preview button commented out as requested */}
+                    {/* {onPreview && canPreview && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onPreview(file); }}
                         className="p-1 hover:bg-gray-200 rounded transition-colors"
-                        title="Preview"
+                        title="Preview (Admin/Lead)"
                       >
                         <Eye className="w-[16px] h-[16px] text-gray-600" strokeWidth={2} />
                       </button>
-                    )}
+                    )} */}
                     {onDelete && canDelete && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onDelete(file._id); }}

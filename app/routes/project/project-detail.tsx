@@ -1613,6 +1613,11 @@ const ProjectDetail = () => {
       if (start > end) {
         return toast.error("Start date cannot be after due date");
       }
+      const projectEnd = project ? new Date(project.endDate) : undefined;
+      if (projectEnd) projectEnd.setHours(0, 0, 0, 0);
+      if (projectEnd && end > projectEnd) {
+        return toast.error("Due date cannot be after project end date");
+      }
 
       try {
         setSubmittingTask(true);
@@ -1946,7 +1951,7 @@ const ProjectDetail = () => {
           </div>
 
           {/* Center: Project Overview Panel (589px width = 620px * 0.95) */}
-          <div className="w-[589px] mx-auto flex-shrink-0">
+          <div className="w-[560px] flex-shrink-0">
             <ProjectOverviewPanel
               projectManager={project.creator.name}
               projectHead={project.projectHead?.name}
@@ -1957,14 +1962,16 @@ const ProjectDetail = () => {
             />
           </div>
 
-          {/* Right: Attachments Sidebar (238px width = 250px * 0.95) */}
-          <div className="w-[238px] flex-shrink-0">
+          {/* Right: Attachments Sidebar (fills leftover width) */}
+          <div className="flex-1 min-w-0">
             <AttachmentsSidebar
               attachments={project.attachments || []}
               canDelete={permissions.isAdmin}
+              canPreview={permissions.isAdmin || isProjectLead}
+              canUpload={permissions.isAdmin || isProjectLead}
               onDelete={async (id) => {
                 try {
-                  await deleteData(`/project/${project._id}/attachments/${id}`);
+                  await deleteData(`/projects/${project._id}/attachments/${id}`);
                   toast.success('Attachment deleted successfully');
                   fetchProjectDetails();
                 } catch (error: any) {
@@ -2467,7 +2474,9 @@ const ProjectDetail = () => {
                         disabled={(date) => {
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
-                          return date < projStart;
+                          const projEnd = project ? new Date(project.endDate) : undefined;
+                          if (projEnd) projEnd.setHours(0, 0, 0, 0);
+                          return Boolean(date < projStart || (projEnd && date > projEnd));
                         }}
                         initialFocus
                       />
@@ -2496,6 +2505,16 @@ const ProjectDetail = () => {
                         selected={dueDateObj}
                         onSelect={(date) => {
                           if (!date) return;
+                          const projEnd = project ? new Date(project.endDate) : undefined;
+                          if (projEnd) {
+                            projEnd.setHours(0, 0, 0, 0);
+                          }
+                          if (projEnd && date > projEnd) {
+                            toast.error("Due date cannot be after project end date");
+                            setDueDateObj(projEnd);
+                            setNewTask({ ...newTask, dueDate: format(projEnd, "yyyy-MM-dd") });
+                            return;
+                          }
                           setDueDateObj(date);
                           setNewTask({ ...newTask, dueDate: format(date, "yyyy-MM-dd") });
                         }}
@@ -2503,7 +2522,9 @@ const ProjectDetail = () => {
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
                           const startBaseline = startDateObj || projStart;
-                          return date < startBaseline;
+                          const projEnd = project ? new Date(project.endDate) : undefined;
+                          if (projEnd) projEnd.setHours(0, 0, 0, 0);
+                          return Boolean(date < startBaseline || (projEnd && date > projEnd));
                         }}
                         initialFocus
                       />

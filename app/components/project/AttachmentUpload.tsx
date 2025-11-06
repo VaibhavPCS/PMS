@@ -80,7 +80,7 @@ export function AttachmentUpload({
         formData.append('attachments', file);
       });
 
-      await postMultipart(`/project/${projectId}/attachments`, formData);
+      await postMultipart(`/projects/${projectId}/attachments`, formData);
 
       setSelectedFiles([]);
       onUploadSuccess();
