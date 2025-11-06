@@ -65,8 +65,8 @@ const VerticalSidebar = () => {
   // Dynamically rename "Workspace" to "Projects" for non-admin users.
   // Keep href the same ("/workspace") since it lists projects.
   const effectiveNavItems = navItems.map((item) => {
-    if (item.name === 'Workspace' && !isAdmin) {
-      return { ...item, name: 'Projects' };
+    if (item.name === 'Workspace') {
+      return { ...item, name: 'Workspace' };
     }
     return item;
   });

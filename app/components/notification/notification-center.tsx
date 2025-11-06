@@ -19,6 +19,7 @@ interface Notification {
     workspaceId?: string;
     projectId?: string;
     taskId?: string;
+    meetingId?: string;
     inviteId?: string;
   };
   createdAt: string;
@@ -105,48 +106,29 @@ const NotificationCenter = () => {
 
     // Navigate based on notification data
     const { data } = notification;
-    let targetPath = '';
-    let targetElement = '';
+    // Persist workspace context for backend requests if provided
+    if (data.workspaceId) {
+      try {
+        localStorage.setItem('currentWorkspaceId', data.workspaceId);
+      } catch {}
+    }
 
-    if (data.workspaceId && data.projectId && data.taskId) {
-      // Task-related notification
-      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
-      targetElement = `task-${data.taskId}`;
-    } else if (data.workspaceId && data.projectId) {
-      // Project-related notification
-      targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+    // Route selection: task > project > workspace > meetings > invite > dashboard
+    let targetPath = '/dashboard';
+    if (data.taskId) {
+      targetPath = `/task/${data.taskId}`;
+    } else if (data.projectId) {
+      targetPath = `/project/${data.projectId}`;
     } else if (data.workspaceId) {
-      // Workspace-related notification
-      targetPath = `/workspace/${data.workspaceId}`;
+      targetPath = `/workspace`;
+    } else if (data.meetingId) {
+      targetPath = `/meetings`;
     } else if (data.inviteId) {
-      // Invite-related notification
-      targetPath = '/invitations';
-    } else {
-      // Default to dashboard
-      targetPath = '/dashboard';
+      targetPath = `/workspace`;
     }
 
     // Navigate to the target path
     navigate(targetPath);
-
-    // Smooth scroll to specific element if specified
-    if (targetElement) {
-      setTimeout(() => {
-        const element = document.getElementById(targetElement);
-        if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center',
-            inline: 'nearest'
-          });
-          // Add a subtle highlight effect
-          element.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
-          }, 3000);
-        }
-      }, 100);
-    }
   };
 
   // ✅ SOLUTION: Add click outside to close

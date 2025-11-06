@@ -20,6 +20,7 @@ interface Notification {
     workspaceId?: string;
     projectId?: string;
     taskId?: string;
+    meetingId?: string;
     inviteId?: string;
   };
   createdAt: string;
@@ -72,32 +73,29 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       onClose();
 
       const { data } = notification;
-      let targetPath = '';
-      let targetElement = '';
+      // Persist workspace context for backend requests if provided
+      if (data.workspaceId) {
+        try {
+          localStorage.setItem('currentWorkspaceId', data.workspaceId);
+        } catch {}
+      }
 
-      if (data.workspaceId && data.projectId && data.taskId) {
-        targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
-        targetElement = `task-${data.taskId}`;
-      } else if (data.workspaceId && data.projectId) {
-        targetPath = `/workspace/${data.workspaceId}/project/${data.projectId}`;
+      // Decide the most specific target route first
+      let targetPath = '/dashboard';
+      if (data.taskId) {
+        targetPath = `/task/${data.taskId}`;
+      } else if (data.projectId) {
+        targetPath = `/project/${data.projectId}`;
       } else if (data.workspaceId) {
-        targetPath = `/workspace/${data.workspaceId}`;
+        targetPath = `/workspace`;
+      } else if (data.meetingId) {
+        targetPath = `/meetings`;
       } else if (data.inviteId) {
-        targetPath = '/invitations';
-      } else {
-        targetPath = '/dashboard';
+        // Workspace invite or similar — bring user to workspace area
+        targetPath = `/workspace`;
       }
 
       navigate(targetPath);
-
-      if (targetElement) {
-        setTimeout(() => {
-          const el = document.getElementById(targetElement);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 400);
-      }
     } catch (err) {
       console.error('Notification navigation error:', err);
     }
