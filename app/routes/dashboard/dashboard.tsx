@@ -37,6 +37,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+// Helper to limit visible words and append ellipsis
+const limitWords = (text: string, maxWords: number) => {
+  if (!text) return "";
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text;
+  return words.slice(0, maxWords).join(" ") + "...";
+};
+
 // ==================== INTERFACES ====================
 
 interface Workspace {
@@ -958,11 +966,11 @@ const Dashboard = () => {
                             <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
                               {index + 1}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] truncate">
-                              {project.title}
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.title}>
+                              {limitWords(project.title, 2)}
                             </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] truncate">
-                              {project.description || "No description"}
+                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.description || "No description"}>
+                              {limitWords(project.description || "No description", 3)}
                             </td>
                             <td className="px-[16px] py-[14px]">
                               <StatusBadge status={project.status} />
