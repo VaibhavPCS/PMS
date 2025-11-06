@@ -70,7 +70,7 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
         .filter((member: User) => member._id !== user?._id);
       setAvailableUsers(otherMembers);
     } catch (error) {
-      console.error('Failed to fetch workspace members:', error);
+      console.error('Failed to fetch workspace employees:', error);
     }
   };
 
@@ -211,7 +211,7 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
           {/* User Search */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">
-              {chatType === 'direct' ? 'Select User' : 'Add Members'}
+              {chatType === 'direct' ? 'Select User' : 'Add Employees'}
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -266,7 +266,7 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
                       isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <Checkbox checked={isSelected} readOnly />
+                    <Checkbox checked={isSelected} />
                     <Avatar className="w-8 h-8">
                       {user.profilePicture ? (
                         <img src={user.profilePicture} alt={user.name} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
-import { fetchData, postData, deleteData } from "@/lib/fetch-util"; // ✅ UPDATED: Added deleteData import
+import { fetchData, postData, deleteData, putData } from "@/lib/fetch-util"; // ✅ UPDATED: Added putData import
 import {
   ArrowLeft,
   Plus,
@@ -773,7 +773,8 @@ const TaskCard = React.memo<{
   userRole?: string;
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
-}>(({ task, onClick, compact = false, currentUser, userRole, onTaskUpdate, assignableMembers = [] }) => {
+  canAssignVisible?: boolean;
+}>(({ task, onClick, compact = false, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>(task.assignee?._id || "");
@@ -825,7 +826,7 @@ const TaskCard = React.memo<{
 
   const handleAssignTask = async () => {
     try {
-      await postData(`/task/${task._id}`, { assigneeId: selectedAssigneeId || null });
+      await putData(`/task/${task._id}`, { assigneeId: selectedAssigneeId || null });
       toast.success("Assignee updated");
       setShowAssignModal(false);
       onTaskUpdate?.();
@@ -836,7 +837,7 @@ const TaskCard = React.memo<{
 
   const handleCardClick = () => {
     if (!task.assignee?._id) {
-      toast.warning("Assign a member to open this task");
+      toast.warning("Assign an employee to open this task");
       if (canManageTask) setShowAssignModal(true);
       return;
     }
@@ -867,23 +868,25 @@ const TaskCard = React.memo<{
             </CardTitle>
 
             <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Always-visible Assign button */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (canManageTask) {
-                    setSelectedAssigneeId(task.assignee?._id || "");
-                    setShowAssignModal(true);
-                  } else {
-                    toast.info("You don’t have permission to assign this task");
-                  }
-                }}
-              >
-                Assign
-              </Button>
+              {/* Assign button (visible only to Project Lead & Admin) */}
+              {canAssignVisible && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canManageTask) {
+                      setSelectedAssigneeId(task.assignee?._id || "");
+                      setShowAssignModal(true);
+                    } else {
+                      toast.info("You don’t have permission to assign this task");
+                    }
+                  }}
+                >
+                  Assign
+                </Button>
+              )}
               <Badge
                 variant="outline"
                 className={cn("text-xs h-5 px-1.5", getPriorityColor(task.priority))}
@@ -1001,7 +1004,7 @@ const TaskCard = React.memo<{
         <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Assign Task</DialogTitle>
-            <DialogDescription>Select a member to assign this task.</DialogDescription>
+            <DialogDescription>Select an employee to assign this task.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
           <Label className="text-sm">Assignee</Label>
@@ -1013,7 +1016,7 @@ const TaskCard = React.memo<{
                 <SelectValue placeholder="Select assignee" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem>
+                {/* <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem> */}
                 {assignableMembers.map((m) => (
                   <SelectItem key={m._id} value={m._id}>
                     {m.name || m.email}
@@ -1089,17 +1092,17 @@ const QuickEditTaskForm: React.FC<{
       return toast.error("Start date cannot be after due date");
     }
 
-    try {
-      setIsSubmitting(true);
-      await postData(`/task/${task._id}`, formData);
-      toast.success("Task updated successfully");
-      onUpdate?.();
-      onClose();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update task");
-    } finally {
-      setIsSubmitting(false);
-    }
+  try {
+    setIsSubmitting(true);
+    await putData(`/task/${task._id}`, formData);
+    toast.success("Task updated successfully");
+    onUpdate?.();
+    onClose();
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Failed to update task");
+  } finally {
+    setIsSubmitting(false);
+  }
   };
 
   return (
@@ -1124,7 +1127,7 @@ const QuickEditTaskForm: React.FC<{
             <SelectValue placeholder="Select" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem>
+            {/* <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem> */}
             {assignableMembers.map((member) => (
               <SelectItem key={member._id} value={member._id}>
                 <div className="flex items-center gap-2">
@@ -1231,7 +1234,8 @@ const SortableTaskCard: React.FC<{
   userRole?: string;
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
-}> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [] }) => {
+  canAssignVisible?: boolean;
+}> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
 
   return (
@@ -1249,6 +1253,7 @@ const SortableTaskCard: React.FC<{
         userRole={userRole}
         onTaskUpdate={onTaskUpdate}
         assignableMembers={assignableMembers}
+        canAssignVisible={canAssignVisible}
       />
     </div>
   );
@@ -1332,6 +1337,14 @@ const ProjectDetail = () => {
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
+
+  // Derived role flags
+  const isAdmin = useMemo(() => ["admin", "super-admin"].includes(userRole), [userRole]);
+  const isProjectLead = useMemo(() => {
+    const currentId = (currentUser?.id || currentUser?._id || "").toString();
+    const leadId = (project?.projectHead?._id || "").toString();
+    return !!currentId && !!leadId && currentId === leadId;
+  }, [project?.projectHead?._id, currentUser?.id, currentUser?._id]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1578,7 +1591,7 @@ const ProjectDetail = () => {
       const response = await fetchData(`/task/project/${projectId}/members`);
       setAssignableMembers(response.members || []);
     } catch {
-      toast.error("Failed to load members");
+      toast.error("Failed to load employees");
     }
   }, [projectId]);
 
@@ -1852,13 +1865,15 @@ const ProjectDetail = () => {
             {/* Team Avatars */}
             <TeamAvatars members={project.members || []} maxVisible={3} />
 
-            {/* Invite Members Button */}
-            <InviteMembersButton
-              projectId={project._id}
-              onInviteSuccess={async () => {
-                await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
-              }}
-            />
+            {/* Invite Members Button (visible only to Project Lead) */}
+            {isProjectLead && (
+              <InviteMembersButton
+                projectId={project._id}
+                onInviteSuccess={async () => {
+                  await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -1969,29 +1984,37 @@ const ProjectDetail = () => {
           <div className={cn("p-3", !isMobile && "p-4")}> 
             <Tabs defaultValue="your-tasks" className="space-y-4">
               <div className="sticky top-0 bg-gray-50 pb-3 z-5">
-                <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
-                  <TabsTrigger
-                    value="your-tasks"
-                    className="text-xs px-2 data-[state=active]:bg-blue-600"
-                  >
-                    <CheckSquare className="w-3 h-3 mr-1" />
-                    <span className="hidden sm:inline">Your</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="kanban"
-                    className="text-xs px-2 data-[state=active]:bg-purple-600"
-                  >
-                    <KanbanSquare className="w-3 h-3 mr-1" />
-                    <span className="hidden sm:inline">Board</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="calendar"
-                    className="text-xs px-2 data-[state=active]:bg-green-600"
-                  >
-              <CalendarIcon className="w-3 h-3 mr-1" />
-                    <span className="hidden sm:inline">Calendar</span>
-                  </TabsTrigger>
-                </TabsList>
+                <div className="flex items-center justify-between">
+                  <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
+                    <TabsTrigger
+                      value="your-tasks"
+                      className="text-xs px-2 data-[state=active]:bg-blue-600"
+                    >
+                      <CheckSquare className="w-3 h-3 mr-1" />
+                      <span className="hidden sm:inline">Your</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="kanban"
+                      className="text-xs px-2 data-[state=active]:bg-purple-600"
+                    >
+                      <KanbanSquare className="w-3 h-3 mr-1" />
+                      <span className="hidden sm:inline">Board</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="calendar"
+                      className="text-xs px-2 data-[state=active]:bg-green-600"
+                    >
+                      <CalendarIcon className="w-3 h-3 mr-1" />
+                      <span className="hidden sm:inline">Calendar</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  {(isAdmin || isProjectLead) && (
+                    <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90">
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Create Task
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* YOUR TASKS TAB */}
@@ -2055,12 +2078,7 @@ const ProjectDetail = () => {
                           ? "Try adjusting filters."
                           : "No tasks assigned yet."}
                       </p>
-                      {canCreateTask && (
-                        <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90">
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          Create Task
-                        </Button>
-                      )}
+                      {/* Create Task button moved to sticky header and gated to admin/lead */}
                     </CardContent>
                   </Card>
                 ) : (
@@ -2080,6 +2098,7 @@ const ProjectDetail = () => {
                         userRole={userRole}
                         onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                         assignableMembers={filteredAssignableMembers}
+                        canAssignVisible={isAdmin || isProjectLead}
                       />
                     ))}
                   </div>
@@ -2094,7 +2113,7 @@ const ProjectDetail = () => {
                       <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
                       <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
                       <p className="text-sm text-gray-600">
-                        {currentUser ? "You are not a member of this project." : "Loading user data..."}
+                        {currentUser ? "You are not an employee of this project." : "Loading user data..."}
                       </p>
                     </CardContent>
                   </Card>
@@ -2109,12 +2128,12 @@ const ProjectDetail = () => {
                             placeholder="Search all tasks..."
                             className="pl-7 h-8 text-sm"
                             value={filters.search}
-                            onChange={(e) => updateFilter("search", e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
                           />
                         </div>
                         <Select
                           value={filters.status}
-                          onValueChange={(value) => updateFilter("status", value)}
+                          onValueChange={(value: string) => updateFilter("status", value)}
                         >
                           <SelectTrigger className="w-20 h-8 text-xs">
                             <SelectValue />
@@ -2128,7 +2147,7 @@ const ProjectDetail = () => {
                         </Select>
                         <Select
                           value={filters.priority}
-                          onValueChange={(value) => updateFilter("priority", value)}
+                          onValueChange={(value: string) => updateFilter("priority", value)}
                         >
                           <SelectTrigger className="w-20 h-8 text-xs">
                             <SelectValue />
@@ -2184,6 +2203,7 @@ const ProjectDetail = () => {
                                         userRole={userRole}
                                         onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                         assignableMembers={assignableMembers}
+                                        canAssignVisible={isAdmin || isProjectLead}
                                       />
                                     ))}
                                   </div>
@@ -2215,6 +2235,7 @@ const ProjectDetail = () => {
                                     userRole={userRole}
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
+                                    canAssignVisible={isAdmin || isProjectLead}
                                   />
                                 ))}
                             </SortableContext>
@@ -2241,6 +2262,7 @@ const ProjectDetail = () => {
                                     userRole={userRole}
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
+                                    canAssignVisible={isAdmin || isProjectLead}
                                   />
                                 ))}
                             </SortableContext>
@@ -2267,6 +2289,7 @@ const ProjectDetail = () => {
                                     userRole={userRole}
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
+                                    canAssignVisible={isAdmin || isProjectLead}
                                   />
                                 ))}
                             </SortableContext>
@@ -2275,7 +2298,9 @@ const ProjectDetail = () => {
                       )}
 
                       <DragOverlay>
-                        {activeTask && <TaskCard task={activeTask} compact={true} />}
+                        {activeTask && (
+                          <TaskCard task={activeTask} compact={true} canAssignVisible={false} />
+                        )}
                       </DragOverlay>
                     </DndContext>
                   </div>
@@ -2290,7 +2315,7 @@ const ProjectDetail = () => {
                       <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
                       <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
                       <p className="text-sm text-gray-600">
-                        {currentUser ? "You are not a member of this project." : "Loading user data..."}
+                    {currentUser ? "You are not an employee of this project." : "Loading user data..."}
                       </p>
                     </CardContent>
                   </Card>
@@ -2490,7 +2515,7 @@ const ProjectDetail = () => {
                 <Label className="text-sm">Description</Label>
                 <Textarea
                   value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewTask({ ...newTask, description: e.target.value })}
                   placeholder="Task details..."
                   rows={3}
                   className="resize-none text-sm"

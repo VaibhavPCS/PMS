@@ -233,7 +233,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               <h3 className="font-medium text-gray-900">{getChatName()}</h3>
               <p className="text-sm text-gray-500">
                 {chat.type === 'group' 
-                  ? `${chat.participants.length} members`
+                  ? `${chat.participants.length} employees`
                   : 'Direct message'
                 }
               </p>

@@ -56,7 +56,7 @@ export function InviteMembersButton({
         memberEmail: email
       });
 
-      setSuccess("Member added successfully!");
+      setSuccess("Employee added successfully!");
       setEmail("");
 
       // Wait a bit to show success message
@@ -68,7 +68,7 @@ export function InviteMembersButton({
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message || "Failed to add member");
+      setError(err.message || "Failed to add employee");
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export function InviteMembersButton({
       >
         <UserPlus className="w-[15px] h-[15px] text-[#040110]" strokeWidth={2} />
         <span className="font-['Inter'] font-medium text-[14px] text-[#040110] whitespace-nowrap">
-          Add member
+          Add employee
         </span>
       </button>
 
@@ -96,10 +96,10 @@ export function InviteMembersButton({
               </div>
               <div>
                 <DialogTitle className="text-[18px] font-semibold font-['Inter']">
-                  Add Member to Project
+                  Add Employee to Project
                 </DialogTitle>
                 <DialogDescription className="text-[14px] text-gray-500 font-['Inter'] mt-1">
-                  Add a workspace member to this project
+                  Add a workspace employee to this project
                 </DialogDescription>
               </div>
             </div>
@@ -115,12 +115,12 @@ export function InviteMembersButton({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter workspace member email"
+                placeholder="Enter workspace employee email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3a5afe] text-[14px] font-['Inter']"
                 disabled={loading}
               />
               <p className="text-[12px] font-normal font-['Inter'] text-[#717680] mt-1">
-                Member must already be part of the workspace
+                Employee must already be part of the workspace
               </p>
             </div>
 
@@ -154,7 +154,7 @@ export function InviteMembersButton({
               disabled={loading}
               className="bg-[#f2761b] hover:bg-[#d96816] text-white font-['Inter']"
             >
-              {loading ? "Adding..." : "Add Member"}
+              {loading ? "Adding..." : "Add Employee"}
             </Button>
           </div>
         </DialogContent>

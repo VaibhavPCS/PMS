@@ -62,8 +62,15 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
 
   const fetchWorkspaceMembers = async () => {
     try {
-      const response = await fetchData('/projects/members');
-      setWorkspaceMembers((response.members || []).filter((m: WorkspaceMember) => m.role === 'head'));
+      const response = await fetchData('/project/members');
+      const leads = (response.members || []).filter((m: WorkspaceMember) => m.role === 'lead');
+      // Sort by name, fallback to email
+      leads.sort((a: WorkspaceMember, b: WorkspaceMember) => {
+        const aKey = (a.name || a.email || '').toLowerCase();
+        const bKey = (b.name || b.email || '').toLowerCase();
+        return aKey.localeCompare(bKey);
+      });
+      setWorkspaceMembers(leads);
     } catch (error) {
       console.error('Failed to load workspace members', error);
     }
@@ -101,7 +108,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
     e.preventDefault();
 
     if (!projectHeadId) {
-      toast.error('Please select a project head');
+      toast.error('Please select a project lead');
       return;
     }
 
@@ -215,14 +222,14 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                 />
               </div>
 
-              {/* Project Head */}
+              {/* Project Lead */}
               <div className="space-y-[6px]">
                 <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
-                  Project Head <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+                  Project Lead <span className="text-[#cd2818] font-['Work_Sans']">*</span>
                 </Label>
                 <Select value={projectHeadId} onValueChange={setProjectHeadId}>
                   <SelectTrigger className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] font-['Inter'] text-[14px]">
-                    <SelectValue placeholder="Select project head" />
+                    <SelectValue placeholder="Select project lead" />
                   </SelectTrigger>
                   <SelectContent className="font-['Inter']">
                     {workspaceMembers.map((member) => (
@@ -233,7 +240,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                   </SelectContent>
                 </Select>
                 <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
-                  Only members with the ‘head’ role can be selected
+                  Only employees with the ‘lead’ role can be selected
                 </p>
               </div>
 
@@ -251,7 +258,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                     <SelectItem value="In Progress">In Progress</SelectItem>
                     <SelectItem value="On Hold">On Hold</SelectItem>
                     <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    {/* <SelectItem value="Cancelled">Cancelled</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>

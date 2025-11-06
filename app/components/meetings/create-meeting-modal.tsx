@@ -128,10 +128,10 @@ export const CreateMeetingModal: React.FC<CreateMeetingModalProps> = ({
       return;
     }
 
-    // Check if email already exists in workspace members
+    // Check if email already exists in workspace employees
     const existingUser = users.find((u: User) => u.email.toLowerCase() === email);
     if (existingUser) {
-      setEmailError('This user is already in your workspace. Please select them from the members list above.');
+      setEmailError('This user is already in your workspace. Please select them from the employees list above.');
       return;
     }
 
@@ -403,13 +403,13 @@ export const CreateMeetingModal: React.FC<CreateMeetingModalProps> = ({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Workspace Members Section */}
+                {/* Workspace Employees Section */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Workspace Members</Label>
+                  <Label className="text-sm font-medium">Workspace Employees</Label>
                   <ScrollArea className="max-h-48 border rounded-md p-3">
                     {users.length === 0 ? (
                       <div className="flex items-center justify-center py-8">
-                        <p className="text-gray-500 text-sm">Loading workspace members...</p>
+                        <p className="text-gray-500 text-sm">Loading workspace employees...</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -482,11 +482,11 @@ export const CreateMeetingModal: React.FC<CreateMeetingModalProps> = ({
                   </div>
                 )}
                 
-                {/* Selected Workspace Members Display */}
+                {/* Selected Workspace Employees Display */}
                 {selectedParticipants.length > 0 && (
                   <div className="space-y-2">
                     <Separator />
-                    <Label className="text-sm font-medium">Selected Members</Label>
+                    <Label className="text-sm font-medium">Selected Employees</Label>
                     <div className="flex flex-wrap gap-2">
                       {getSelectedUserNames().map((name, index) => (
                         <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">

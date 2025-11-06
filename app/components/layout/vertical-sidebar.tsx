@@ -62,7 +62,16 @@ const VerticalSidebar = () => {
   const { user } = useAuth();
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const visibleNavItems = navItems.filter((item) => item.name !== 'Administration' || isAdmin);
+  // Dynamically rename "Workspace" to "Projects" for non-admin users.
+  // Keep href the same ("/workspace") since it lists projects.
+  const effectiveNavItems = navItems.map((item) => {
+    if (item.name === 'Workspace' && !isAdmin) {
+      return { ...item, name: 'Projects' };
+    }
+    return item;
+  });
+
+  const visibleNavItems = effectiveNavItems.filter((item) => item.name !== 'Administration' || isAdmin);
 
   const isActive = (href: string, hasDropdown?: boolean, subItems?: { name: string; href: string }[]) => {
     // For dropdown items, only consider them active if we're exactly on that route

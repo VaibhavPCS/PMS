@@ -165,7 +165,7 @@ const SignIn = () => {
               />
 
               {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between gap-4">
+              {/* <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="remember"
@@ -186,7 +186,7 @@ const SignIn = () => {
                 >
                   Forgot password?
                 </Link>
-              </div>
+              </div> */}
 
               {/* Sign In Button */}
               <Button

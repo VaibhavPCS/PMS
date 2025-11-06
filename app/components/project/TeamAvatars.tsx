@@ -7,7 +7,7 @@ interface Member {
     name: string;
     email: string;
   };
-  role: string;
+  role?: string;
 }
 
 interface TeamAvatarsProps {

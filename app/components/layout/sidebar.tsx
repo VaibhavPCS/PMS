@@ -194,7 +194,7 @@ const Sidebar = () => {
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Workspace', href: '/workspace', icon: Building2 },
     { name: 'My Tasks', href: '/tasks', icon: CheckSquare },
-    { name: 'Members', href: '/members', icon: Users },
+    { name: 'Employees', href: '/members', icon: Users },
     { name: 'Archived', href: '/archived', icon: Archive },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
     { name: 'Settings', href: '/settings', icon: Settings },

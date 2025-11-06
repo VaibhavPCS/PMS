@@ -317,7 +317,7 @@ export function ProjectCard({ project, onStatusChange, onDelete }: ProjectCardPr
               <Users size={20} className="text-[#344BFD]" />
             </div>
             <p className="text-[14px] text-[#717182] font-normal font-['Inter']">
-              {totalMembers} members
+              {totalMembers} employees
             </p>
           </div>
 
