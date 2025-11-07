@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus } from "lucide-react";
 import { fetchData, postData } from "@/lib/fetch-util";
+import { toast } from "sonner";
 
 interface InviteMembersButtonProps {
   projectId: string;
@@ -33,6 +34,21 @@ export function InviteMembersButton({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Consistent error message extraction for API failures
+  const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
+    const status = error?.response?.status as number | undefined;
+    const backendMessage = error?.response?.data?.message as string | undefined;
+    if (backendMessage) return backendMessage;
+    if (error?.code === 'ERR_NETWORK') return 'Network error. Please check your connection.';
+    if (specific && status && specific[status]) return specific[status];
+    if (status === 401) return 'Unauthorized. Please sign in again.';
+    if (status === 404) return 'Project or employee not found in workspace';
+    if (status === 403) return 'Only project head or admin can add members';
+    if (status === 500) return 'Server error. Please try again later.';
+    if (status === 400) return 'Employee is already part of this project';
+    return error?.message || fallback;
+  };
+
   const handleInviteClick = () => {
     setShowInviteDialog(true);
     setEmail("");
@@ -44,6 +60,7 @@ export function InviteMembersButton({
     // Validation
     if (!email || !email.includes('@')) {
       setError("Please enter a valid email address");
+      toast.error("Please enter a valid email address");
       return;
     }
 
@@ -52,11 +69,13 @@ export function InviteMembersButton({
     setSuccess(null);
 
     try {
-      await postData(`/project/${projectId}/members`, {
+      const res = await postData(`/project/${projectId}/members`, {
         memberEmail: email
       });
 
-      setSuccess("Employee added successfully!");
+      const successMsg = res?.message || 'Employee added successfully!';
+      setSuccess(successMsg);
+      toast.success(successMsg);
       setEmail("");
 
       // Wait a bit to show success message
@@ -65,10 +84,16 @@ export function InviteMembersButton({
         if (onInviteSuccess) {
           onInviteSuccess();
         }
-      }, 1500);
+      }, 800);
 
     } catch (err: any) {
-      setError(err.message || "Failed to add employee");
+      const message = getErrorMessage(err, 'Failed to add employee', {
+        403: 'Only project head or admin can add members',
+        404: 'Project or employee not found in workspace',
+        400: 'Employee is already part of this project',
+      });
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -125,11 +150,11 @@ export function InviteMembersButton({
             </div>
 
             {/* Error Message */}
-            {error && (
+            {/* {error && (
               <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
                 {error}
               </div>
-            )}
+            )} */}
 
             {/* Success Message */}
             {success && (

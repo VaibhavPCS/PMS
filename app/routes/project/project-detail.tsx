@@ -87,6 +87,7 @@ import { format } from "date-fns";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import { TeamAvatars } from "@/components/project/TeamAvatars";
+import RemoveProjectMembersModal from "@/components/project/RemoveProjectMembersModal";
 import { InviteMembersButton } from "@/components/project/InviteMembersButton";
 import { ProjectOverviewPanel } from "@/components/project/ProjectOverviewPanel";
 import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
@@ -775,7 +776,7 @@ const TaskCard = React.memo<{
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
   canAssignVisible?: boolean;
-  project?: ProjectDetails | null; // ✅ NEW: Add project prop for permission checks
+  project?: Project | null; // ✅ NEW: Add project prop for permission checks
 }>(({ task, onClick, compact = false, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -785,31 +786,37 @@ const TaskCard = React.memo<{
 
   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "done";
 
-  // ✅ ENHANCED: Check if user can manage this task
-  const canManageTask = useMemo(() => {
-    if (!currentUser) return false;
+  // ✅ ENHANCED: Permission checks aligned with backend
+  const isAdmin = useMemo(() => {
+    return ["admin", "super_admin"].includes(currentUser?.role || userRole || "");
+  }, [currentUser, userRole]);
 
-    const currentUserIdStr = (currentUser.id || currentUser._id || "").toString();
+  const isProjectLead = useMemo(() => {
+    const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
+    return project?.projectHead?._id?.toString() === currentUserIdStr;
+  }, [currentUser, project]);
+
+  const isAssigneeOrCreator = useMemo(() => {
+    const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
     const assigneeIdStr = task.assignee?._id?.toString() || "";
     const creatorIdStr = task.creator?._id?.toString() || "";
+    return assigneeIdStr === currentUserIdStr || creatorIdStr === currentUserIdStr;
+  }, [currentUser, task]);
 
-    return (
-      assigneeIdStr === currentUserIdStr ||
-      creatorIdStr === currentUserIdStr ||
-      ["admin", "super_admin"].includes(currentUser.role || userRole || "")
-    );
-  }, [currentUser, task, userRole]);
+  // Show dropdown menu if any actionable permission exists (matches backend capabilities)
+  const canManageTask = useMemo(() => {
+    return isAssigneeOrCreator || isAdmin || isProjectLead;
+  }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
-  // ✅ NEW: Check if user can edit/delete task (only admin or project lead)
-  const canEditOrDeleteTask = useMemo(() => {
-    if (!currentUser) return false;
+  // Edit allowed for assignee, creator, admin, or project lead (backend: updateTask)
+  const canEditTask = useMemo(() => {
+    return isAssigneeOrCreator || isAdmin || isProjectLead;
+  }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
-    const currentUserIdStr = (currentUser.id || currentUser._id || "").toString();
-    const isAdmin = ["admin", "super_admin"].includes(currentUser.role || userRole || "");
-    const isProjectLead = project?.projectHead?._id?.toString() === currentUserIdStr;
-
-    return isAdmin || isProjectLead;
-  }, [currentUser, userRole, project]);
+  // Delete allowed for assignee, creator, or admin (backend: deleteTask)
+  const canDeleteTask = useMemo(() => {
+    return isAssigneeOrCreator || isAdmin;
+  }, [isAssigneeOrCreator, isAdmin]);
 
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
@@ -861,7 +868,7 @@ const TaskCard = React.memo<{
     <>
       <Card
         className={cn(
-          "cursor-pointer border-l-4 hover:shadow-sm transition-all duration-200 active:scale-95 relative group",
+          "border-l-4 hover:shadow-sm transition-all duration-200 active:scale-95 relative group",
           task.status === "done"
             ? "border-l-green-500"
             : task.status === "in-progress"
@@ -869,13 +876,11 @@ const TaskCard = React.memo<{
               : "border-l-gray-400",
           isOverdue && "border-l-red-500"
         )}
-        onClick={handleCardClick}
       >
         <CardHeader className="p-3 pb-2">
           <div className="flex items-start justify-between gap-2">
             <CardTitle
-              className="text-sm font-medium line-clamp-2 text-gray-900 flex-1 cursor-pointer"
-              onClick={handleCardClick}
+              className="text-sm font-medium line-clamp-2 text-gray-900 flex-1"
             >
               {task.title}
             </CardTitle>
@@ -927,8 +932,8 @@ const TaskCard = React.memo<{
                       View Details
                     </DropdownMenuItem>
 
-                    {/* ✅ UPDATED: Only show Edit for admin & project lead */}
-                    {canEditOrDeleteTask && (
+                    {/* ✅ UPDATED: Edit allowed for assignee, creator, admin, project lead */}
+                    {canEditTask && (
                       <DropdownMenuItem onClick={() => setShowEditModal(true)}>
                         <Edit className="w-3 h-3 mr-2" />
                         Edit Task
@@ -957,8 +962,8 @@ const TaskCard = React.memo<{
                       </DropdownMenuItem>
                     )}
 
-                    {/* ✅ UPDATED: Only show Delete for admin & project lead */}
-                    {canEditOrDeleteTask && (
+                    {/* ✅ UPDATED: Delete allowed for assignee, creator, admin (not project lead) */}
+                    {canDeleteTask && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -977,7 +982,7 @@ const TaskCard = React.memo<{
           </div>
         </CardHeader>
 
-        <CardContent className="p-3 pt-0" onClick={handleCardClick}>
+        <CardContent className="p-3 pt-0">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <div className="flex items-center gap-1.5 min-w-0">
               <Avatar className="w-4 h-4">
@@ -1256,7 +1261,7 @@ const SortableTaskCard: React.FC<{
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
   canAssignVisible?: boolean;
-  project?: ProjectDetails | null; // ✅ NEW: Add project prop
+  project?: Project | null; // ✅ NEW: Add project prop
 }> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
 
@@ -1338,6 +1343,7 @@ const ProjectDetail = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Attachment state
   const [previewAttachment, setPreviewAttachment] = useState<NonNullable<Project['attachments']>[0] | null>(null);
@@ -1890,7 +1896,11 @@ const ProjectDetail = () => {
             </div>
 
             {/* Team Avatars */}
-            <TeamAvatars members={project.members || []} maxVisible={3} />
+            <TeamAvatars
+              members={project.members || []}
+              maxVisible={3}
+              onClick={(isAdmin || isProjectLead) ? () => setShowMembersModal(true) : undefined}
+            />
 
             {/* Invite Members Button (visible only to Project Lead) */}
             {isProjectLead && (
@@ -1903,6 +1913,18 @@ const ProjectDetail = () => {
             )}
           </div>
         </div>
+
+        {/* Remove Members Modal */}
+        <RemoveProjectMembersModal
+          open={showMembersModal}
+          onOpenChange={setShowMembersModal}
+          projectId={project._id}
+          projectHead={project.projectHead || null}
+          members={project.members || []}
+          onRemoveSuccess={async () => {
+            await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
+          }}
+        />
 
         {/* Project Overview Heading */}
         <div className="mb-3">

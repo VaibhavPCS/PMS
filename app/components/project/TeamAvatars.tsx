@@ -1,5 +1,6 @@
 import React from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 interface Member {
   userId: {
@@ -17,9 +18,11 @@ interface TeamAvatarsProps {
   }>;
   members?: Member[];
   maxVisible?: number;
+  onClick?: () => void;
+  className?: string;
 }
 
-export function TeamAvatars({ categories, members, maxVisible = 3 }: TeamAvatarsProps) {
+export function TeamAvatars({ categories, members, maxVisible = 3, onClick, className }: TeamAvatarsProps) {
   // Extract and deduplicate all members from all categories
   const allMembers = React.useMemo(() => {
     const memberMap = new Map();
@@ -67,7 +70,14 @@ export function TeamAvatars({ categories, members, maxVisible = 3 }: TeamAvatars
   };
 
   return (
-    <div className="flex items-center h-[50px]">
+    <div
+      className={cn(
+        "flex items-center h-[50px]",
+        onClick ? "cursor-pointer" : "",
+        className
+      )}
+      onClick={onClick}
+    >
       {visibleMembers.map((member, index) => (
         <div
           key={member._id}

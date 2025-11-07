@@ -86,8 +86,12 @@ const patchData = async <T = any>(url: string, data: unknown = {}): Promise<T> =
   return response.data;
 };
 
-const deleteData = async <T = any>(url: string): Promise<T> => {
-  const response = await api.delete(url);
+const deleteData = async <T = any>(url: string, data?: unknown): Promise<T> => {
+  // Support sending a JSON body with DELETE when needed (e.g., memberId)
+  const response = await api.delete(url, data !== undefined ? {
+    data,
+    headers: { 'Content-Type': 'application/json' },
+  } : undefined);
   return response.data;
 };
 
