@@ -70,7 +70,7 @@ export function AttachmentsSidebar({
             {attachments.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[191px] text-center px-4">
                 <div className="text-sm text-gray-400 mb-2">No attachments</div>
-                {onUploadClick && (
+                {onUploadClick && canUpload && (
                   <button
                     onClick={onUploadClick}
                     className="text-xs text-[#f2761b] hover:underline"
