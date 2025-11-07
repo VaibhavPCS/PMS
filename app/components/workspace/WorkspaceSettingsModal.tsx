@@ -63,6 +63,20 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
   // Determine current user's role within this workspace for permission gating (used for display only)
   const currentUserRole = members.find((m) => m._id === user?._id)?.role || 'member';
   
+  // Consistent error message extraction for API failures
+  const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
+    const status = error?.response?.status as number | undefined;
+    const backendMessage = error?.response?.data?.message as string | undefined;
+    if (backendMessage) return backendMessage;
+    if (error?.code === 'ERR_NETWORK') return 'Network error. Please check your connection.';
+    if (specific && status && specific[status]) return specific[status];
+    if (status === 401) return 'Unauthorized. Please sign in again.';
+    if (status === 404) return 'Not found.';
+    if (status === 403) return 'Forbidden. You do not have permission to perform this action.';
+    if (status === 500) return 'Server error. Please try again later.';
+    return error?.message || fallback;
+  };
+  
 
   useEffect(() => {
     if (open && workspaceId) {
@@ -87,7 +101,12 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       setMembers(memberItems);
     } catch (error: any) {
       console.error('Failed to load workspace details', error);
-      toast.error(error?.message || 'Failed to load workspace details');
+      toast.error(
+        getErrorMessage(error, 'Failed to load workspace details', {
+          404: 'Workspace not found',
+          403: "You don't have access to this workspace",
+        })
+      );
     } finally {
       setLoadingMembers(false);
     }
@@ -107,7 +126,11 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       // Inform parent so workspace name/description updates immediately in UI
       onWorkspaceUpdated?.({ _id: workspaceId as string, name, description: generalDescription.trim() });
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update workspace');
+      toast.error(
+        getErrorMessage(error, 'Failed to update workspace', {
+          403: 'Only owners and admins can update workspace',
+        })
+      );
     } finally {
       setSavingGeneral(false);
     }
@@ -133,15 +156,12 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       setInviteEmail('');
       await loadWorkspaceDetails();
     } catch (error: any) {
-      // Prefer backend-provided error message for clarity (e.g., 404/403/400)
-      const message =
-        error?.response?.data?.message ||
-        (error?.response?.status === 404
-          ? 'Workspace or user not found'
-          : undefined) ||
-        error?.message ||
-        'Failed to send invite';
-      toast.error(message);
+      toast.error(
+        getErrorMessage(error, 'Failed to send invite', {
+          404: 'Workspace or user not found',
+          403: 'Only owners and admins can invite members',
+        })
+      );
     } finally {
       setInviting(false);
     }
@@ -158,7 +178,11 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       toast.success(res?.message || 'Role updated');
       setMembers((prev) => prev.map((m) => (m._id === member._id ? { ...m, role: newRole } : m)));
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update role');
+      toast.error(
+        getErrorMessage(error, 'Failed to update role', {
+          403: 'Only owners and admins can change member roles',
+        })
+      );
     }
   };
 
@@ -175,11 +199,11 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         window.location.href = '/dashboard';
       }, 500);
     } catch (error: any) {
-      const status = error?.response?.status;
-      const backendMessage = error?.response?.data?.message;
-      const message = backendMessage 
-        || (status === 403 ? 'Only the owner can delete the workspace.' : (error?.message || 'Failed to delete workspace'));
-      toast.error(message);
+      toast.error(
+        getErrorMessage(error, 'Failed to delete workspace', {
+          403: 'Only the owner can delete the workspace.',
+        })
+      );
     } finally {
       setDeleting(false);
     }
@@ -203,7 +227,13 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       //   ...logs,
       // ]);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to remove employee');
+      toast.error(
+        getErrorMessage(error, 'Failed to remove employee', {
+          403: 'Only owners and admins can remove members',
+          404: 'Member not found in this workspace',
+          400: 'Cannot remove the owner. Transfer ownership first.',
+        })
+      );
       // setAuditLogs((logs) => [
       //   { type: 'remove', message: `Remove failed for ${member.email}: ${error?.message || 'error'}`, status: 'error', timestamp: new Date().toISOString() },
       //   ...logs,
