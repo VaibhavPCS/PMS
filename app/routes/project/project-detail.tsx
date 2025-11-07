@@ -775,7 +775,8 @@ const TaskCard = React.memo<{
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
   canAssignVisible?: boolean;
-}>(({ task, onClick, compact = false, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false }) => {
+  project?: ProjectDetails | null; // ✅ NEW: Add project prop for permission checks
+}>(({ task, onClick, compact = false, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>(task.assignee?._id || "");
@@ -784,7 +785,7 @@ const TaskCard = React.memo<{
 
   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "done";
 
-  // ✅ NEW: Check if user can manage this task
+  // ✅ ENHANCED: Check if user can manage this task
   const canManageTask = useMemo(() => {
     if (!currentUser) return false;
 
@@ -798,6 +799,17 @@ const TaskCard = React.memo<{
       ["admin", "super_admin"].includes(currentUser.role || userRole || "")
     );
   }, [currentUser, task, userRole]);
+
+  // ✅ NEW: Check if user can edit/delete task (only admin or project lead)
+  const canEditOrDeleteTask = useMemo(() => {
+    if (!currentUser) return false;
+
+    const currentUserIdStr = (currentUser.id || currentUser._id || "").toString();
+    const isAdmin = ["admin", "super_admin"].includes(currentUser.role || userRole || "");
+    const isProjectLead = project?.projectHead?._id?.toString() === currentUserIdStr;
+
+    return isAdmin || isProjectLead;
+  }, [currentUser, userRole, project]);
 
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
@@ -915,10 +927,13 @@ const TaskCard = React.memo<{
                       View Details
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem onClick={() => setShowEditModal(true)}>
-                      <Edit className="w-3 h-3 mr-2" />
-                      Edit Task
-                    </DropdownMenuItem>
+                    {/* ✅ UPDATED: Only show Edit for admin & project lead */}
+                    {canEditOrDeleteTask && (
+                      <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                        <Edit className="w-3 h-3 mr-2" />
+                        Edit Task
+                      </DropdownMenuItem>
+                    )}
 
                     {/* Status Change Options */}
                     {task.status !== "to-do" && (
@@ -942,15 +957,19 @@ const TaskCard = React.memo<{
                       </DropdownMenuItem>
                     )}
 
-                    <DropdownMenuSeparator />
-
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="w-3 h-3 mr-2" />
-                      Delete Task
-                    </DropdownMenuItem>
+                    {/* ✅ UPDATED: Only show Delete for admin & project lead */}
+                    {canEditOrDeleteTask && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setShowDeleteDialog(true)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3 mr-2" />
+                          Delete Task
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -1230,14 +1249,15 @@ const QuickEditTaskForm: React.FC<{
 };
 
 // ✅ UPDATED: SortableTaskCard with props passing
-const SortableTaskCard: React.FC<{ 
+const SortableTaskCard: React.FC<{
   task: Task;
   currentUser?: CurrentUser | null;
   userRole?: string;
   onTaskUpdate?: () => void;
   assignableMembers?: AssignableMember[];
   canAssignVisible?: boolean;
-}> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false }) => {
+  project?: ProjectDetails | null; // ✅ NEW: Add project prop
+}> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
 
   return (
@@ -1253,6 +1273,7 @@ const SortableTaskCard: React.FC<{
         onClick={() => (window.location.href = `/task/${task._id}`)}
         currentUser={currentUser}
         userRole={userRole}
+        project={project}
         onTaskUpdate={onTaskUpdate}
         assignableMembers={assignableMembers}
         canAssignVisible={canAssignVisible}
@@ -2103,6 +2124,7 @@ const ProjectDetail = () => {
                         compact={true}
                         onClick={() => navigate(`/task/${task._id}`)}
                         currentUser={currentUser}
+                        project={project}
                         userRole={userRole}
                         onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                         assignableMembers={filteredAssignableMembers}
@@ -2212,6 +2234,7 @@ const ProjectDetail = () => {
                                         onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                         assignableMembers={assignableMembers}
                                         canAssignVisible={isAdmin || isProjectLead}
+                                        project={project}
                                       />
                                     ))}
                                   </div>
@@ -2244,6 +2267,7 @@ const ProjectDetail = () => {
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
                                     canAssignVisible={isAdmin || isProjectLead}
+                                    project={project}
                                   />
                                 ))}
                             </SortableContext>
@@ -2271,6 +2295,7 @@ const ProjectDetail = () => {
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
                                     canAssignVisible={isAdmin || isProjectLead}
+                                    project={project}
                                   />
                                 ))}
                             </SortableContext>
@@ -2298,6 +2323,7 @@ const ProjectDetail = () => {
                                     onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
                                     assignableMembers={filteredAssignableMembers}
                                     canAssignVisible={isAdmin || isProjectLead}
+                                    project={project}
                                   />
                                 ))}
                             </SortableContext>

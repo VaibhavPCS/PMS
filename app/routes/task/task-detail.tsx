@@ -52,6 +52,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { RichTextToolbar } from "@/components/ui/rich-text-toolbar";
@@ -660,6 +666,21 @@ const TaskDetail = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
 
+  // ✅ NEW: Enhanced rejection states with date selection
+  const [rejectStartDate, setRejectStartDate] = useState("");
+  const [rejectDueDate, setRejectDueDate] = useState("");
+  const [rejectReassigneeId, setRejectReassigneeId] = useState("");
+
+  // ✅ NEW: Reassignment modal states
+  const [showReassignDialog, setShowReassignDialog] = useState(false);
+  const [reassignAssigneeId, setReassignAssigneeId] = useState("");
+  const [reassignStartDate, setReassignStartDate] = useState("");
+  const [reassignDueDate, setReassignDueDate] = useState("");
+  const [isReassigning, setIsReassigning] = useState(false);
+
+  // ✅ NEW: Fetch assignable members for reassignment
+  const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -683,6 +704,23 @@ const TaskDetail = () => {
       fetchComments();
     }
   }, [taskId, authLoading]);
+
+  // ✅ NEW: Fetch assignable members when task is loaded
+  useEffect(() => {
+    const fetchAssignableMembers = async () => {
+      if (!task?.project?._id) return;
+      try {
+        const response = await fetchData(`/task/project/${task.project._id}/members`);
+        setAssignableMembers(response.members || []);
+      } catch (error) {
+        console.error("Failed to fetch assignable members:", error);
+      }
+    };
+
+    if (task?.project?._id) {
+      fetchAssignableMembers();
+    }
+  }, [task?.project?._id]);
 
   useEffect(() => {
     if (task) {
@@ -708,7 +746,7 @@ const TaskDetail = () => {
     }
 
     try {
-      console.log("Fetching task details for ID:", taskId);
+      // console.log("Fetching task details for ID:", taskId);
       // Use direct fetch with cookie-based authentication
       const response = await fetch(
         buildApiUrl(`/task/${taskId}`),
@@ -750,7 +788,7 @@ const TaskDetail = () => {
 
   const fetchComments = async () => {
     try {
-      console.log("Fetching comments for task:", taskId);
+      // console.log("Fetching comments for task:", taskId);
       const response = await fetch(
         buildApiUrl(`/comments/task/${taskId}`),
         {
@@ -763,7 +801,7 @@ const TaskDetail = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Comments fetched:", data);
+        // console.log("Comments fetched:", data);
         setComments(data.comments || []);
       } else {
         console.error(
@@ -781,8 +819,8 @@ const TaskDetail = () => {
 
   // In the TaskDetail component, add after fetchComments:
   useEffect(() => {
-    console.log("Comments state updated:", comments);
-    console.log("Comments length:", comments?.length);
+    // console.log("Comments state updated:", comments);
+    // console.log("Comments length:", comments?.length);
   }, [comments]);
 
   const handleStatusChange = async (newStatus: string) => {
@@ -925,19 +963,32 @@ const TaskDetail = () => {
     }
   };
 
+  // ✅ ENHANCED: Reject task with new dates and optional reassignment
   const handleRejectTask = async () => {
     if (!task) return;
     if (!rejectionReason.trim()) {
       toast.error("Please provide a reason for rejection");
       return;
     }
+    if (!rejectStartDate || !rejectDueDate) {
+      toast.error("Please provide new start and due dates");
+      return;
+    }
 
     try {
       setIsRejecting(true);
-      await postData(`/task/${task._id}/reject`, { reason: rejectionReason });
-      toast.success("Task rejected with feedback");
+      await postData(`/task/${task._id}/reject`, {
+        reason: rejectionReason,
+        newStartDate: rejectStartDate,
+        newDueDate: rejectDueDate,
+        reassigneeId: rejectReassigneeId || undefined
+      });
+      toast.success("Task rejected with new dates");
       setShowRejectDialog(false);
       setRejectionReason("");
+      setRejectStartDate("");
+      setRejectDueDate("");
+      setRejectReassigneeId("");
       // Refresh task details
       await fetchTaskDetails();
     } catch (error: any) {
@@ -948,27 +999,107 @@ const TaskDetail = () => {
     }
   };
 
+  // ✅ NEW: Reassign approved task
+  const handleReassignTask = async () => {
+    if (!task) return;
+    if (!reassignAssigneeId) {
+      toast.error("Please select an assignee");
+      return;
+    }
+    if (!reassignStartDate || !reassignDueDate) {
+      toast.error("Please provide start and due dates");
+      return;
+    }
+
+    try {
+      setIsReassigning(true);
+      await postData(`/task/${task._id}/reassign`, {
+        assigneeId: reassignAssigneeId,
+        startDate: reassignStartDate,
+        dueDate: reassignDueDate
+      });
+      toast.success("Task reassigned successfully");
+      setShowReassignDialog(false);
+      setReassignAssigneeId("");
+      setReassignStartDate("");
+      setReassignDueDate("");
+      // Refresh task details
+      await fetchTaskDetails();
+    } catch (error: any) {
+      console.error("Failed to reassign task:", error);
+      toast.error(error.message || "Failed to reassign task");
+    } finally {
+      setIsReassigning(false);
+    }
+  };
+
   const canApproveTask = () => {
-    if (!currentUser || !task) return false;
+    const me = activeUser;
+    if (!me || !task) return false;
+
+    // Check if user is admin or super admin (aligned with backend)
+    if (["super_admin", "admin"].includes(me.role)) return true;
+
+    // Check if user is project head
+    const meIdStr = (me.id || me._id || "").toString();
+    const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
+
+    if (projectHeadId && meIdStr === projectHeadId) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // ✅ NEW: Check if user can reassign approved tasks
+  const canReassignTask = () => {
+    const me = activeUser;
+    if (!me || !task) return false;
+    if (task.approvalStatus !== "approved") return false;
+
     // Check if user is admin or super admin
-    if (["super_admin", "admin"].includes(currentUser.role)) return true;
-    // Check if user is project head (would need to fetch project details or add to task response)
-    // For now, we'll rely on backend permission check
-    return task.status === "done" && task.approvalStatus === "pending-approval";
+    if (["super_admin", "admin"].includes(me.role)) return true;
+
+    // Check if user is project head
+    const meIdStr = (me.id || me._id || "").toString();
+    const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
+
+    return Boolean(projectHeadId && meIdStr === projectHeadId);
+  };
+
+  // ✅ NEW: Pre-fill rejection modal with current task dates
+  const openRejectDialog = () => {
+    if (task) {
+      setRejectStartDate(new Date(task.startDate).toISOString().split('T')[0]);
+      setRejectDueDate(new Date(task.dueDate).toISOString().split('T')[0]);
+      setRejectReassigneeId(task.assignee?._id || "");
+    }
+    setShowRejectDialog(true);
+  };
+
+  // ✅ NEW: Pre-fill reassignment modal with current task dates
+  const openReassignDialog = () => {
+    if (task) {
+      setReassignStartDate(new Date(task.startDate).toISOString().split('T')[0]);
+      setReassignDueDate(new Date(task.dueDate).toISOString().split('T')[0]);
+      setReassignAssigneeId(task.assignee?._id || "");
+    }
+    setShowReassignDialog(true);
   };
 
   const canDeleteAttachments = () => {
-    if (!currentUser || !task) return false;
+    const me = activeUser;
+    if (!me || !task) return false;
     // Allow deletion if user is the assignee, admin, or super_admin
-    if (["super_admin", "admin"].includes(currentUser.role)) return true;
-    return task.assignee._id === currentUser._id;
+    if (["super_admin", "admin"].includes(me.role)) return true;
+    return task.assignee._id === me._id;
   };
 
   // Chat functions - Simplified: Anyone who can view the task can comment
   const canComment = () => {
     // If user can see the task, they can comment
     // Task visibility is already controlled by backend permissions
-    return !!(currentUser && task);
+    return !!(activeUser && task);
   };
 
   const canReply = () => {
@@ -1292,12 +1423,12 @@ const TaskDetail = () => {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Badge
+              {/* <Badge
                 variant="outline"
                 className={getPriorityColor(task.priority)}
               >
                 {task.priority} priority
-              </Badge>
+              </Badge> */}
 
               {task.approvalStatus && task.approvalStatus !== "not-required" && (
                 <Badge
@@ -1317,25 +1448,48 @@ const TaskDetail = () => {
               )}
 
               {task.status === "done" && task.approvalStatus === "pending-approval" && canApproveTask() && (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={handleApproveTask}
-                    disabled={isApproving}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {isApproving ? "Approving..." : "Approve"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowRejectDialog(true)}
-                    disabled={isRejecting}
-                    className="border-red-600 text-red-600 hover:bg-red-50"
-                  >
-                    Reject
-                  </Button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#717182] hover:bg-[#e5e4e9] px-[10px] py-[6px] flex items-center gap-[6px]"
+                    >
+                      Review
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuItem
+                      onClick={handleApproveTask}
+                      disabled={isApproving}
+                      className="cursor-pointer"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                      {isApproving ? "Approving..." : "Approve Task"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={openRejectDialog}
+                      disabled={isRejecting}
+                      variant="destructive"
+                      className="cursor-pointer"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Reject Task
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* ✅ NEW: Reassign button for approved tasks */}
+              {canReassignTask() && (
+                <Button
+                  size="sm"
+                  onClick={openReassignDialog}
+                  disabled={isReassigning}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Reassign Task
+                </Button>
               )}
 
               <Select value={task.status} onValueChange={handleStatusChange}>
@@ -1348,19 +1502,19 @@ const TaskDetail = () => {
                 <SelectContent>
                   <SelectItem value="to-do">
                     <div className="flex items-center space-x-2">
-                      <Circle className="w-4 h-4 text-gray-600" />
+                      {/* <Circle className="w-4 h-4 text-gray-600" /> */}
                       <span>To Do</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="in-progress">
                     <div className="flex items-center space-x-2">
-                      <PlayCircle className="w-4 h-4 text-blue-600" />
+                      {/* <PlayCircle className="w-4 h-4 text-blue-600" /> */}
                       <span>In Progress</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="done">
                     <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      {/* <CheckCircle className="w-4 h-4 text-green-600" /> */}
                       <span>Done</span>
                     </div>
                   </SelectItem>
@@ -1698,16 +1852,16 @@ const TaskDetail = () => {
         </div>
       </div>
 
-      {/* Rejection Dialog */}
+      {/* ✅ ENHANCED: Rejection Dialog with Date Pickers */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <AlertCircle className="w-5 h-5 text-red-600" />
               <span>Reject Task</span>
             </DialogTitle>
             <DialogDescription>
-              Please provide feedback explaining why this task needs more work.
+              Provide feedback and set new dates for the task.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1719,13 +1873,61 @@ const TaskDetail = () => {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Explain what needs to be improved or corrected..."
-                rows={4}
+                rows={3}
                 className="resize-none"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                The assignee will receive this feedback and the task will be moved back to in-progress.
-              </p>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                  New Start Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={rejectStartDate}
+                  onChange={(e) => setRejectStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                  New Due Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={rejectDueDate}
+                  onChange={(e) => setRejectDueDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Reassign To (Optional)
+              </label>
+              <Select
+                value={rejectReassigneeId}
+                onValueChange={(v) => setRejectReassigneeId(v === "__keep__" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Keep current assignee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__keep__">Keep current assignee</SelectItem>
+                  {assignableMembers.map((member) => (
+                    <SelectItem key={member._id} value={member._id}>
+                      {member.name} {member.role === 'project-head' && '(Project Head)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              The task will be moved back to in-progress with the new dates and the assignee will be notified.
+            </p>
           </div>
           <div className="flex gap-3 justify-end">
             <Button
@@ -1733,6 +1935,9 @@ const TaskDetail = () => {
               onClick={() => {
                 setShowRejectDialog(false);
                 setRejectionReason("");
+                setRejectStartDate("");
+                setRejectDueDate("");
+                setRejectReassigneeId("");
               }}
               disabled={isRejecting}
             >
@@ -1740,10 +1945,96 @@ const TaskDetail = () => {
             </Button>
             <Button
               onClick={handleRejectTask}
-              disabled={isRejecting || !rejectionReason.trim()}
+              disabled={isRejecting || !rejectionReason.trim() || !rejectStartDate || !rejectDueDate}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {isRejecting ? "Rejecting..." : "Reject Task"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ NEW: Reassignment Dialog for Approved Tasks */}
+      <Dialog open={showReassignDialog} onOpenChange={setShowReassignDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <User className="w-5 h-5 text-blue-600" />
+              <span>Reassign Approved Task</span>
+            </DialogTitle>
+            <DialogDescription>
+              Assign this completed task to someone else with new dates.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Assign To <span className="text-red-500">*</span>
+              </label>
+              <Select value={reassignAssigneeId} onValueChange={setReassignAssigneeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableMembers.map((member) => (
+                    <SelectItem key={member._id} value={member._id}>
+                      {member.name} {member.role === 'project-head' && '(Project Head)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={reassignStartDate}
+                  onChange={(e) => setReassignStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                  Due Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={reassignDueDate}
+                  onChange={(e) => setReassignDueDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-xs text-yellow-800">
+                ⚠️ This will reset the task to "To Do" status and clear the approval. The new assignee will be notified.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReassignDialog(false);
+                setReassignAssigneeId("");
+                setReassignStartDate("");
+                setReassignDueDate("");
+              }}
+              disabled={isReassigning}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReassignTask}
+              disabled={isReassigning || !reassignAssigneeId || !reassignStartDate || !reassignDueDate}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isReassigning ? "Reassigning..." : "Reassign Task"}
             </Button>
           </div>
         </DialogContent>
