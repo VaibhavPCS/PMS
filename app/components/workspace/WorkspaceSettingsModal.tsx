@@ -175,7 +175,11 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         window.location.href = '/dashboard';
       }, 500);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete workspace');
+      const status = error?.response?.status;
+      const backendMessage = error?.response?.data?.message;
+      const message = backendMessage 
+        || (status === 403 ? 'Only the owner can delete the workspace.' : (error?.message || 'Failed to delete workspace'));
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
