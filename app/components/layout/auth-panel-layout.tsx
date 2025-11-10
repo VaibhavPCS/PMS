@@ -41,7 +41,7 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
             {/* Top right image - Ellipse 1167 */}
             <div className="absolute left-[216.83px] top-[5.13px] w-[153.22px] h-[194.76px]">
               <img
-                src="/assets/4e5638f48cc36e54dcf90d90636cb9e3eeb1a734.png"
+                src="/assets/6ca044e807ecaca1f18f8eef3afff6eb18b951f0.png"
                 alt=""
                 className="block max-w-none w-full h-full"
                 style={{ width: '153.22px', height: '194.76px' }}
@@ -50,39 +50,39 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
             {/* Top left image - Vector 28 */}
             <div className="absolute left-[26.21px] top-0 w-[213.064px] h-[134.913px]">
               <img
-                src="/assets/b8e7e92c30a0039b583930d7875865552bd1aba8.png"
+                src="/assets/6cee9e11183574caacaf33e25144b32c38ab87ef.png"
                 alt=""
                 className="block max-w-none w-full h-full"
                 style={{ width: '213.064px', height: '134.913px' }}
               />
             </div>
             {/* Bottom left image - Vector 29 (optimized version) */}
-            <div 
-              className="absolute flex items-center justify-center left-[-41.8px] top-[79.07px]" 
-              style={{ 
-                height: '0px', 
-                width: '0px' 
+            <div
+              className="absolute flex items-center justify-center left-[-41.8px] top-[79.07px]"
+              style={{
+                height: '0px',
+                width: '0px'
               }}
-            > 
-              <div className="flex-none" style={{ transform: 'rotate(-71.125deg)' }}> 
-                <div 
-                  className="relative w-[213.064px] h-[134.913px]" 
-                  style={{ 
-                    top: '8.29rem', 
-                    left: '-5.398rem' 
+            >
+              <div className="flex-none" style={{ transform: 'rotate(-71.125deg)' }}>
+                <div
+                  className="relative w-[213.064px] h-[134.913px]"
+                  style={{
+                    top: '8.29rem',
+                    left: '-5.398rem'
                   }}
-                > 
-                  <img 
-                    alt="" 
-                    className="block max-w-none w-full h-full" 
-                    src="/assets/3df9bb910847f92ec63648a7f818c7d8eb2dfd64.png" 
-                    style={{ 
-                      width: '213.064px', 
-                      height: '134.913px' 
-                    }} 
-                  /> 
-                </div> 
-              </div> 
+                >
+                  <img
+                    alt=""
+                    className="block max-w-none w-full h-full"
+                    src="/assets/2267c615c2558e13677cc9fade0ba92efd0fa732.png"
+                    style={{
+                      width: '213.064px',
+                      height: '134.913px'
+                    }}
+                  />
+                </div>
+              </div>
             </div>
             {/* Bottom center image - Vector 30 (optimized with precise implementation) */}
             <div
@@ -93,7 +93,7 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
               }}
             >
               <div className="flex-none" style={{ transform: 'rotate(-143.789deg)' /* rotate(216.211deg) */ }}>
-                <div 
+                <div
                   className="relative w-[213.064px] h-[136.066px]"
                   style={{
                     bottom: '1.3rem',
@@ -101,7 +101,7 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
                   }}
                 >
                   <img
-                    src="/assets/ff2affc0e980f78fb25f86de9ab527d1d4b2fa98.png"
+                    src="/assets/edc6673e15b60b7959b8155d92f115fd929af09d.png"
                     alt=""
                     className="block max-w-none w-full h-full"
                     style={{ width: '213.064px', height: '136.066px' }}
@@ -118,7 +118,7 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
               }}
             >
               <div className="flex-none" style={{ transform: 'rotate(142.535deg)' }}>
-                <div 
+                <div
                   className="relative w-[213.064px] h-[136.952px]"
                   style={{
                     bottom: '10.72rem',
@@ -126,7 +126,7 @@ const AuthPanelLayout: React.FC<AuthPanelLayoutProps> = ({ children }) => {
                   }}
                 >
                   <img
-                    src="/assets/76696078b52786db2907040e743a1286eadf36a7.png"
+                    src="/assets/e8dad36f05f419a4be25e9299f8531ab9c91e7e7.png"
                     alt=""
                     className="block max-w-none w-full h-full"
                     style={{ width: '213.064px', height: '136.952px' }}
