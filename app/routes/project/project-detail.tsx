@@ -28,6 +28,7 @@ import {
   MapPin,
   Eye,
   EyeOff,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -868,64 +869,39 @@ const TaskCard = React.memo<{
     <>
       <Card
         className={cn(
-          "border-l-4 hover:shadow-sm transition-all duration-200 active:scale-95 relative group",
-          task.status === "done"
-            ? "border-l-green-500"
-            : task.status === "in-progress"
-              ? "border-l-blue-500"
-              : "border-l-gray-400",
-          isOverdue && "border-l-red-500"
+          "hover:shadow-md transition-all duration-200 relative group bg-white rounded-lg border border-gray-200",
+          onClick && "cursor-pointer"
         )}
+        onClick={onClick}
       >
-        <CardHeader className="p-3 pb-2">
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle
-              className="text-sm font-medium line-clamp-2 text-gray-900 flex-1"
-            >
-              {task.title}
-            </CardTitle>
-
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Assign button (visible only to Project Lead & Admin) */}
-              {canAssignVisible && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Allow assignment if user is Admin or Project Lead (button visible) or can manage
-                    if (canAssignVisible || canManageTask) {
-                      setSelectedAssigneeId(task.assignee?._id || "");
-                      setShowAssignModal(true);
-                    } else {
-                      toast.info("You don’t have permission to assign this task");
-                    }
-                  }}
-                >
-                  Assign
-                </Button>
+        <CardHeader className="p-4 pb-3">
+          {/* Top Row: Priority Badge + 3-dot Menu */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <Badge
+              className={cn(
+                "text-xs font-medium px-2 py-0.5 rounded",
+                task.priority === "high" && "bg-red-100 text-red-700",
+                task.priority === "medium" && "bg-yellow-100 text-yellow-700",
+                task.priority === "low" && "bg-blue-100 text-blue-700",
+                task.priority === "urgent" && "bg-purple-100 text-purple-700"
               )}
-              <Badge
-                variant="outline"
-                className={cn("text-xs h-5 px-1.5", getPriorityColor(task.priority))}
-              >
-                {compact ? task.priority.charAt(0).toUpperCase() : task.priority}
-              </Badge>
+            >
+              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+            </Badge>
 
-              {/* ✅ NEW: Settings Dropdown Menu */}
-              {canManageTask && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
+            {/* ✅ 3-dot Menu */}
+            {canManageTask && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="w-4 h-4 text-gray-500" />
+                  </Button>
+                </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem onClick={handleCardClick}>
                       <Eye className="w-3 h-3 mr-2" />
@@ -937,6 +913,20 @@ const TaskCard = React.memo<{
                       <DropdownMenuItem onClick={() => setShowEditModal(true)}>
                         <Edit className="w-3 h-3 mr-2" />
                         Edit Task
+                      </DropdownMenuItem>
+                    )}
+
+                    {/* ✅ NEW: Assign Task (visible only to admin/project lead) */}
+                    {canAssignVisible && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAssigneeId(task.assignee?._id || "");
+                          setShowAssignModal(true);
+                        }}
+                      >
+                        <Users className="w-3 h-3 mr-2" />
+                        Assign Task
                       </DropdownMenuItem>
                     )}
 
@@ -978,34 +968,42 @@ const TaskCard = React.memo<{
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-            </div>
           </div>
+
+          {/* Title */}
+          <CardTitle className="text-base font-semibold text-gray-900 mb-2 line-clamp-2">
+            {task.title}
+          </CardTitle>
+
+          {/* Description */}
+          {task.description && (
+            <p className="text-sm text-gray-600 line-clamp-3 mb-4">
+              {task.description}
+            </p>
+          )}
         </CardHeader>
 
-        <CardContent className="p-3 pt-0">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Avatar className="w-4 h-4">
-                <AvatarFallback className="bg-blue-100 text-blue-700 font-medium text-xs">
-                  {(task.assignee?.name?.charAt(0) || task.assignee?.email?.charAt(0) || "?")}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">{(task.assignee?.name || task.assignee?.email || "?").split(" ")[0]}</span>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <Clock className="w-3 h-3" />
-              <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-                {new Date(task.startDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-                {" → "}
-                {new Date(task.dueDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
+        <CardContent className="px-4 pb-4 pt-0 space-y-2">
+          {/* Date */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Clock className="w-4 h-4" />
+            <span className={isOverdue ? "text-red-600 font-medium" : ""}>
+              {new Date(task.dueDate).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          </div>
+
+          {/* Assignee */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Avatar className="w-4 h-4">
+              <AvatarFallback className="bg-blue-100 text-blue-700 font-medium text-xs">
+                {(task.assignee?.name?.charAt(0) || task.assignee?.email?.charAt(0) || "?")}
+              </AvatarFallback>
+            </Avatar>
+            <span>Assigned to {task.assignee?.name || task.assignee?.email || "Unassigned"}</span>
           </div>
         </CardContent>
       </Card>
@@ -1435,9 +1433,10 @@ const ProjectDetail = () => {
     } else if ((project?.projectHead?._id || "").toString() === currentUserIdStr) {
       tasksToShow = allTasks;
     } else {
-      // Members should only see tasks assigned to them
+      // Regular members should only see tasks assigned to them (NOT unassigned tasks)
+      // Unassigned tasks are only visible to admin/project lead
       tasksToShow = allTasks.filter(
-        (task) => (task.assignee?._id?.toString() || "") === currentUserIdStr
+        (task) => task.assignee?._id && (task.assignee._id.toString() === currentUserIdStr)
       );
     }
 
@@ -2070,14 +2069,14 @@ const ProjectDetail = () => {
 
               {/* YOUR TASKS TAB */}
               <TabsContent value="your-tasks" className="space-y-3 mt-0">
-                {/* DESKTOP QUICK FILTERS */}
+                {/* DESKTOP QUICK FILTERS - Updated to match Figma design */}
                 <div className="hidden md:block">
                   <div className="flex gap-2 items-center">
                     <div className="flex-1 relative">
-                      <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        placeholder="Search your tasks..."
-                        className="pl-7 h-8 text-sm"
+                        placeholder="Search..."
+                        className="pl-9 h-10 text-sm border-gray-200 focus:border-gray-300"
                         value={filters.search}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
                       />
@@ -2086,13 +2085,13 @@ const ProjectDetail = () => {
                       value={filters.status}
                       onValueChange={(value: string) => updateFilter("status", value)}
                     >
-                      <SelectTrigger className="w-20 h-8 text-xs">
-                        <SelectValue />
+                      <SelectTrigger className="w-[140px] h-10 text-sm border-gray-200">
+                        <SelectValue placeholder="Task Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="to-do">To Do</SelectItem>
-                        <SelectItem value="in-progress">Active</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
                         <SelectItem value="done">Done</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2100,19 +2099,19 @@ const ProjectDetail = () => {
                       value={filters.priority}
                       onValueChange={(value: string) => updateFilter("priority", value)}
                     >
-                      <SelectTrigger className="w-20 h-8 text-xs">
-                        <SelectValue />
+                      <SelectTrigger className="w-[120px] h-10 text-sm border-gray-200">
+                        <SelectValue placeholder="Priority" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="all">All Priority</SelectItem>
                         <SelectItem value="urgent">Urgent</SelectItem>
                         <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Med</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="low">Low</SelectItem>
                       </SelectContent>
                     </Select>
                     {(filters.search || filters.status !== "all" || filters.priority !== "all") && (
-                      <Button variant="outline" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs">
+                      <Button variant="outline" size="sm" onClick={clearFilters} className="h-10 px-3 text-sm border-gray-200">
                         Clear
                       </Button>
                     )}
@@ -2120,16 +2119,26 @@ const ProjectDetail = () => {
                 </div>
 
                 {filteredUserTasks.length === 0 ? (
-                  <Card className="border-dashed border-2 border-gray-200">
-                    <CardContent className="text-center py-8">
-                      <CheckSquare className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <CardTitle className="text-base mb-2">No Tasks Found</CardTitle>
-                      <p className="text-sm text-gray-600 mb-3">
+                  <Card className="border-dashed border-2 border-gray-200 bg-white">
+                    <CardContent className="text-center py-12">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                        <CheckSquare className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold mb-2 text-gray-900">No Task Found</CardTitle>
+                      <p className="text-sm text-gray-500 mb-4">
                         {filters.search || filters.status !== "all" || filters.priority !== "all"
-                          ? "Try adjusting filters."
-                          : "No tasks assigned yet."}
+                          ? "Try adjusting your filters"
+                          : "No task assigned yet"}
                       </p>
-                      {/* Create Task button moved to sticky header and gated to admin/lead */}
+                      {(isAdmin || isProjectLead) && (
+                        <Button
+                          onClick={() => setShowTaskModal(true)}
+                          className="bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Task
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (
@@ -2272,7 +2281,7 @@ const ProjectDetail = () => {
                             id="to-do"
                             title="To Do"
                             count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
-                            color="bg-gray-400"
+                            color="bg-blue-500"
                           >
                             <SortableContext
                               items={kanbanFilteredTasks.filter((t) => t.status === "to-do").map((t) => t._id)}
@@ -2300,7 +2309,7 @@ const ProjectDetail = () => {
                             id="in-progress"
                             title="In Progress"
                             count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
-                            color="bg-blue-400"
+                            color="bg-orange-400"
                           >
                             <SortableContext
                               items={kanbanFilteredTasks.filter((t) => t.status === "in-progress").map((t) => t._id)}
@@ -2328,7 +2337,7 @@ const ProjectDetail = () => {
                             id="done"
                             title="Done"
                             count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
-                            color="bg-green-400"
+                            color="bg-green-500"
                           >
                             <SortableContext
                               items={kanbanFilteredTasks.filter((t) => t.status === "done").map((t) => t._id)}
@@ -2590,6 +2599,24 @@ const ProjectDetail = () => {
                   rows={3}
                   className="resize-none text-sm"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-sm">Attachments (optional)</Label>
+                <Input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  className="h-8 text-sm cursor-pointer"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const files = e.target.files;
+                    if (files) {
+                      // Store files for upload when creating task
+                      // Files will be handled in handleCreateTask function
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500">Max 3 files (images or documents)</p>
               </div>
 
               <div className="flex gap-2 pt-3 border-t">
