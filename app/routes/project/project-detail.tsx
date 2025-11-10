@@ -1290,12 +1290,14 @@ const DroppableColumn = ({
   id,
   title,
   count,
+  total,
   color,
 }: {
   children: React.ReactNode;
   id: string;
   title: string;
   count: number;
+  total: number;
   color: string;
 }) => {
   const { isOver, setNodeRef } = useDroppable({ id });
@@ -1315,6 +1317,18 @@ const DroppableColumn = ({
         <Badge variant="secondary" className="text-xs h-5 px-2">
           {count}
         </Badge>
+      </div>
+      {/* Per-column progress: show fraction and visual bar */}
+      <div className="mb-3">
+        <div className="flex items-center justify-end text-xs text-gray-600 mb-1">
+          <span>{count}/{total}</span>
+        </div>
+        <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className={cn("h-1.5 rounded-full", color)}
+            style={{ width: `${total > 0 ? Math.round((count / total) * 100) : 0}%` }}
+          />
+        </div>
       </div>
       <div ref={setNodeRef} className="space-y-2 min-h-80">
         {children}
@@ -2281,6 +2295,7 @@ const ProjectDetail = () => {
                             id="to-do"
                             title="To Do"
                             count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
+                            total={kanbanFilteredTasks.length}
                             color="bg-blue-500"
                           >
                             <SortableContext
@@ -2309,6 +2324,7 @@ const ProjectDetail = () => {
                             id="in-progress"
                             title="In Progress"
                             count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
+                            total={kanbanFilteredTasks.length}
                             color="bg-orange-400"
                           >
                             <SortableContext
@@ -2337,6 +2353,7 @@ const ProjectDetail = () => {
                             id="done"
                             title="Done"
                             count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
+                            total={kanbanFilteredTasks.length}
                             color="bg-green-500"
                           >
                             <SortableContext
