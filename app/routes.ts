@@ -29,10 +29,16 @@ export default [
     route("archived", "routes/archived/archived.tsx"),
     route("chat", "routes/chat/chat.tsx"),
     route("settings", "routes/settings/settings.tsx"),
-    // Add project detail route here inside the dashboard layout
     route("project/:id", "routes/project/project-detail.tsx"),
-    // Move task route INSIDE dashboard layout
     route("task/:id", "routes/task/task-detail.tsx"),
+    
+    // Analytics routes - FIXED VERSION
+    route("analytics", "routes/analytics/analytics.tsx", [
+      index("routes/analytics/performance.tsx"),
+      route("workspace", "routes/analytics/workspace.tsx"),
+      route("leaderboard", "routes/analytics/leaderboard.tsx"),
+      route("personal", "routes/analytics/personal.tsx"), // ✅ ADD THIS LINE
+    ]),
   ]),
 
   // 404 catch-all
