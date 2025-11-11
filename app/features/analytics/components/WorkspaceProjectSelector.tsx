@@ -67,7 +67,7 @@ export function WorkspaceProjectSelector() {
         const workspaceList = data?.workspaces || [];
         setWorkspaces(workspaceList);
         
-        // ✅ Auto-select current workspace with name
+        // Auto-select current workspace with name
         if (data?.currentWorkspace?._id && !selectedWorkspaceId) {
           setSelectedWorkspace(data.currentWorkspace._id, data.currentWorkspace.name);
         }
@@ -82,7 +82,7 @@ export function WorkspaceProjectSelector() {
     fetchWorkspaces();
   }, [user]);
 
-  // ✅ Fetch projects when workspace changes
+  // Fetch projects when workspace changes
   useEffect(() => {
     if (!selectedWorkspaceId || selectedWorkspaceId === 'all') {
       setProjects([]);
@@ -99,7 +99,7 @@ export function WorkspaceProjectSelector() {
         const projectList = data?.projects || [];
         setProjects(projectList);
         
-        // ✅ Auto-select first project with name
+        // Auto-select first project with name
         if (projectList.length > 0 && !selectedProjectId) {
           setSelectedProject(projectList[0]._id, projectList[0].title);
         }
@@ -112,9 +112,9 @@ export function WorkspaceProjectSelector() {
     };
 
     fetchProjects();
-  }, [selectedWorkspaceId]); // ✅ Re-fetch when workspace changes
+  }, [selectedWorkspaceId]);
 
-  // ✅ Handle workspace selection
+  // Handle workspace selection
   const handleWorkspaceChange = (workspaceId: string) => {
     if (workspaceId === 'all') {
       setSelectedWorkspace('all', 'All Workspaces');
@@ -126,7 +126,7 @@ export function WorkspaceProjectSelector() {
     }
   };
 
-  // ✅ Handle project selection
+  // Handle project selection
   const handleProjectChange = (projectId: string) => {
     if (projectId === 'all') {
       setSelectedProject('all', 'All Projects');
@@ -142,7 +142,7 @@ export function WorkspaceProjectSelector() {
     <div className="flex items-center gap-3">
       {/* Workspace Selector */}
       <Select 
-        value={selectedWorkspaceId || undefined} 
+        value={selectedWorkspaceId || ''} // ✅ Fix: Use empty string instead of undefined
         onValueChange={handleWorkspaceChange}
         disabled={loadingWorkspaces}
       >
@@ -161,7 +161,7 @@ export function WorkspaceProjectSelector() {
 
       {/* Project Selector */}
       <Select 
-        value={selectedProjectId || undefined} 
+        value={selectedProjectId || ''} // ✅ Fix: Use empty string instead of undefined
         onValueChange={handleProjectChange}
         disabled={!selectedWorkspaceId || selectedWorkspaceId === 'all' || loadingProjects || projects.length === 0}
       >
