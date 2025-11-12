@@ -21,6 +21,7 @@ import { useLeaderboardAnalytics } from "@/features/analytics/hooks";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { format } from "date-fns";
+import { WorkspaceProjectSelector } from '@/features/analytics/components/WorkspaceProjectSelector';
 
 type SortField = "projectName" | "completionPercentage" | "dueDate" | "status";
 type SortDirection = "asc" | "desc";
@@ -151,17 +152,22 @@ const Leaderboard = () => {
             {data?.totalProjects || 0} projects ranked by completion
           </p>
         </div>
-        <Button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          variant="outline"
-          size="default"
-        >
-          <RefreshCw
-            className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3">
+            <WorkspaceProjectSelector />
+          </div>
+          <Button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            variant="outline"
+            size="default"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Leaderboard Table */}

@@ -65,6 +65,7 @@ import { AttachmentsPanel } from "@/components/task/AttachmentsPanel";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar-group";
 import { ImagePreviewModal } from "@/components/ui/image-preview-modal";
+import { cn } from "@/lib/utils";
 
 interface Task {
   _id: string;
@@ -92,6 +93,13 @@ interface Task {
   durationDays?: number;
   createdAt: string;
   completedAt?: string;
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: "image" | "document";
+    fileSize: number;
+    mimeType: string;
+  }>;
   handoverNotes?: string;
   handoverAttachments?: Array<{
     fileName: string;
@@ -1095,6 +1103,99 @@ const TaskDetail = () => {
     return task.assignee._id === me._id;
   };
 
+  // Permission functions for task attachments (creation attachments)
+  const canUploadAttachments = () => {
+    const me = activeUser;
+    if (!me || !task) return false;
+    // Only admin, super_admin, or project head can upload task attachments
+    if (["super_admin", "admin"].includes(me.role)) return true;
+    const meIdStr = (me.id || me._id || "").toString();
+    const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
+    return Boolean(projectHeadId && meIdStr === projectHeadId);
+  };
+
+  const canDeleteTaskAttachments = () => {
+    const me = activeUser;
+    if (!me || !task) return false;
+    // Only admin, super_admin, or project head can delete task attachments
+    if (["super_admin", "admin"].includes(me.role)) return true;
+    const meIdStr = (me.id || me._id || "").toString();
+    const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
+    return Boolean(projectHeadId && meIdStr === projectHeadId);
+  };
+
+  const handleUploadTaskAttachments = async (files: File[]) => {
+    if (!task) return;
+
+    try {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("attachments", file);
+      });
+
+      const response = await fetch(
+        buildApiUrl(`/task/${task._id}/attachments`),
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to upload attachments");
+      }
+
+      toast.success("Attachments uploaded successfully");
+      await fetchTaskDetails();
+    } catch (error: any) {
+      console.error("Failed to upload attachments:", error);
+      toast.error(error.message || "Failed to upload attachments");
+    }
+  };
+
+  const handleDeleteTaskAttachment = async (index: number) => {
+    if (!task || !task.attachments) return;
+
+    const attachment = task.attachments[index];
+    if (!attachment) {
+      toast.error("Attachment not found");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete "${attachment.fileName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        buildApiUrl(`/task/${task._id}/attachments/${index}`),
+        {
+          method: "DELETE",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete attachment");
+      }
+
+      toast.success("Attachment deleted successfully");
+      await fetchTaskDetails();
+    } catch (error) {
+      console.error("Failed to delete attachment:", error);
+      toast.error("Failed to delete attachment");
+    }
+  };
+
   // Chat functions - Simplified: Anyone who can view the task can comment
   const canComment = () => {
     // If user can see the task, they can comment
@@ -1590,12 +1691,44 @@ const TaskDetail = () => {
                   </div>
                   <div>
                     <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Status</p>
-                    <p className={`text-[17px] font-normal ${
-                      task.status === 'done' ? 'text-[#10B981]' :
-                      task.status === 'in-progress' ? 'text-[#3B82F6]' : 'text-[#717182]'
-                    }`}>
-                      {task.status === 'to-do' ? 'To Do' : task.status === 'in-progress' ? 'Ongoing' : 'Done'}
-                    </p>
+                    <div className="flex gap-1">
+                      <Badge
+                        className={cn(
+                          "cursor-pointer transition-colors text-xs",
+                          task.status === 'to-do'
+                            ? "border-transparent bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                        variant={task.status === 'to-do' ? "default" : "outline"}
+                        onClick={() => handleStatusChange('to-do')}
+                      >
+                        To Do
+                      </Badge>
+                      <Badge
+                        className={cn(
+                          "cursor-pointer transition-colors text-xs",
+                          task.status === 'in-progress'
+                            ? "border-transparent bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                        variant={task.status === 'in-progress' ? "default" : "outline"}
+                        onClick={() => handleStatusChange('in-progress')}
+                      >
+                        Active
+                      </Badge>
+                      <Badge
+                        className={cn(
+                          "cursor-pointer transition-colors text-xs",
+                          task.status === 'done'
+                            ? "border-transparent bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                        variant={task.status === 'done' ? "default" : "outline"}
+                        onClick={() => handleStatusChange('done')}
+                      >
+                        Done
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
@@ -1716,8 +1849,101 @@ const TaskDetail = () => {
             </div>
           </div>
 
-          {/* Enhanced Chat Section */}
+          {/* Task Attachments Section */}
           <div className="lg:col-span-1">
+            <Card className="h-fit mb-6">
+              <CardHeader className="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6">
+                <CardTitle className="leading-none font-semibold">Attachments</CardTitle>
+                {canUploadAttachments() && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.multiple = true;
+                      input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
+                      input.onchange = async (e: any) => {
+                        const files = Array.from(e.target.files || []) as File[];
+                        if (files.length > 0) {
+                          await handleUploadTaskAttachments(files);
+                        }
+                      };
+                      input.click();
+                    }}
+                    className="p-1.5 hover:bg-white/50 rounded transition-colors h-auto"
+                    title="Upload files"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="p-0">
+                {!task.attachments || task.attachments.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 text-sm border-0">
+                    <File className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p>No attachments</p>
+                  </div>
+                ) : (
+                  <>
+                    <ScrollArea className="h-48 px-3">
+                      <div className="space-y-0 py-2">
+                        {task.attachments.map((attachment, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between h-11 hover:bg-white/50 transition-colors rounded-md px-2.5 py-1.5 group"
+                          >
+                            <div
+                              className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = buildBackendUrl(attachment.fileUrl);
+                                link.download = attachment.fileName;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                            >
+                              <File className="w-6 h-6 text-gray-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-normal text-gray-900 truncate">
+                                  {attachment.fileName}
+                                </div>
+                                <div className="text-xs font-normal text-gray-500">
+                                  {((attachment.fileSize || 0) / (1024 * 1024)).toFixed(1)} MB
+                                </div>
+                              </div>
+                            </div>
+                            {canDeleteTaskAttachments() && (
+                              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteTaskAttachment(index)}
+                                  className="p-1 hover:bg-red-100 rounded transition-colors h-auto"
+                                  title="Delete (Admin only)"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                    <div className="px-2.5 py-2 border-t border-gray-200">
+                      <div className="text-xs text-gray-500 text-center">
+                        {task.attachments.length} / 10 attachments
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Chat Section */}
             <Card className="h-fit">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">

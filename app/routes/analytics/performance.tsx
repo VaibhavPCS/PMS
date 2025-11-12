@@ -8,6 +8,7 @@ import { useSearchParams } from "react-router";
 import { DateRangeFilter } from "@/features/analytics/components/DateRangeFilter";
 import { VelocityChart } from "@/features/analytics/components/VelocityChart";
 import { useFilter } from '@/features/analytics/context/FilterContext';
+import { WorkspaceProjectSelector } from '@/features/analytics/components/WorkspaceProjectSelector';
 
 const Performance = () => {
   const [searchParams] = useSearchParams();
@@ -19,6 +20,7 @@ const Performance = () => {
     selectedWorkspaceName,
     selectedProjectName 
   } = useFilter();
+  const projectsCount = Number(sessionStorage.getItem('analyticsProjectsCount') || '0');
   
   // Get date range from URL params or use defaults
   const startDate = searchParams.get("startDate") || undefined;
@@ -67,6 +69,9 @@ const Performance = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-3">
+          <WorkspaceProjectSelector />
+        </div>
         {/* ✅ Date Range Filter - Always visible */}
         <DateRangeFilter onChange={handleDateRangeChange} />
 
@@ -95,6 +100,23 @@ const Performance = () => {
             <p className="text-gray-600 font-medium mb-2">No Workspace Selected</p>
             <p className="text-gray-500 text-sm mb-4">
               Please select a workspace and project from the filters above to view performance metrics.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedProjectId && selectedWorkspaceId && projectsCount === 0) {
+    return (
+      <div className="space-y-4">
+        {renderHeader()}
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium mb-2">No Project Found</p>
+            <p className="text-gray-500 text-sm">
+              This workspace has no projects accessible to you.
             </p>
           </div>
         </div>

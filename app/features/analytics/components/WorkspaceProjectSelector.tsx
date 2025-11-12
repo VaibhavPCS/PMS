@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useFilter } from '../context/FilterContext';
 import { useAuth } from '@/provider/auth-context';
-import { fetchData } from '@/lib/fetch-util';
+import { fetchData, postData } from '@/lib/fetch-util';
 import {
   Select,
   SelectContent,
@@ -54,6 +54,13 @@ export function WorkspaceProjectSelector() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [supportsAllProjects, setSupportsAllProjects] = useState<boolean>(() => {
+    const stored = sessionStorage.getItem('supportsAllProjectsAnalytics');
+    return stored ? stored === 'true' : true;
+  });
+  const [capabilityProbed, setCapabilityProbed] = useState<boolean>(() => {
+    return sessionStorage.getItem('supportsAllProjectsAnalytics') !== null;
+  });
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -67,9 +74,9 @@ export function WorkspaceProjectSelector() {
         const workspaceList = data?.workspaces || [];
         setWorkspaces(workspaceList);
         
-        // Auto-select current workspace with name
         if (data?.currentWorkspace?._id && !selectedWorkspaceId) {
           setSelectedWorkspace(data.currentWorkspace._id, data.currentWorkspace.name);
+          try { localStorage.setItem('currentWorkspaceId', data.currentWorkspace._id); } catch {}
         }
       } catch (error) {
         console.error('Failed to fetch workspaces:', error);
@@ -86,6 +93,7 @@ export function WorkspaceProjectSelector() {
   useEffect(() => {
     if (!selectedWorkspaceId || selectedWorkspaceId === 'all') {
       setProjects([]);
+      try { sessionStorage.setItem('analyticsProjectsCount', '0'); } catch {}
       return;
     }
 
@@ -97,9 +105,10 @@ export function WorkspaceProjectSelector() {
         console.log('Fetched projects response:', data);
         
         const projectList = data?.projects || [];
-        setProjects(projectList);
+        const filtered = projectList.filter(p => `${p.workspace}` === selectedWorkspaceId);
+        setProjects(filtered);
+        try { sessionStorage.setItem('analyticsProjectsCount', String(filtered.length)); } catch {}
         
-        // Auto-select first project with name
         if (projectList.length > 0 && !selectedProjectId) {
           setSelectedProject(projectList[0]._id, projectList[0].title);
         }
@@ -114,14 +123,37 @@ export function WorkspaceProjectSelector() {
     fetchProjects();
   }, [selectedWorkspaceId]);
 
+  useEffect(() => {
+    const probe = async () => {
+      if (!selectedWorkspaceId || capabilityProbed) return;
+      try {
+        await fetchData(`/analytics/project/all`);
+        setSupportsAllProjects(true);
+        sessionStorage.setItem('supportsAllProjectsAnalytics', 'true');
+      } catch (err: any) {
+        setSupportsAllProjects(false);
+        sessionStorage.setItem('supportsAllProjectsAnalytics', 'false');
+      } finally {
+        setCapabilityProbed(true);
+      }
+    };
+    probe();
+  }, [selectedWorkspaceId, capabilityProbed]);
+
   // Handle workspace selection
-  const handleWorkspaceChange = (workspaceId: string) => {
+  const handleWorkspaceChange = async (workspaceId: string) => {
     if (workspaceId === 'all') {
       setSelectedWorkspace('all', 'All Workspaces');
+      try { localStorage.removeItem('currentWorkspaceId'); } catch {}
     } else {
       const workspace = workspaces.find(w => w.workspaceId._id === workspaceId);
       if (workspace) {
+        try {
+          await postData('/workspace/switch', { workspaceId });
+        } catch {}
         setSelectedWorkspace(workspaceId, workspace.workspaceId.name);
+        try { localStorage.setItem('currentWorkspaceId', workspaceId); } catch {}
+        setProjects([]);
       }
     }
   };
@@ -165,15 +197,15 @@ export function WorkspaceProjectSelector() {
         onValueChange={handleProjectChange}
         disabled={!selectedWorkspaceId || selectedWorkspaceId === 'all' || loadingProjects || projects.length === 0}
       >
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-[160px] sm:w-[200px]">
           <SelectValue placeholder={
-            loadingProjects ? "Loading..." : 
-            projects.length === 0 ? "No projects" : 
-            "Select Project"
+            loadingProjects ? "Loading..." :
+            projects.length === 0 ? "--" :
+            supportsAllProjects ? "Select Project" : "Select the project"
           } />
         </SelectTrigger>
         <SelectContent>
-          {projects.length > 0 && <SelectItem value="all">All Projects</SelectItem>}
+          {projects.length > 0 && supportsAllProjects && <SelectItem value="all">All Projects</SelectItem>}
           {projects.map((project) => (
             <SelectItem key={project._id} value={project._id}>
               {project.title}

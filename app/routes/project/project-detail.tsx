@@ -865,6 +865,32 @@ const TaskCard = React.memo<{
     onClick?.();
   };
 
+  const handleSelectView = () => {
+    setShowEditModal(false);
+    setShowAssignModal(false);
+    setShowDeleteDialog(false);
+    handleCardClick();
+  };
+
+  const handleSelectEdit = () => {
+    setShowAssignModal(false);
+    setShowDeleteDialog(false);
+    setShowEditModal(true);
+  };
+
+  const handleSelectAssign = () => {
+    setSelectedAssigneeId(task.assignee?._id || "");
+    setShowEditModal(false);
+    setShowDeleteDialog(false);
+    setShowAssignModal(true);
+  };
+
+  const handleSelectDelete = () => {
+    setShowEditModal(false);
+    setShowAssignModal(false);
+    setShowDeleteDialog(true);
+  };
+
   return (
     <>
       <Card
@@ -897,20 +923,24 @@ const TaskCard = React.memo<{
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => e.stopPropagation()}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   >
                     <MoreVertical className="w-4 h-4 text-gray-500" />
                   </Button>
                 </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={handleCardClick}>
+                  <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onSelect={handleSelectView}>
                       <Eye className="w-3 h-3 mr-2" />
                       View Details
                     </DropdownMenuItem>
 
                     {/* ✅ UPDATED: Edit allowed for assignee, creator, admin, project lead */}
                     {canEditTask && (
-                      <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                      <DropdownMenuItem onSelect={handleSelectEdit}>
                         <Edit className="w-3 h-3 mr-2" />
                         Edit Task
                       </DropdownMenuItem>
@@ -918,13 +948,7 @@ const TaskCard = React.memo<{
 
                     {/* ✅ NEW: Assign Task (visible only to admin/project lead) */}
                     {canAssignVisible && (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAssigneeId(task.assignee?._id || "");
-                          setShowAssignModal(true);
-                        }}
-                      >
+                      <DropdownMenuItem onSelect={handleSelectAssign}>
                         <Users className="w-3 h-3 mr-2" />
                         Assign Task
                       </DropdownMenuItem>
@@ -932,21 +956,21 @@ const TaskCard = React.memo<{
 
                     {/* Status Change Options */}
                     {task.status !== "to-do" && (
-                      <DropdownMenuItem onClick={() => handleStatusChange("to-do")}>
+                      <DropdownMenuItem onSelect={() => handleStatusChange("to-do")}>
                         <Clock className="w-3 h-3 mr-2" />
                         Mark as To Do
                       </DropdownMenuItem>
                     )}
 
                     {task.status !== "in-progress" && (
-                      <DropdownMenuItem onClick={() => handleStatusChange("in-progress")}>
+                      <DropdownMenuItem onSelect={() => handleStatusChange("in-progress")}>
                         <PlayCircle className="w-3 h-3 mr-2" />
                         Mark In Progress
                       </DropdownMenuItem>
                     )}
 
                     {task.status !== "done" && (
-                      <DropdownMenuItem onClick={() => handleStatusChange("done")}>
+                      <DropdownMenuItem onSelect={() => handleStatusChange("done")}>
                         <CheckCircle2 className="w-3 h-3 mr-2" />
                         Mark as Done
                       </DropdownMenuItem>
@@ -957,7 +981,7 @@ const TaskCard = React.memo<{
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => setShowDeleteDialog(true)}
+                          onSelect={handleSelectDelete}
                           className="text-red-600 focus:text-red-600"
                         >
                           <Trash2 className="w-3 h-3 mr-2" />
@@ -1262,6 +1286,7 @@ const SortableTaskCard: React.FC<{
   project?: Project | null; // ✅ NEW: Add project prop
 }> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
+  const navigate = useNavigate();
 
   return (
     <div
@@ -1273,7 +1298,7 @@ const SortableTaskCard: React.FC<{
       <TaskCard
         task={task}
         compact={true}
-        onClick={() => (window.location.href = `/task/${task._id}`)}
+        onClick={() => navigate(`/task/${task._id}`)}
         currentUser={currentUser}
         userRole={userRole}
         project={project}
@@ -1378,6 +1403,7 @@ const ProjectDetail = () => {
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
+  const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
 
   // Derived role flags
   const isAdmin = useMemo(() => ["admin", "super_admin", "super-admin"].includes(userRole), [userRole]);
@@ -1661,11 +1687,50 @@ const ProjectDetail = () => {
 
       try {
         setSubmittingTask(true);
-        const payload: any = { ...newTask, projectId };
-        if (!newTask.assigneeId) {
-          delete payload.assigneeId; // allow backend to treat as unassigned
+
+        // Use FormData if there are attachments, otherwise use JSON
+        if (taskAttachments.length > 0) {
+          const formData = new FormData();
+          formData.append("title", newTask.title);
+          formData.append("description", newTask.description);
+          formData.append("status", newTask.status);
+          formData.append("priority", newTask.priority);
+          if (newTask.assigneeId) {
+            formData.append("assigneeId", newTask.assigneeId);
+          }
+          formData.append("startDate", newTask.startDate);
+          formData.append("dueDate", newTask.dueDate);
+          formData.append("projectId", projectId || "");
+
+          // Append files
+          taskAttachments.forEach((file) => {
+            formData.append("attachments", file);
+          });
+
+          const response = await fetch(
+            `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api-v1/task`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+              },
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to create task");
+          }
+        } else {
+          const payload: any = { ...newTask, projectId };
+          if (!newTask.assigneeId) {
+            delete payload.assigneeId;
+          }
+          await postData("/task", payload);
         }
-        await postData("/task", payload);
+
         setShowTaskModal(false);
         setNewTask({
           title: "",
@@ -1678,15 +1743,16 @@ const ProjectDetail = () => {
         });
         setStartDateObj(undefined);
         setDueDateObj(undefined);
+        setTaskAttachments([]);
         await Promise.all([fetchAllTasks(), fetchUserTasks()]);
         toast.success("Task created!");
       } catch (error: any) {
-        toast.error(error.response?.data?.message || "Failed to create task");
+        toast.error(error.response?.data?.message || error.message || "Failed to create task");
       } finally {
         setSubmittingTask(false);
       }
     },
-    [newTask, projectId, fetchAllTasks, fetchUserTasks, project]
+    [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments]
   );
 
   useEffect(() => {
@@ -2627,12 +2693,21 @@ const ProjectDetail = () => {
                   className="h-8 text-sm cursor-pointer"
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const files = e.target.files;
-                    if (files) {
-                      // Store files for upload when creating task
-                      // Files will be handled in handleCreateTask function
+                    if (files && files.length > 0) {
+                      const fileArray = Array.from(files);
+                      if (fileArray.length > 3) {
+                        toast.error("Maximum 3 files allowed");
+                        return;
+                      }
+                      setTaskAttachments(fileArray);
                     }
                   }}
                 />
+                {taskAttachments.length > 0 && (
+                  <div className="text-xs text-gray-600 mt-1">
+                    {taskAttachments.length} file(s) selected
+                  </div>
+                )}
                 <p className="text-xs text-gray-500">Max 3 files (images or documents)</p>
               </div>
 

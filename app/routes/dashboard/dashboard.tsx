@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
 import { fetchData, postData } from "@/lib/fetch-util";
+import { buildApiUrl } from "@/lib/config";
 import {
   Calendar,
   Clock,
@@ -14,6 +15,9 @@ import {
   Folder,
   ArrowRight,
   Eye,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   PieChart,
   Pie,
@@ -142,6 +163,21 @@ const Dashboard = () => {
   });
   const [accessibleProjects, setAccessibleProjects] = useState<Project[]>([]);
   const [accessibleProjectIds, setAccessibleProjectIds] = useState<Set<string>>(new Set());
+
+  // Task update/delete modals
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [updateForm, setUpdateForm] = useState({
+    title: "",
+    description: "",
+    priority: "",
+    status: "",
+    startDate: "",
+    dueDate: "",
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const currentUserId = (user as any)?.id || (user as any)?._id || "";
   const userRole = (user as any)?.role || "";
@@ -487,6 +523,102 @@ const Dashboard = () => {
     setSelectedYear(year);
     setShowMonthPicker(false);
     await fetchMonthlyProjectStats(month, year);
+  };
+
+  // ==================== TASK UPDATE/DELETE HANDLERS ====================
+
+  const handleOpenUpdateModal = (task: Task) => {
+    setSelectedTask(task);
+    setUpdateForm({
+      title: task.title,
+      description: task.description || "",
+      priority: task.priority,
+      status: task.status,
+      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "",
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "",
+    });
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+    if (!updateForm.title.trim()) {
+      toast.error("Task title is required");
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      const response = await fetch(buildApiUrl(`/task/${selectedTask._id}`), {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+        body: JSON.stringify({
+          title: updateForm.title,
+          description: updateForm.description,
+          priority: updateForm.priority,
+          status: updateForm.status,
+          startDate: updateForm.startDate,
+          dueDate: updateForm.dueDate,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update task");
+      }
+
+      toast.success("Task updated successfully");
+      setShowUpdateModal(false);
+      setSelectedTask(null);
+      // Refresh tasks
+      await fetchTasks();
+    } catch (error: any) {
+      console.error("Failed to update task:", error);
+      toast.error(error.message || "Failed to update task");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleOpenDeleteDialog = (task: Task) => {
+    setSelectedTask(task);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask) return;
+
+    try {
+      setIsDeleting(true);
+      const response = await fetch(buildApiUrl(`/task/${selectedTask._id}`), {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete task");
+      }
+
+      toast.success("Task deleted successfully");
+      setShowDeleteDialog(false);
+      setSelectedTask(null);
+      // Refresh tasks
+      await fetchTasks();
+    } catch (error: any) {
+      console.error("Failed to delete task:", error);
+      toast.error(error.message || "Failed to delete task");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // ==================== RENDER GUARDS ====================
@@ -1260,16 +1392,53 @@ const Dashboard = () => {
                                     </span>
                                   </div>
                                 )}
-                                
-                                {/* Status badge */}
-                                <div className={cn(
-                                  "px-2 py-1 rounded-full text-xs font-medium",
-                                  task.status === "to-do" && "bg-blue-100 text-blue-700",
-                                  task.status === "in-progress" && "bg-amber-100 text-amber-700",
-                                  task.status === "done" && "bg-green-100 text-green-700"
-                                )}>
-                                  {task.status === "to-do" ? "To Do" : 
-                                   task.status === "in-progress" ? "In Progress" : "Done"}
+
+                                <div className="flex items-center gap-2">
+                                  {/* Status badge */}
+                                  <div className={cn(
+                                    "px-2 py-1 rounded-full text-xs font-medium",
+                                    task.status === "to-do" && "bg-blue-100 text-blue-700",
+                                    task.status === "in-progress" && "bg-amber-100 text-amber-700",
+                                    task.status === "done" && "bg-green-100 text-green-700"
+                                  )}>
+                                    {task.status === "to-do" ? "To Do" :
+                                     task.status === "in-progress" ? "In Progress" : "Done"}
+                                  </div>
+
+                                  {/* 3-dot menu */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 w-7 p-0 hover:bg-gray-100"
+                                      >
+                                        <MoreVertical className="h-4 w-4 text-gray-600" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenUpdateModal(task);
+                                        }}
+                                        className="cursor-pointer"
+                                      >
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Update
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenDeleteDialog(task);
+                                        }}
+                                        className="cursor-pointer text-red-600 focus:text-red-600"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </div>
                             </div>
@@ -1285,6 +1454,116 @@ const Dashboard = () => {
         </div>
       </div>
     </div>
+
+    {/* Update Task Modal */}
+    <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Update Task</DialogTitle>
+          <DialogDescription>
+            Make changes to the task details below.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="title">Title *</Label>
+            <Input
+              id="title"
+              value={updateForm.title}
+              onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
+              placeholder="Enter task title"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={updateForm.description}
+              onChange={(e) => setUpdateForm({ ...updateForm, description: e.target.value })}
+              placeholder="Enter task description"
+              rows={3}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="to-do">To Do</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={updateForm.startDate}
+                onChange={(e) => setUpdateForm({ ...updateForm, startDate: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={updateForm.dueDate}
+                onChange={(e) => setUpdateForm({ ...updateForm, dueDate: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowUpdateModal(false)} disabled={isUpdating}>
+            Cancel
+          </Button>
+          <Button onClick={handleUpdateTask} disabled={isUpdating || !updateForm.title.trim()}>
+            {isUpdating ? "Updating..." : "Update Task"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Delete Task Dialog */}
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Delete Task</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete "{selectedTask?.title}"? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+            {isDeleting ? "Deleting..." : "Delete Task"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 };
