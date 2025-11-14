@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
-import { fetchData, postData } from "@/lib/fetch-util";
+import { fetchData, postData, putData } from "@/lib/fetch-util";
 import { buildApiUrl, buildBackendUrl } from "@/lib/config";
 import {
   ArrowLeft,
@@ -1021,11 +1021,23 @@ const TaskDetail = () => {
 
     try {
       setIsReassigning(true);
-      await postData(`/task/${task._id}/reassign`, {
-        assigneeId: reassignAssigneeId,
-        startDate: reassignStartDate,
-        dueDate: reassignDueDate
-      });
+      const me = activeUser;
+      const meIdStr = (me?.id || me?._id || "").toString();
+      const isAdminOrHead = !!me && (["super_admin", "admin"].includes(me.role) || ((task.project as any)?.projectHead?._id?.toString() === meIdStr));
+      const isApproved = task.approvalStatus === "approved";
+      if (isAdminOrHead && isApproved) {
+        await postData(`/task/${task._id}/reassign`, {
+          assigneeId: reassignAssigneeId,
+          startDate: reassignStartDate,
+          dueDate: reassignDueDate
+        });
+      } else {
+        await putData(`/task/${task._id}`, {
+          assigneeId: reassignAssigneeId,
+          startDate: reassignStartDate,
+          dueDate: reassignDueDate
+        });
+      }
       toast.success("Task reassigned successfully");
       setShowReassignDialog(false);
       setReassignAssigneeId("");
@@ -1052,9 +1064,13 @@ const TaskDetail = () => {
     const meIdStr = (me.id || me._id || "").toString();
     const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
 
-    if (projectHeadId && meIdStr === projectHeadId) {
-      return true;
-    }
+    if (projectHeadId && meIdStr === projectHeadId) return true;
+
+    // TL can approve trainee's task: if assignee is in assignableMembers as trainee
+    const isAssigneeTraineeOfMe = (assignableMembers || []).some(
+      (m) => (m._id || "").toString() === (task.assignee?._id || "").toString() && (m.role || "") === "trainee"
+    );
+    if (isAssigneeTraineeOfMe && task.approvalStatus === "pending-approval") return true;
 
     return false;
   };
@@ -1063,7 +1079,7 @@ const TaskDetail = () => {
   const canReassignTask = () => {
     const me = activeUser;
     if (!me || !task) return false;
-    if (task.approvalStatus !== "approved") return false;
+    if (task.approvalStatus === "approved") return false;
 
     // Check if user is admin or super admin
     if (["super_admin", "admin"].includes(me.role)) return true;
@@ -1072,7 +1088,13 @@ const TaskDetail = () => {
     const meIdStr = (me.id || me._id || "").toString();
     const projectHeadId = (task.project as any)?.projectHead?._id?.toString();
 
-    return Boolean(projectHeadId && meIdStr === projectHeadId);
+    if (projectHeadId && meIdStr === projectHeadId) return true;
+
+    const isAssignee = (task.assignee?._id || "").toString() === meIdStr;
+    if (!isAssignee) return false;
+
+    const hasDelegationTargets = (assignableMembers || []).some(m => (m._id || "").toString() !== meIdStr);
+    return hasDelegationTargets;
   };
 
   // ✅ NEW: Pre-fill rejection modal with current task dates
@@ -1098,6 +1120,7 @@ const TaskDetail = () => {
   const canDeleteAttachments = () => {
     const me = activeUser;
     if (!me || !task) return false;
+    if (task.approvalStatus === "approved") return false;
     // Allow deletion if user is the assignee, admin, or super_admin
     if (["super_admin", "admin"].includes(me.role)) return true;
     return task.assignee._id === me._id;
@@ -1107,6 +1130,7 @@ const TaskDetail = () => {
   const canUploadAttachments = () => {
     const me = activeUser;
     if (!me || !task) return false;
+    if (task.approvalStatus === "approved") return false;
     // Only admin, super_admin, or project head can upload task attachments
     if (["super_admin", "admin"].includes(me.role)) return true;
     const meIdStr = (me.id || me._id || "").toString();
@@ -1117,6 +1141,7 @@ const TaskDetail = () => {
   const canDeleteTaskAttachments = () => {
     const me = activeUser;
     if (!me || !task) return false;
+    if (task.approvalStatus === "approved") return false;
     // Only admin, super_admin, or project head can delete task attachments
     if (["super_admin", "admin"].includes(me.role)) return true;
     const meIdStr = (me.id || me._id || "").toString();
@@ -1200,12 +1225,16 @@ const TaskDetail = () => {
   const canComment = () => {
     // If user can see the task, they can comment
     // Task visibility is already controlled by backend permissions
-    return !!(activeUser && task);
+    if (!activeUser || !task) return false;
+    if (task.approvalStatus === "approved") return false;
+    return true;
   };
 
   const canReply = () => {
     // Same logic as canComment - anyone who can see the task can reply
-    return !!(currentUser && task);
+    if (!currentUser || !task) return false;
+    if (task.approvalStatus === "approved") return false;
+    return true;
   };
 
   const handleReply = (comment: Comment) => {
@@ -1507,7 +1536,64 @@ const TaskDetail = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb Navigation */}
         <div className="mb-6">
-          <Breadcrumb />
+          <Breadcrumb
+            items={[
+              {
+                label: "Workspace",
+                icon: (
+                  <img
+                    src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+                    alt="Workspace"
+                    className="w-[20px] h-[20px]"
+                  />
+                ),
+                href: "/workspace",
+                isActive: false,
+              },
+              {
+                label: "Project Detail",
+                icon: (
+                  <img
+                    src="/assets/folder-project-icon.svg"
+                    alt="Project"
+                    className="w-[20px] h-[20px]"
+                  />
+                ),
+                href: task ? `/project/${task.project._id}` : undefined,
+                isActive: false,
+              },
+              {
+                label: "Task Details",
+                icon: (
+                  <svg
+                    className="w-[20px] h-[20px]"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 10L9 13L14 7"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <rect
+                      x="3"
+                      y="3"
+                      width="14"
+                      height="14"
+                      rx="2"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      fill="none"
+                    />
+                  </svg>
+                ),
+                isActive: true,
+              },
+            ]}
+          />
         </div>
 
         {/* Header */}
@@ -1689,7 +1775,7 @@ const TaskDetail = () => {
                       {task.durationDays ? `${task.durationDays} Day${task.durationDays > 1 ? 's' : ''}` : '-'}
                     </p>
                   </div>
-                  <div>
+                  {/* <div>
                     <p className="text-[14px] text-[#717182] mb-1.5 font-medium">Status</p>
                     <div className="flex gap-1">
                       <Badge
@@ -1729,7 +1815,7 @@ const TaskDetail = () => {
                         Done
                       </Badge>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 {task.rejectionReason && task.approvalStatus === "rejected" && (
@@ -1774,7 +1860,7 @@ const TaskDetail = () => {
                       />
                     </div>
                   )}
-                  <RichTextToolbar
+                  {<RichTextToolbar
                     onAttachClick={() => {
                       // Trigger file input
                       const input = document.createElement('input');
@@ -1829,6 +1915,7 @@ const TaskDetail = () => {
                     actionLoading={savingHandover}
                     showFormattingButtons={true}
                   />
+                  }
                 </CardContent>
               </Card>
 

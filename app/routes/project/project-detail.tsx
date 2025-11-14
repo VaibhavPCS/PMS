@@ -89,6 +89,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import { TeamAvatars } from "@/components/project/TeamAvatars";
 import RemoveProjectMembersModal from "@/components/project/RemoveProjectMembersModal";
+import ProjectApprovalMetrics from "@/features/analytics/components/ProjectApprovalMetrics";
 import { InviteMembersButton } from "@/components/project/InviteMembersButton";
 import { ProjectOverviewPanel } from "@/components/project/ProjectOverviewPanel";
 import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
@@ -804,6 +805,8 @@ const TaskCard = React.memo<{
     return assigneeIdStr === currentUserIdStr || creatorIdStr === currentUserIdStr;
   }, [currentUser, task]);
 
+  const isApproved = (task as any).approvalStatus === "approved";
+
   // Show dropdown menu if any actionable permission exists (matches backend capabilities)
   const canManageTask = useMemo(() => {
     return isAssigneeOrCreator || isAdmin || isProjectLead;
@@ -937,47 +940,37 @@ const TaskCard = React.memo<{
                       <Eye className="w-3 h-3 mr-2" />
                       View Details
                     </DropdownMenuItem>
-
-                    {/* ✅ UPDATED: Edit allowed for assignee, creator, admin, project lead */}
-                    {canEditTask && (
+                    {(!isApproved && canEditTask) && (
                       <DropdownMenuItem onSelect={handleSelectEdit}>
                         <Edit className="w-3 h-3 mr-2" />
                         Edit Task
                       </DropdownMenuItem>
                     )}
-
-                    {/* ✅ NEW: Assign Task (visible only to admin/project lead) */}
-                    {canAssignVisible && (
+                    {(!isApproved && canAssignVisible) && (
                       <DropdownMenuItem onSelect={handleSelectAssign}>
                         <Users className="w-3 h-3 mr-2" />
                         Assign Task
                       </DropdownMenuItem>
                     )}
-
-                    {/* Status Change Options */}
-                    {task.status !== "to-do" && (
+                    {(!isApproved && task.status !== "to-do") && (
                       <DropdownMenuItem onSelect={() => handleStatusChange("to-do")}>
                         <Clock className="w-3 h-3 mr-2" />
                         Mark as To Do
                       </DropdownMenuItem>
                     )}
-
-                    {task.status !== "in-progress" && (
+                    {(!isApproved && task.status !== "in-progress") && (
                       <DropdownMenuItem onSelect={() => handleStatusChange("in-progress")}>
                         <PlayCircle className="w-3 h-3 mr-2" />
                         Mark In Progress
                       </DropdownMenuItem>
                     )}
-
-                    {task.status !== "done" && (
+                    {(!isApproved && task.status !== "done") && (
                       <DropdownMenuItem onSelect={() => handleStatusChange("done")}>
                         <CheckCircle2 className="w-3 h-3 mr-2" />
                         Mark as Done
                       </DropdownMenuItem>
                     )}
-
-                    {/* ✅ UPDATED: Delete allowed for assignee, creator, admin (not project lead) */}
-                    {canDeleteTask && (
+                    {(!isApproved && canDeleteTask) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -1285,7 +1278,7 @@ const SortableTaskCard: React.FC<{
   canAssignVisible?: boolean;
   project?: Project | null; // ✅ NEW: Add project prop
 }> = ({ task, currentUser, userRole, onTaskUpdate, assignableMembers = [], canAssignVisible = false, project }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task._id, disabled: (task as any).approvalStatus === "approved" });
   const navigate = useNavigate();
 
   return (
@@ -1376,6 +1369,7 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [userRole, setUserRole] = useState("");
+  const [projectRole, setProjectRole] = useState<string>("member");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
@@ -1436,7 +1430,7 @@ const ProjectDetail = () => {
       const matchesStatus = filters.status === "all" || task.status === filters.status;
       const matchesPriority = filters.priority === "all" || task.priority === filters.priority;
 
-      return matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesPriority && (task as any).approvalStatus !== "approved";
     });
   }, [allTasks, filters]);
 
@@ -1450,7 +1444,7 @@ const ProjectDetail = () => {
       const matchesStatus = filters.status === "all" || task.status === filters.status;
       const matchesPriority = filters.priority === "all" || task.priority === filters.priority;
 
-      return matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesPriority && (task as any).approvalStatus !== "approved";
     });
   }, [userTasks, filters]);
 
@@ -1471,6 +1465,8 @@ const ProjectDetail = () => {
     } else if ((currentUser.role || userRole) === "lead" && isProjectMember) {
       tasksToShow = allTasks;
     } else if ((project?.projectHead?._id || "").toString() === currentUserIdStr) {
+      tasksToShow = allTasks;
+    } else if (projectRole === 'tl') {
       tasksToShow = allTasks;
     } else {
       // Regular members should only see tasks assigned to them (NOT unassigned tasks)
@@ -1584,7 +1580,7 @@ const ProjectDetail = () => {
       const newStatus = over.id as string;
       const task = allTasks.find((t) => t._id === taskId);
 
-      if (!task || task.status === newStatus || !["to-do", "in-progress", "done"].includes(newStatus)) {
+      if (!task || (task as any).approvalStatus === "approved" || task.status === newStatus || !["to-do", "in-progress", "done"].includes(newStatus)) {
         return setActiveTask(null);
       }
 
@@ -1763,6 +1759,7 @@ const ProjectDetail = () => {
         fetchAllTasks(),
         fetchUserTasks(),
         fetchAssignableMembers(),
+        (async () => { try { const res = await fetchData(`/project/${projectId}/role`); setProjectRole(res.projectRole || 'member'); } catch {} })(),
       ]);
     }
   }, [isAuthenticated, projectId]);
@@ -2469,7 +2466,7 @@ const ProjectDetail = () => {
                   </Card>
                 ) : (
                   <CalendarViewComponent
-                    tasks={kanbanFilteredTasks}
+                    tasks={kanbanFilteredTasks.filter((t) => (t as any).approvalStatus !== "approved")}
                     filters={filters}
                     updateFilter={updateFilter}
                     clearFilters={clearFilters}
@@ -2480,6 +2477,9 @@ const ProjectDetail = () => {
                   />
                 )}
               </TabsContent>
+              <div className="mt-4">
+                {project && <ProjectApprovalMetrics projectId={project._id} />}
+              </div>
             </Tabs>
           </div>
       </div>

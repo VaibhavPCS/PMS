@@ -458,6 +458,8 @@ const Dashboard = () => {
       );
     }
 
+    filtered = filtered.filter((t: any) => t.approvalStatus !== "approved");
+
     setFilteredTasks(filtered);
   }, [tasks, taskStatusFilter, taskSearchQuery]);
 

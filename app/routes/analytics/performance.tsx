@@ -7,7 +7,9 @@ import { useProjectAnalytics } from "@/features/analytics/hooks";
 import { useSearchParams } from "react-router";
 import { DateRangeFilter } from "@/features/analytics/components/DateRangeFilter";
 import { VelocityChart } from "@/features/analytics/components/VelocityChart";
+import { useEffect } from "react";
 import { useFilter } from '@/features/analytics/context/FilterContext';
+import { fetchData } from '@/lib/fetch-util';
 import { WorkspaceProjectSelector } from '@/features/analytics/components/WorkspaceProjectSelector';
 
 const Performance = () => {
@@ -18,7 +20,9 @@ const Performance = () => {
     selectedWorkspaceId, 
     selectedProjectId,
     selectedWorkspaceName,
-    selectedProjectName 
+    selectedProjectName,
+    setSelectedWorkspace,
+    setSelectedProject
   } = useFilter();
   const projectsCount = Number(sessionStorage.getItem('analyticsProjectsCount') || '0');
   
@@ -27,7 +31,26 @@ const Performance = () => {
   const endDate = searchParams.get("endDate") || undefined;
 
   // ✅ Use selectedProjectId from FilterContext (falls back to hardcoded if not selected)
-  const projectId = selectedProjectId || "6912bd18e5e41fd8fdbc839d";
+  const projectId = selectedProjectId || "";
+
+  // ✅ Sync selection from URL (?projectId=...) when navigating from workspace list
+  useEffect(() => {
+    const urlProjectId = searchParams.get('projectId');
+    if (!urlProjectId) return;
+    if (selectedProjectId === urlProjectId) return;
+
+    (async () => {
+      try {
+        const detail = await fetchData<{ project: { _id: string; title: string; workspace: { _id: string; name: string } } }>(`/projects/${urlProjectId}`);
+        const wsId = detail.project.workspace?._id as string;
+        const wsName = detail.project.workspace?.name as string;
+        setSelectedWorkspace(wsId, wsName || null);
+        setSelectedProject(urlProjectId, detail.project.title || null);
+      } catch {
+        setSelectedProject(urlProjectId, null);
+      }
+    })();
+  }, [searchParams, selectedProjectId, setSelectedWorkspace, setSelectedProject]);
 
   const { 
     data, 
@@ -52,7 +75,7 @@ const Performance = () => {
       <div className="flex-1">
         <h2 className="text-xl font-semibold text-gray-900">Performance Metrics</h2>
         <p className="text-sm text-gray-600">
-          Project: <span className="font-medium">{data?.project?.title || selectedProjectName || 'Loading...'}</span> 
+          Project: <span className="font-medium">{data?.project?.title || selectedProjectName || '...'}</span> 
           {data?.totalTasks !== undefined && (
             <span className="ml-2 text-gray-500">({data.totalTasks} tasks)</span>
           )}
@@ -60,7 +83,7 @@ const Performance = () => {
         {/* ✅ Show selected workspace/project names instead of IDs */}
         {selectedWorkspaceName && (
           <p className="text-xs text-gray-500 mt-1">
-            Workspace: <span className="font-medium">{selectedWorkspaceName}</span>
+            Workspace: <span className="font-medium">{selectedWorkspaceName || '...'}</span>
             {selectedProjectName && selectedProjectName !== 'All Projects' && (
               <> | Project: <span className="font-medium">{selectedProjectName}</span></>
             )}

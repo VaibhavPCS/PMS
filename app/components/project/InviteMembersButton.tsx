@@ -9,6 +9,13 @@ import {
 } from "@/components/ui/dialog";
 import { UserPlus } from "lucide-react";
 import { fetchData, postData } from "@/lib/fetch-util";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface InviteMembersButtonProps {
@@ -33,6 +40,9 @@ export function InviteMembersButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [role, setRole] = useState<string>("member");
+  const [reportsTo, setReportsTo] = useState<string>("");
+  const [tls, setTls] = useState<Array<{ _id: string; name: string; email: string }>>([]);
 
   // Consistent error message extraction for API failures
   const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
@@ -54,6 +64,20 @@ export function InviteMembersButton({
     setEmail("");
     setError(null);
     setSuccess(null);
+    setRole("member");
+    setReportsTo("");
+    fetchProjectTls();
+  };
+
+  const fetchProjectTls = async () => {
+    try {
+      const res = await fetchData(`/project/${projectId}`);
+      const members = (res?.project?.members || []) as Array<{ userId: { _id: string; name: string; email: string }, role?: string }>;
+      const tlMembers = members.filter(m => (m.role || 'member') === 'tl').map(m => ({ _id: m.userId._id, name: m.userId.name, email: m.userId.email }));
+      setTls(tlMembers);
+    } catch {
+      setTls([]);
+    }
   };
 
   const handleSendInvite = async () => {
@@ -64,13 +88,21 @@ export function InviteMembersButton({
       return;
     }
 
+    if (role === 'trainee' && !reportsTo) {
+      setError("Please select a TL for this trainee");
+      toast.error("Please select a TL for this trainee");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
       const res = await postData(`/project/${projectId}/members`, {
-        memberEmail: email
+        memberEmail: email,
+        role,
+        reportsTo: role === 'trainee' ? reportsTo : undefined
       });
 
       const successMsg = res?.message || 'Employee added successfully!';
@@ -148,6 +180,48 @@ export function InviteMembersButton({
                 Employee must already be part of the workspace
               </p>
             </div>
+
+            {/* Role Selector */}
+            <div>
+              <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
+                Role<span className="text-red-500">*</span>
+              </label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger className="h-10 w-full border border-gray-300 rounded-lg px-3 text-[14px] font-['Inter']">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent className="font-['Inter']">
+                  <SelectItem value="member" className="text-[14px]">Employee</SelectItem>
+                  <SelectItem value="tl" className="text-[14px]">TL</SelectItem>
+                  <SelectItem value="trainee" className="text-[14px]">Trainee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* TL Selector (shown only for Trainee) */}
+            {role === 'trainee' && (
+              <div>
+                <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
+                  TL<span className="text-red-500">*</span>
+                </label>
+                <Select value={reportsTo} onValueChange={setReportsTo}>
+                  <SelectTrigger className="h-10 w-full border border-gray-300 rounded-lg px-3 text-[14px] font-['Inter']">
+                    <SelectValue placeholder="Select TL" />
+                  </SelectTrigger>
+                  <SelectContent className="font-['Inter']">
+                    {tls.length === 0 ? (
+                      <div className="px-3 py-2 text-[12px] text-gray-500">No TLs in this project</div>
+                    ) : (
+                      tls.map(tl => (
+                        <SelectItem key={tl._id} value={tl._id} className="text-[14px]">
+                          {tl.name} ({tl.email})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Error Message */}
             {/* {error && (
