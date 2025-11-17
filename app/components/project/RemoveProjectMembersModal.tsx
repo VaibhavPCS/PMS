@@ -17,6 +17,7 @@ interface UserRef {
 interface ProjectMember {
   userId: UserRef;
   role?: string;
+  reportsTo?: string;
 }
 
 interface RemoveProjectMembersModalProps {
@@ -53,14 +54,14 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const allMembers = useMemo(() => {
-    const list: Array<{ _id: string; name: string; email: string; isHead?: boolean }> = [];
+    const list: Array<{ _id: string; name: string; email: string; isHead?: boolean; role?: string; reportsTo?: string }> = [];
     if (projectHead?._id) {
-      list.push({ _id: projectHead._id, name: projectHead.name, email: projectHead.email, isHead: true });
+      list.push({ _id: projectHead._id, name: projectHead.name, email: projectHead.email, isHead: true, role: 'project-head' });
     }
     for (const m of members) {
       const u = m?.userId;
       if (u?._id && !list.some(x => x._id === u._id)) {
-        list.push({ _id: u._id, name: u.name, email: u.email });
+        list.push({ _id: u._id, name: u.name, email: u.email, role: m.role, reportsTo: m.reportsTo });
       }
     }
     return list;
@@ -71,6 +72,51 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
     const q = query.toLowerCase();
     return allMembers.filter(m => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
   }, [allMembers, query]);
+
+  const [editing, setEditing] = useState<{ _id: string; name: string; email: string; role?: string; reportsTo?: string } | null>(null);
+  const [editRole, setEditRole] = useState<string>('member');
+  const [editReportsTo, setEditReportsTo] = useState<string>('');
+
+  const reportingOptions = useMemo(() => {
+    const opts: Array<{ id: string; label: string }> = [];
+    if (projectHead?._id) {
+      opts.push({ id: projectHead._id, label: `${projectHead.name || projectHead.email} (Project Head)` });
+    }
+    (members || []).forEach(m => {
+      if ((m.role || 'member') === 'tl') {
+        opts.push({ id: m.userId._id, label: `${m.userId.name || m.userId.email} (TL)` });
+      }
+    });
+    return opts;
+  }, [projectHead, members]);
+
+  const openEdit = (m: { _id: string; name: string; email: string; role?: string; reportsTo?: string }) => {
+    setEditing(m);
+    setEditRole(m.role || 'member');
+    setEditReportsTo(m.reportsTo || '');
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editReportsTo) { toast.error('Reporting is required'); return; }
+    try {
+      const res = await fetch(`/api-v1/projects/${projectId}/members/${editing._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'workspace-id': localStorage.getItem('currentWorkspaceId') || '' },
+        credentials: 'include',
+        body: JSON.stringify({ role: editRole, reportsTo: editReportsTo })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}));
+        throw new Error(data.message || 'Failed to update');
+      }
+      toast.success('Member updated');
+      setEditing(null);
+      if (onRemoveSuccess) await onRemoveSuccess();
+    } catch (e: any) {
+      toast.error(getErrorMessage({ response: { data: { message: e.message } } }, 'Failed to update'));
+    }
+  };
 
   const handleRemove = async (memberId: string, isHead?: boolean) => {
     if (isHead) {
@@ -114,7 +160,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
               ) : (
                 filteredMembers.map((m) => (
                   <div key={m._id} className="flex items-center justify-between p-2 border rounded-md">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => !m.isHead && openEdit(m)}>
                       <Avatar className="w-8 h-8">
                         <AvatarFallback className="text-xs">
                           {(m.name?.charAt(0) || m.email?.charAt(0) || '?').toUpperCase()}
@@ -125,7 +171,10 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
                           {m.name} {m.isHead && <span className="ml-1 text-[10px] text-blue-600">(Project Head)</span>}
                         </div>
                         <div className="text-xs text-gray-600">{m.email}</div>
-                      </div>
+                        {m.role && (
+                          <div className="text-[10px] text-gray-500 mt-0.5">Role: {m.role}</div>
+                        )}
+                    </div>
                     </div>
                     <Button
                       size="sm"
@@ -152,6 +201,43 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
             </div>
           </ScrollArea>
         </div>
+        {editing && (
+          <Dialog open={!!editing} onOpenChange={(o)=>!o && setEditing(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Member</DialogTitle>
+                <DialogDescription>Change role and reporting. Email cannot be modified.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500">Email</label>
+                  <Input value={editing.email} disabled />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Role</label>
+                  <select className="w-full border rounded h-9 px-2" value={editRole} onChange={e=>setEditRole(e.target.value)}>
+                    <option value="member">Member</option>
+                    <option value="tl">TL</option>
+                    <option value="trainee">Trainee</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Reporting</label>
+                  <select className="w-full border rounded h-9 px-2" value={editReportsTo} onChange={e=>setEditReportsTo(e.target.value)}>
+                    <option value="">Select reporting user</option>
+                    {reportingOptions.map(o => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={()=>setEditing(null)}>Cancel</Button>
+                  <Button onClick={saveEdit}>Save</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );

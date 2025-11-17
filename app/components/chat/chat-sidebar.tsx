@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import CreateChatModal from './create-chat-modal';
+import { useAuth } from '@/provider/auth-context';
 
 interface Chat {
   _id: string;
@@ -54,6 +55,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const { user } = useAuth();
 
   const filteredChats = chats.filter(chat => {
     const chatName = chat.name || chat.participants
@@ -76,7 +78,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       );
     }
     
-    const otherParticipant = chat.participants.find(p => p.user._id !== 'current-user-id');
+    const otherParticipant = chat.participants.find(p => p.user._id !== user?._id);
     if (otherParticipant?.user.profilePicture) {
       return (
         <Avatar className="w-10 h-10">

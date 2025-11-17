@@ -1978,7 +1978,7 @@ const ProjectDetail = () => {
               onClick={(isAdmin || isProjectLead) ? () => setShowMembersModal(true) : undefined}
             />
 
-            {/* Invite Members Button (visible only to Project Lead) */}
+            {/* Invite/Add Members (visible only to Project Lead) */}
             {isProjectLead && (
               <InviteMembersButton
                 projectId={project._id}
@@ -1987,6 +1987,7 @@ const ProjectDetail = () => {
                 }}
               />
             )}
+            {/* Existing Add employee button is provided by InviteMembersButton */}
           </div>
         </div>
 
@@ -2001,6 +2002,8 @@ const ProjectDetail = () => {
             await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
           }}
         />
+
+        {/* AddProjectMemberModal removed; using InviteMembersButton dialog */}
 
         {/* Project Overview Heading */}
         <div className="mb-3">

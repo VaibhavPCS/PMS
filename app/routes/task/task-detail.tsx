@@ -35,6 +35,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -685,6 +686,13 @@ const TaskDetail = () => {
   const [reassignStartDate, setReassignStartDate] = useState("");
   const [reassignDueDate, setReassignDueDate] = useState("");
   const [isReassigning, setIsReassigning] = useState(false);
+  const [subtasks, setSubtasks] = useState<any[]>([]);
+  const [showCreateSubtask, setShowCreateSubtask] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskDescription, setSubtaskDescription] = useState("");
+  const [subtaskAssigneeId, setSubtaskAssigneeId] = useState("");
+  const [subtaskPriority, setSubtaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [subtaskDueDate, setSubtaskDueDate] = useState<string>("");
 
   // ✅ NEW: Fetch assignable members for reassignment
   const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
@@ -710,6 +718,7 @@ const TaskDetail = () => {
     if (taskId && !authLoading) {
       fetchTaskDetails();
       fetchComments();
+      fetchSubtasks();
     }
   }, [taskId, authLoading]);
 
@@ -822,6 +831,60 @@ const TaskDetail = () => {
       }
     } catch (error) {
       console.error("Failed to fetch comments:", error);
+    }
+  };
+
+  // Subtasks helpers
+  const fetchSubtasks = async () => {
+    if (!taskId) return;
+    try {
+      const res = await fetch(
+        buildApiUrl(`/task/${taskId}/subtasks`),
+        { credentials: "include", headers: { "workspace-id": localStorage.getItem("currentWorkspaceId") || "" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSubtasks(data.subtasks || []);
+      }
+    } catch (e) {}
+  };
+
+  const handleCreateSubtask = async () => {
+    if (!subtaskTitle) {
+      toast.error("Subtask title is required");
+      return;
+    }
+    try {
+      const res = await fetch(buildApiUrl(`/task/${taskId}/subtasks`), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+        body: JSON.stringify({
+          title: subtaskTitle,
+          description: subtaskDescription,
+          assigneeId: subtaskAssigneeId || undefined,
+          priority: subtaskPriority,
+          dueDate: subtaskDueDate || undefined,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Subtask created");
+        setShowCreateSubtask(false);
+        setSubtaskTitle("");
+        setSubtaskDescription("");
+        setSubtaskAssigneeId("");
+        setSubtaskDueDate("");
+        setSubtaskPriority("medium");
+        fetchSubtasks();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Failed to create subtask");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to create subtask");
     }
   };
 
@@ -1679,6 +1742,21 @@ const TaskDetail = () => {
                 </Button>
               )}
 
+              {(() => {
+                const member = assignableMembers.find((m:any) => m._id === task?.assignee?._id);
+                const isTLAssignee = member && (member.role || 'member') === 'tl' && task?.assignee?._id === (activeUser?._id || activeUser?.id);
+                return isTLAssignee;
+              })() && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowCreateSubtask(true)}
+                  className="ml-2"
+                >
+                  Create Subtask
+                </Button>
+              )}
+
               <Select value={task.status} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-40">
                   <div className="flex items-center space-x-2">
@@ -1921,31 +1999,76 @@ const TaskDetail = () => {
 
               {/* Attachments Panel */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Attachments</CardTitle>
+                <CardHeader className="grid grid-cols-[1fr_auto] items-center px-6">
+                  <CardTitle className="leading-none font-semibold">Attachments</CardTitle>
+                  {canUploadAttachments() && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.multiple = true;
+                        input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt';
+                        input.onchange = async (e: any) => {
+                          const files = Array.from(e.target.files || []) as File[];
+                          if (files.length > 0) {
+                            await handleUploadTaskAttachments(files);
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="p-1.5 hover:bg-white/50 rounded transition-colors h-auto"
+                      title="Upload files"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </Button>
+                  )}
                 </CardHeader>
-                <CardContent className="p-0">
+              <CardContent className="p-0">
                   <AttachmentsPanel
                     attachments={task.handoverAttachments || []}
                     canDelete={canDeleteAttachments()}
                     onDelete={handleDeleteAttachment}
                     className="border-0"
                   />
-                </CardContent>
+              </CardContent>
               </Card>
+
+              {/* Subtasks Section */}
+              {subtasks && subtasks.length > 0 && (
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle>Subtasks</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-3 space-y-2">
+                      {subtasks.map(st => (
+                        <div key={st._id} className="p-2 border rounded flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium">{st.title}</div>
+                            <div className="text-xs text-gray-500">{st.status} • {st.priority} {st.assignee?.name ? `• ${st.assignee.name}` : ''}</div>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={()=>navigate(`/task/${st._id}`)}>Open</Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
 
-          {/* Task Attachments Section */}
+      {/* Task Attachments Section */}
           <div className="lg:col-span-1">
             <Card className="h-fit mb-6">
               <CardHeader className="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6">
                 <CardTitle className="leading-none font-semibold">Attachments</CardTitle>
-                {canUploadAttachments() && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
+              {canUploadAttachments() && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
                       const input = document.createElement('input');
                       input.type = 'file';
                       input.multiple = true;
@@ -1962,8 +2085,9 @@ const TaskDetail = () => {
                     title="Upload files"
                   >
                     <Upload className="w-4 h-4" />
-                  </Button>
-                )}
+              </Button>
+              )}
+              
               </CardHeader>
               <CardContent className="p-0">
                 {!task.attachments || task.attachments.length === 0 ? (
@@ -2027,9 +2151,43 @@ const TaskDetail = () => {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+      </CardContent>
+      </Card>
 
+      {/* Create Subtask Modal */}
+      <Dialog open={showCreateSubtask} onOpenChange={setShowCreateSubtask}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Subtask</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input value={subtaskTitle} onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setSubtaskTitle(e.target.value)} placeholder="Title" />
+            <Textarea value={subtaskDescription} onChange={e=>setSubtaskDescription(e.target.value)} placeholder="Description" />
+            <Select value={subtaskAssigneeId} onValueChange={(v:any)=>setSubtaskAssigneeId(v)}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Assign to (optional)" /></SelectTrigger>
+              <SelectContent>
+                {assignableMembers.map((m:any)=> (
+                  <SelectItem key={m._id} value={m._id}>{m.name || m.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={subtaskPriority} onValueChange={(v:any)=>setSubtaskPriority(v)}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Priority" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="date" value={subtaskDueDate} onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setSubtaskDueDate(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={()=>setShowCreateSubtask(false)}>Cancel</Button>
+              <Button onClick={handleCreateSubtask}>Create</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
             {/* Enhanced Chat Section */}
             <Card className="h-fit">
               <CardHeader>

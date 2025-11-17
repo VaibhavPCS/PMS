@@ -43,6 +43,7 @@ export function InviteMembersButton({
   const [role, setRole] = useState<string>("member");
   const [reportsTo, setReportsTo] = useState<string>("");
   const [tls, setTls] = useState<Array<{ _id: string; name: string; email: string }>>([]);
+  const [projectHead, setProjectHead] = useState<{ _id: string; name: string; email: string } | null>(null);
 
   // Consistent error message extraction for API failures
   const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
@@ -71,12 +72,19 @@ export function InviteMembersButton({
 
   const fetchProjectTls = async () => {
     try {
-      const res = await fetchData(`/project/${projectId}`);
-      const members = (res?.project?.members || []) as Array<{ userId: { _id: string; name: string; email: string }, role?: string }>;
+      const res = await fetchData(`/projects/${projectId}`);
+      const proj = res?.project || {};
+      const members = (proj?.members || []) as Array<{ userId: { _id: string; name: string; email: string }, role?: string }>;
       const tlMembers = members.filter(m => (m.role || 'member') === 'tl').map(m => ({ _id: m.userId._id, name: m.userId.name, email: m.userId.email }));
       setTls(tlMembers);
+      if (proj?.projectHead?._id) {
+        setProjectHead({ _id: proj.projectHead._id, name: proj.projectHead.name, email: proj.projectHead.email });
+      } else {
+        setProjectHead(null);
+      }
     } catch {
       setTls([]);
+      setProjectHead(null);
     }
   };
 
@@ -88,9 +96,9 @@ export function InviteMembersButton({
       return;
     }
 
-    if (role === 'trainee' && !reportsTo) {
-      setError("Please select a TL for this trainee");
-      toast.error("Please select a TL for this trainee");
+    if (!reportsTo) {
+      setError("Please select Reporting (Project Head or TL)");
+      toast.error("Please select Reporting (Project Head or TL)");
       return;
     }
 
@@ -99,10 +107,10 @@ export function InviteMembersButton({
     setSuccess(null);
 
     try {
-      const res = await postData(`/project/${projectId}/members`, {
+      const res = await postData(`/projects/${projectId}/members`, {
         memberEmail: email,
         role,
-        reportsTo: role === 'trainee' ? reportsTo : undefined
+        reportsTo: reportsTo || undefined
       });
 
       const successMsg = res?.message || 'Employee added successfully!';
@@ -198,25 +206,32 @@ export function InviteMembersButton({
               </Select>
             </div>
 
-            {/* TL Selector (shown only for Trainee) */}
-            {role === 'trainee' && (
+            {/* Reporting Selector */}
+            {(
               <div>
                 <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
-                  TL<span className="text-red-500">*</span>
+                  Reporting <span className="text-red-500">*</span>
                 </label>
                 <Select value={reportsTo} onValueChange={setReportsTo}>
                   <SelectTrigger className="h-10 w-full border border-gray-300 rounded-lg px-3 text-[14px] font-['Inter']">
-                    <SelectValue placeholder="Select TL" />
+                    <SelectValue placeholder="Select reporting user" />
                   </SelectTrigger>
                   <SelectContent className="font-['Inter']">
-                    {tls.length === 0 ? (
-                      <div className="px-3 py-2 text-[12px] text-gray-500">No TLs in this project</div>
-                    ) : (
+                    {/* Project Head option */}
+                    {projectHead && (
+                      <SelectItem value={projectHead._id} className="text-[14px]">
+                        {projectHead.name || projectHead.email} (Project Head)
+                      </SelectItem>
+                    )}
+                    {/* TL options */}
+                    {tls.length > 0 ? (
                       tls.map(tl => (
                         <SelectItem key={tl._id} value={tl._id} className="text-[14px]">
-                          {tl.name} ({tl.email})
+                          {tl.name} ({tl.email}) (TL)
                         </SelectItem>
                       ))
+                    ) : (
+                      <div className="px-3 py-2 text-[12px] text-gray-500">No TLs in this project</div>
                     )}
                   </SelectContent>
                 </Select>
