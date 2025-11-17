@@ -5,6 +5,7 @@ import { useWorkspaceAnalytics } from "@/features/analytics/hooks";
 import { WorkloadChart } from "@/features/analytics/components/WorkloadChart";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import axios from "@/lib/axios";
 
 const Workspace = () => {
   const [workspaceId, setWorkspaceId] = useState<string>("");
@@ -23,6 +24,42 @@ const Workspace = () => {
     refetch,
     isFetching 
   } = useWorkspaceAnalytics(workspaceId);
+
+  const downloadWorkspaceCsv = async () => {
+    try {
+      if (!workspaceId) { alert('Please select a workspace first'); return; }
+      const resp = await axios.get(`/analytics/export/workspace/${workspaceId}`, { responseType: 'blob' });
+      const blob = new Blob([resp.data], { type: 'text/csv' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `workspace-${workspaceId}-analytics.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to download workspace CSV. Please try again.');
+    }
+  };
+
+  const downloadWorkspaceExcel = async () => {
+    try {
+      if (!workspaceId) { alert('Please select a workspace first'); return; }
+      const resp = await axios.get(`/analytics/export/workspace/${workspaceId}/excel`, { responseType: 'blob' });
+      const blob = new Blob([resp.data], { type: 'application/vnd.ms-excel' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `workspace-${workspaceId}-analytics.xls`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to download workspace Excel. Please try again.');
+    }
+  };
 
   if (!workspaceId) {
     return (
@@ -82,15 +119,19 @@ const Workspace = () => {
             Overview of workspace activity and team workload
           </p>
         </div>
-        <Button 
-          onClick={() => refetch()} 
-          disabled={isFetching}
-          variant="outline"
-          size="default"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => refetch()} 
+            disabled={isFetching}
+            variant="outline"
+            size="default"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={downloadWorkspaceExcel} className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white">Download Excel</Button>
+          <Button onClick={downloadWorkspaceCsv} variant="outline">Download CSV</Button>
+        </div>
       </div>
 
       {/* Key Metrics Row */}

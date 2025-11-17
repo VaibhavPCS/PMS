@@ -20,9 +20,12 @@ function AnalyticsContent() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isAdmin = selectedRole === 'admin' || selectedRole === 'super_admin';
+
   // Determine active tab based on current route
   const getActiveTab = () => {
     const path = location.pathname;
+    if (!isAdmin) return "personal";
     if (path.includes("/analytics/workspace")) return "workspace";
     if (path.includes("/analytics/leaderboard")) return "leaderboard";
     if (path.includes("/analytics/personal")) return "personal";
@@ -36,8 +39,22 @@ function AnalyticsContent() {
     setActiveTab(getActiveTab());
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!isAdmin) {
+      const path = location.pathname;
+      if (!path.includes('/analytics/personal')) {
+        navigate('/analytics/personal', { replace: true });
+      }
+    }
+  }, [isAdmin, location.pathname, navigate]);
+
   // Handle tab navigation
   const handleTabChange = (tab: string) => {
+    if (!isAdmin && tab !== 'personal') {
+      setActiveTab('personal');
+      navigate('/analytics/personal', { replace: true });
+      return;
+    }
     setActiveTab(tab);
     if (tab === "performance") {
       navigate("/analytics");
@@ -68,9 +85,9 @@ function AnalyticsContent() {
   }
 
   // Determine which tabs to show based on selected role
-  const showPerformanceTab = selectedRole === 'admin' || selectedRole === 'super_admin';
-  const showWorkspaceTab = selectedRole === 'admin' || selectedRole === 'super_admin';
-  const showLeaderboardTab = selectedRole === 'admin' || selectedRole === 'super_admin';
+  const showPerformanceTab = isAdmin;
+  const showWorkspaceTab = isAdmin;
+  const showLeaderboardTab = isAdmin;
   const showPersonalTab = true; // All roles can see personal
 
   return (
