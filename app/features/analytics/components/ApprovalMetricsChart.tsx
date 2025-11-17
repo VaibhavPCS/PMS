@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts';
 
 export default function ApprovalMetricsChart({ metrics }: { metrics: any }) {
   const data = [
@@ -10,12 +10,14 @@ export default function ApprovalMetricsChart({ metrics }: { metrics: any }) {
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" label={{ value: 'Status', position: 'insideBottom', offset: -5 }} />
+          <YAxis label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
+          <Tooltip formatter={(val) => [val as number, 'Count']} />
+          <Legend />
           <Bar dataKey="value">
             {data.map((entry, index) => (
-              <Bar key={index} dataKey="value" fill={entry.fill} />
+              <Cell key={index} fill={entry.fill} />
             ))}
           </Bar>
         </BarChart>

@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function TaskDistributionChart({ metrics }: { metrics: any }) {
   const data = [
@@ -16,6 +16,7 @@ export default function TaskDistributionChart({ metrics }: { metrics: any }) {
             ))}
           </Pie>
           <Tooltip />
+          <Legend />
         </PieChart>
       </ResponsiveContainer>
     </div>

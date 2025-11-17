@@ -65,6 +65,15 @@ type Pages = {
       "id": string;
     };
   };
+  "/administration/project-management": {
+    params: {};
+  };
+  "/administration/project-management/user-export": {
+    params: {};
+  };
+  "/administration/project-management/employee-performance": {
+    params: {};
+  };
   "/analytics": {
     params: {};
   };
@@ -87,7 +96,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal" | "/*";
+    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal" | "/*";
   };
   "routes/root/redirect.tsx": {
     id: "routes/root/redirect";
@@ -123,7 +132,7 @@ type RouteFiles = {
   };
   "components/layout/dashboard-layout.tsx": {
     id: "components/layout/dashboard-layout";
-    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal";
+    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal";
   };
   "routes/dashboard/dashboard.tsx": {
     id: "routes/dashboard/dashboard";
@@ -164,6 +173,18 @@ type RouteFiles = {
   "routes/task/task-detail.tsx": {
     id: "routes/task/task-detail";
     page: "/task/:id";
+  };
+  "routes/administration/project-management/project-management.tsx": {
+    id: "routes/administration/project-management/project-management";
+    page: "/administration/project-management";
+  };
+  "routes/administration/project-management/user-export.tsx": {
+    id: "routes/administration/project-management/user-export";
+    page: "/administration/project-management/user-export";
+  };
+  "routes/administration/project-management/employee-performance.tsx": {
+    id: "routes/administration/project-management/employee-performance";
+    page: "/administration/project-management/employee-performance";
   };
   "routes/analytics/analytics.tsx": {
     id: "routes/analytics/analytics";

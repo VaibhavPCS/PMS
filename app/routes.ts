@@ -31,6 +31,9 @@ export default [
     route("settings", "routes/settings/settings.tsx"),
     route("project/:id", "routes/project/project-detail.tsx"),
     route("task/:id", "routes/task/task-detail.tsx"),
+    route("administration/project-management", "routes/administration/project-management/project-management.tsx"),
+    route("administration/project-management/user-export", "routes/administration/project-management/user-export.tsx"),
+    route("administration/project-management/employee-performance", "routes/administration/project-management/employee-performance.tsx"),
     
     // Analytics routes - FIXED VERSION
     route("analytics", "routes/analytics/analytics.tsx", [

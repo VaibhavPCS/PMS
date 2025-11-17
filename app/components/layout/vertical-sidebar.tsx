@@ -38,8 +38,8 @@ const navItems: NavItem[] = [
     icon: "/assets/b7b1ff15d3dbedec030add1434e807ef753068e4.svg",
     hasDropdown: true,
     subItems: [
-      { name: "Role Management", href: "/administration/role-management" },
-      { name: "User Management", href: "/administration/user-management" },
+      // { name: "Role Management", href: "/administration/role-management" },
+      // { name: "User Management", href: "/administration/user-management" },
       { name: "Analytics", href: "/administration/project-management" },
     ],
   },
