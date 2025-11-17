@@ -34,15 +34,15 @@ const UserExportPage = () => {
 
   const canDownload = !!userId && !!startDate && !!endDate
 
-  const download = async (format: 'csv'|'pdf') => {
+  const download = async (format: 'excel'|'pdf') => {
     if (!canDownload) return
-    const url = format === 'csv'
-      ? `/analytics/export/user/${userId}?startDate=${startDate}&endDate=${endDate}`
+    const url = format === 'excel'
+      ? `/analytics/export/user/${userId}/excel?startDate=${startDate}&endDate=${endDate}`
       : `/analytics/export/user/${userId}/pdf?startDate=${startDate}&endDate=${endDate}`
     const resp = await axios.get(url, { responseType: 'blob' })
-    const blob = new Blob([resp.data], { type: format === 'csv' ? 'text/csv' : 'application/pdf' })
+    const blob = new Blob([resp.data], { type: format === 'excel' ? 'application/vnd.ms-excel' : 'application/pdf' })
     const link = document.createElement('a')
-    const fname = format === 'csv' ? `user-${userId}-productivity.csv` : `user-${userId}-productivity.pdf`
+    const fname = format === 'excel' ? `user-${userId}-productivity.xls` : `user-${userId}-productivity.pdf`
     link.href = URL.createObjectURL(blob)
     link.download = fname
     document.body.appendChild(link)
@@ -100,11 +100,11 @@ const UserExportPage = () => {
 
           <div className="flex flex-wrap gap-3 pt-4">
             <button
-              onClick={()=>download('csv')}
+              onClick={()=>download('excel')}
               disabled={!canDownload || loading}
               className="justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive has-[>svg]:px-3 bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center gap-[10px]"
             >
-              Download Excel (CSV)
+              Download Excel
             </button>
             <button
               onClick={()=>download('pdf')}
