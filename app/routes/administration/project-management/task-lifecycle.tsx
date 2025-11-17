@@ -190,22 +190,42 @@ const TaskLifecyclePage = () => {
                   <th className="text-left p-2">Timestamp</th>
                   <th className="text-left p-2">Event</th>
                   <th className="text-left p-2">Actor</th>
+                  <th className="text-left p-2">Task Status</th>
                   <th className="text-left p-2">Field</th>
                   <th className="text-left p-2">Old → New</th>
                   <th className="text-left p-2">IP</th>
                 </tr>
               </thead>
               <tbody>
-                {timeline.map((e:any, idx:number) => (
-                  <tr key={idx} className={idx % 2 ? 'bg-[#fafafa]' : ''}>
-                    <td className="p-2">{new Date(e.timestamp).toLocaleString()}</td>
-                    <td className="p-2">{e.eventType}</td>
-                    <td className="p-2">{e.actor?.name}</td>
-                    <td className="p-2">{e.changes?.field}</td>
-                    <td className="p-2">{String(e.changes?.oldValue || '—')} → {String(e.changes?.newValue || '—')}</td>
-                    <td className="p-2">{e.metadata?.ipAddress || '—'}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const sorted = [...timeline].sort((a:any,b:any)=> new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  const isId = (v:any) => typeof v === 'string' && /^[a-f\d]{24}$/i.test(v)
+                  const fmt = (v:any) => {
+                    if (v === null || v === undefined || v === '') return '—'
+                    return isId(v) ? '—' : String(v)
+                  }
+                  let currStatus = 'to-do'
+                  return sorted.map((e:any, idx:number) => {
+                    if (e.changes?.field === 'status') {
+                      currStatus = String(e.changes?.newValue || currStatus)
+                    } else if (e.eventType === 'completed') {
+                      currStatus = 'done'
+                    } else if (e.eventType === 'assigned' && !currStatus) {
+                      currStatus = 'to-do'
+                    }
+                    return (
+                      <tr key={idx} className={idx % 2 ? 'bg-[#fafafa]' : ''}>
+                        <td className="p-2">{new Date(e.timestamp).toLocaleString()}</td>
+                        <td className="p-2">{e.eventType}</td>
+                        <td className="p-2">{e.actor?.name || '—'}</td>
+                        <td className="p-2">{currStatus}</td>
+                        <td className="p-2">{e.changes?.field || '—'}</td>
+                        <td className="p-2">{fmt(e.changes?.oldValue)} → {fmt(e.changes?.newValue)}</td>
+                        <td className="p-2">{e.metadata?.ipAddress || '—'}</td>
+                      </tr>
+                    )
+                  })
+                })()}
               </tbody>
             </table>
           </div>

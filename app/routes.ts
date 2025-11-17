@@ -35,6 +35,7 @@ export default [
     route("administration/project-management/user-export", "routes/administration/project-management/user-export.tsx"),
     route("administration/project-management/employee-performance", "routes/administration/project-management/employee-performance.tsx"),
     route("administration/project-management/task-lifecycle", "routes/administration/project-management/task-lifecycle.tsx"),
+    route("administration/project-management/workspace-report", "routes/administration/project-management/workspace-report.tsx"),
     
     // Analytics routes - FIXED VERSION
     route("analytics", "routes/analytics/analytics.tsx", [

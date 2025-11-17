@@ -49,6 +49,15 @@ const ProjectManagement = () => {
               </div>
             </div>
           </a>
+
+          <a href="/administration/project-management/workspace-report" className="block bg-white rounded-[8px] border border-[#e6e8ec] p-4 hover:shadow-sm transition-shadow">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-[16px] font-semibold text-[#111827] mb-1">Workspace Comprehensive Report</h2>
+                <p className="text-[#717182] text-[13px]">Analyze workspace-wide metrics with timeline, per-project breakdowns, and download styled Excel.</p>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
     </div>
