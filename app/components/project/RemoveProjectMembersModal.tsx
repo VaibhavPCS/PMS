@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2, UserX } from "lucide-react";
-import { deleteData } from "@/lib/fetch-util";
+import { deleteData, patchData } from "@/lib/fetch-util";
 import { toast } from "sonner";
 
 interface UserRef {
@@ -100,17 +100,8 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
     if (!editing) return;
     if (!editReportsTo) { toast.error('Reporting is required'); return; }
     try {
-      const res = await fetch(`/api-v1/projects/${projectId}/members/${editing._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'workspace-id': localStorage.getItem('currentWorkspaceId') || '' },
-        credentials: 'include',
-        body: JSON.stringify({ role: editRole, reportsTo: editReportsTo })
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(()=>({}));
-        throw new Error(data.message || 'Failed to update');
-      }
-      toast.success('Member updated');
+      const res = await patchData(`/projects/${projectId}/members/${editing._id}`, { role: editRole, reportsTo: editReportsTo });
+      toast.success((res as any)?.message || 'Member updated');
       setEditing(null);
       if (onRemoveSuccess) await onRemoveSuccess();
     } catch (e: any) {
@@ -124,7 +115,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
     }
     try {
       setRemovingId(memberId);
-      const res = await deleteData(`/project/${projectId}/members`, { memberId });
+      const res = await deleteData(`/projects/${projectId}/members`, { memberId });
       toast.success(res?.message || 'Member removed successfully');
       if (onRemoveSuccess) await onRemoveSuccess();
       // Keep modal open so user can remove multiple members; do not close automatically
