@@ -121,6 +121,7 @@ interface Task {
   description?: string;
   status: "to-do" | "in-progress" | "done";
   priority: "low" | "medium" | "high" | "urgent";
+  startDate?: string;
   dueDate: string;
   assignedTo?: { _id: string; name: string; email: string };
   project?: { _id: string; title: string };
@@ -213,13 +214,7 @@ const Dashboard = () => {
       // Update current workspace state
       const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
       setCurrentWorkspace(selectedWorkspace || null);
-      // Refresh data including pie chart for current month
-      await Promise.all([
-        fetchProjectStatistics(),
-        fetchRecentProjects(),
-        fetchTasks(),
-        fetchMonthlyProjectStats(selectedMonth, selectedYear),
-      ]);
+      await fetchRecentProjects();
     } catch (error) {
       console.error("Error switching workspace:", error);
       toast.error("Failed to switch workspace");
@@ -228,36 +223,17 @@ const Dashboard = () => {
 
   const fetchProjectStatistics = useCallback(async () => {
     try {
-      const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
-      const allProjects: Project[] = response.projects || [];
-      const membershipFiltered = isAdmin
-        ? allProjects
-        : allProjects.filter((p: any) => {
-            const inMembers = Array.isArray(p.members)
-              ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
-              : Array.isArray(p.categories)
-              ? p.categories.some(
-                  (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
-                )
-              : false;
-            const isHead = p?.projectHead?._id === currentUserId;
-            const isCreator = p?.creator?._id === currentUserId;
-            return inMembers || isHead || isCreator;
-          });
-
+      const source = accessibleProjects || [];
       const totals = {
-        totalProjects: membershipFiltered.length,
-        ongoingProjects: membershipFiltered.filter(
+        totalProjects: source.length,
+        ongoingProjects: source.filter(
           (p: any) => (p?.status || "").toLowerCase() === "in progress" || (p?.status || "").toLowerCase() === "ongoing"
         ).length,
-        completedProjects: membershipFiltered.filter((p: any) => (p?.status || "").toLowerCase() === "completed").length,
-        proposedProjects: membershipFiltered.filter((p: any) => (p?.status || "").toLowerCase() === "planning").length,
+        completedProjects: source.filter((p: any) => (p?.status || "").toLowerCase() === "completed").length,
+        proposedProjects: source.filter((p: any) => (p?.status || "").toLowerCase() === "planning").length,
       };
-
       setProjectStats(totals);
     } catch (error) {
-      console.error("Error computing project statistics:", error);
-      toast.error("Failed to load project statistics");
       setProjectStats({
         totalProjects: 0,
         ongoingProjects: 0,
@@ -265,7 +241,7 @@ const Dashboard = () => {
         proposedProjects: 0,
       });
     }
-  }, [isAdmin, currentUserId]);
+  }, [accessibleProjects]);
 
   const fetchAccessibleProjects = useCallback(async () => {
     try {
@@ -300,38 +276,14 @@ const Dashboard = () => {
   // Fetch monthly project statistics for pie chart
   const fetchMonthlyProjectStats = useCallback(async (month: number, year: number) => {
     try {
-      // Fetch all projects without limit to filter by month
-      const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
-      const allProjects = response.projects || [];
-
-      const membershipFiltered: Project[] = isAdmin
-        ? allProjects
-        : allProjects.filter((p: any) => {
-            const inMembers = Array.isArray(p.members)
-              ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
-              : Array.isArray(p.categories)
-              ? p.categories.some(
-                  (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
-                )
-              : false;
-            const isHead = p?.projectHead?._id === currentUserId;
-            const isCreator = p?.creator?._id === currentUserId;
-            return inMembers || isHead || isCreator;
-          });
-
-      // Filter projects that are active in the selected month
+      const dataset = accessibleProjects || [];
       const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0); // Last day of the month
-
-      const projectsInMonth = membershipFiltered.filter((project: Project) => {
+      const monthEnd = new Date(year, month + 1, 0);
+      const projectsInMonth = dataset.filter((project: Project) => {
         const projectStart = new Date(project.startDate);
         const projectEnd = new Date(project.endDate);
-
-        // Check if project overlaps with selected month
         return projectStart <= monthEnd && projectEnd >= monthStart;
       });
-
-      // Calculate stats by status
       const stats = {
         planning: 0,
         inProgress: 0,
@@ -339,7 +291,6 @@ const Dashboard = () => {
         completed: 0,
         total: projectsInMonth.length,
       };
-
       projectsInMonth.forEach((project: Project) => {
         const status = project.status.toLowerCase();
         if (status === "planning") {
@@ -352,10 +303,8 @@ const Dashboard = () => {
           stats.completed++;
         }
       });
-
       setMonthlyProjectStats(stats);
     } catch (error) {
-      console.error("Error fetching monthly project statistics:", error);
       setMonthlyProjectStats({
         planning: 0,
         inProgress: 0,
@@ -364,7 +313,7 @@ const Dashboard = () => {
         total: 0,
       });
     }
-  }, []);
+  }, [accessibleProjects]);
 
   const fetchRecentProjects = useCallback(async () => {
     try {
@@ -469,27 +418,20 @@ const Dashboard = () => {
         setLoading(true);
         await fetchWorkspaces();
         await fetchAccessibleProjects();
-        await Promise.all([
-          fetchProjectStatistics(),
-          fetchRecentProjects(),
-          fetchMonthlyProjectStats(selectedMonth, selectedYear),
-        ]);
+        await fetchProjectStatistics();
+        await fetchRecentProjects();
+        await fetchMonthlyProjectStats(selectedMonth, selectedYear);
         await fetchTasks();
         setLoading(false);
       };
       loadData();
     }
-  }, [
-    isAuthenticated,
-    fetchWorkspaces,
-    fetchAccessibleProjects,
-    fetchProjectStatistics,
-    fetchRecentProjects,
-    fetchTasks,
-    fetchMonthlyProjectStats,
-    selectedMonth,
-    selectedYear,
-  ]);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchProjectStatistics();
+    fetchMonthlyProjectStats(selectedMonth, selectedYear);
+  }, [accessibleProjects, selectedMonth, selectedYear]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -576,8 +518,15 @@ const Dashboard = () => {
       toast.success("Task updated successfully");
       setShowUpdateModal(false);
       setSelectedTask(null);
-      // Refresh tasks
-      await fetchTasks();
+      setTasks(prev => prev.map(t => t._id === (selectedTask as Task)._id ? {
+        ...t,
+        title: updateForm.title,
+        description: updateForm.description,
+        priority: updateForm.priority as any,
+        status: updateForm.status as any,
+        startDate: updateForm.startDate,
+        dueDate: updateForm.dueDate,
+      } : t));
     } catch (error: any) {
       console.error("Failed to update task:", error);
       toast.error(error.message || "Failed to update task");
@@ -613,8 +562,7 @@ const Dashboard = () => {
       toast.success("Task deleted successfully");
       setShowDeleteDialog(false);
       setSelectedTask(null);
-      // Refresh tasks
-      await fetchTasks();
+      setTasks(prev => prev.filter(t => t._id !== (selectedTask as Task)._id));
     } catch (error: any) {
       console.error("Failed to delete task:", error);
       toast.error(error.message || "Failed to delete task");
