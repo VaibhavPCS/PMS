@@ -207,6 +207,7 @@ const Dashboard = () => {
 
   const handleSwitchWorkspace = async (workspaceId: string) => {
     try {
+      setLoading(true);
       await postData("/workspace/switch", { workspaceId });
       // Update localStorage
       localStorage.setItem("currentWorkspaceId", workspaceId);
@@ -214,16 +215,30 @@ const Dashboard = () => {
       // Update current workspace state
       const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
       setCurrentWorkspace(selectedWorkspace || null);
-      await fetchRecentProjects();
+
+      // Refetch all data that depends on workspace
+      const [_, projects] = await Promise.all([
+        fetchRecentProjects(),
+        fetchAccessibleProjects(),
+        fetchTasks()
+      ]);
+
+      // Update stats immediately with the new projects
+      if (projects) {
+        fetchProjectStatistics(projects);
+        fetchMonthlyProjectStats(selectedMonth, selectedYear, projects);
+      }
     } catch (error) {
       console.error("Error switching workspace:", error);
       toast.error("Failed to switch workspace");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchProjectStatistics = useCallback(async () => {
+  const fetchProjectStatistics = useCallback(async (projects?: Project[]) => {
     try {
-      const source = accessibleProjects || [];
+      const source = projects || accessibleProjects || [];
       const totals = {
         totalProjects: source.length,
         ongoingProjects: source.filter(
@@ -247,36 +262,38 @@ const Dashboard = () => {
     try {
       const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
       const allProjects = response.projects || [];
+      let filtered = [];
       if (isAdmin) {
-        setAccessibleProjects(allProjects);
-        setAccessibleProjectIds(new Set(allProjects.map((p: any) => p._id)));
-        return;
+        filtered = allProjects;
+      } else {
+        filtered = allProjects.filter((p: any) => {
+          const inMembers = Array.isArray(p.members)
+            ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+            : Array.isArray(p.categories)
+              ? p.categories.some(
+                (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+              )
+              : false;
+          const isHead = p?.projectHead?._id === currentUserId;
+          const isCreator = p?.creator?._id === currentUserId;
+          return inMembers || isHead || isCreator;
+        });
       }
-      const filtered = allProjects.filter((p: any) => {
-        const inMembers = Array.isArray(p.members)
-          ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
-          : Array.isArray(p.categories)
-          ? p.categories.some(
-              (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
-            )
-          : false;
-        const isHead = p?.projectHead?._id === currentUserId;
-        const isCreator = p?.creator?._id === currentUserId;
-        return inMembers || isHead || isCreator;
-      });
       setAccessibleProjects(filtered);
       setAccessibleProjectIds(new Set(filtered.map((p: any) => p._id)));
+      return filtered;
     } catch (error) {
       console.error("Error fetching accessible projects:", error);
       setAccessibleProjects([]);
       setAccessibleProjectIds(new Set());
+      return [];
     }
   }, [isAdmin, currentUserId]);
 
   // Fetch monthly project statistics for pie chart
-  const fetchMonthlyProjectStats = useCallback(async (month: number, year: number) => {
+  const fetchMonthlyProjectStats = useCallback(async (month: number, year: number, projects?: Project[]) => {
     try {
-      const dataset = accessibleProjects || [];
+      const dataset = projects || accessibleProjects || [];
       const monthStart = new Date(year, month, 1);
       const monthEnd = new Date(year, month + 1, 0);
       const projectsInMonth = dataset.filter((project: Project) => {
@@ -348,10 +365,10 @@ const Dashboard = () => {
           const inMembers = Array.isArray(p.members)
             ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
             : Array.isArray(p.categories)
-            ? p.categories.some(
+              ? p.categories.some(
                 (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
               )
-            : false;
+              : false;
           const isHead = p?.projectHead?._id === currentUserId;
           const isCreator = p?.creator?._id === currentUserId;
           return inMembers || isHead || isCreator;
@@ -399,7 +416,7 @@ const Dashboard = () => {
     // Filter by search query
     if (taskSearchQuery.trim()) {
       const query = taskSearchQuery.toLowerCase();
-      filtered = filtered.filter(task => 
+      filtered = filtered.filter(task =>
         task.title.toLowerCase().includes(query) ||
         (task.description && task.description.toLowerCase().includes(query)) ||
         (task.assignedTo && task.assignedTo.name.toLowerCase().includes(query)) ||
@@ -417,10 +434,10 @@ const Dashboard = () => {
       const loadData = async () => {
         setLoading(true);
         await fetchWorkspaces();
-        await fetchAccessibleProjects();
-        await fetchProjectStatistics();
+        const projects = await fetchAccessibleProjects();
+        await fetchProjectStatistics(projects);
         await fetchRecentProjects();
-        await fetchMonthlyProjectStats(selectedMonth, selectedYear);
+        await fetchMonthlyProjectStats(selectedMonth, selectedYear, projects);
         await fetchTasks();
         setLoading(false);
       };
@@ -573,7 +590,7 @@ const Dashboard = () => {
 
   // ==================== RENDER GUARDS ====================
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -652,341 +669,341 @@ const Dashboard = () => {
       `}</style>
 
       <div className="min-h-screen bg-[#f1f2f7] p-6">
-      <div className="max-w-full mx-auto space-y-6">
-        {/* Page Title */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        </div>
-
-        {/* TOP ROW: Statistics Cards + Project Chart Side by Side */}
-        {(isAdmin || (accessibleProjectIds && accessibleProjectIds.size > 0)) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Project Statistics Cards */}
-          <div className="grid grid-cols-2 gap-[15px]">
-            {/* Total Projects Card */}
-            <div className="bg-[#4a8cd7] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
-              {/* Decorative Circle - Creates light blue gradient effect on top */}
-              <div className="absolute left-[-85px] top-[-135px] w-[256px] h-[256px] rotate-[5.438deg]">
-                <div className="w-full h-full rounded-full bg-[#6ba9e3] opacity-40"></div>
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 p-[15px]">
-                <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  Total Projects
-                </p>
-                <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {projectStats.totalProjects}
-                </p>
-              </div>
-            </div>
-
-            {/* Ongoing Projects Card */}
-            <div className="bg-[#479c39] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
-              {/* Decorative Pattern - White wavy lines */}
-              <div className="absolute left-[50px] top-[8px] w-[200.5px] h-[126.5px]">
-                <img
-                  src="/assets/2b063dca51b5ca11609fc603566283ea564647cb.svg"
-                  alt=""
-                  className="block max-w-none w-full h-full"
-                />
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 p-[15px]">
-                <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  Ongoing Projects
-                </p>
-                <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {projectStats.ongoingProjects}
-                </p>
-              </div>
-            </div>
-
-            {/* Completed Projects Card */}
-            <div className="bg-[#6647bf] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
-              {/* Decorative Circle - Purple circle at top right */}
-              <div className="absolute left-[111px] top-[-40px] w-[100px] h-[100px]">
-                <img
-                  src="/assets/1b64fa6c63104807e4e78a514d253af1cf83e472.svg"
-                  alt=""
-                  className="block max-w-none w-full h-full"
-                />
-              </div>
-
-              {/* Decorative Pattern - Bottom left pattern */}
-              <div className="absolute left-[0.5px] top-[37.5px] w-[138px] h-[82.5px]">
-                <img
-                  src="/assets/2cc8d5759ab199ac352266e7f212d8c7f1f25fcb.svg"
-                  alt=""
-                  className="block max-w-none w-full h-full"
-                />
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 p-[15px]">
-                <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  Completed Projects
-                </p>
-                <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {projectStats.completedProjects}
-                </p>
-              </div>
-            </div>
-
-            {/* Proposed Projects Card */}
-            <div className="bg-[#f27944] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
-              {/* Decorative Shape - Left side light shape */}
-              <div className="absolute left-[-80px] top-[-55px] w-[148.992px] h-[136px]">
-                <img
-                  src="/assets/c22bb55b4bce2667347f808cb73b615654287850.svg"
-                  alt=""
-                  className="block max-w-none w-full h-full"
-                />
-              </div>
-
-              {/* Decorative Pattern - Right side pattern */}
-              <div className="absolute left-[124px] top-[-33px] w-[100.186px] h-[111.296px]">
-                <img
-                  src="/assets/c8c774b0bd6d6628bb3416cb3eb48d96f38697cd.svg"
-                  alt=""
-                  className="block max-w-none w-full h-full"
-                />
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 p-[15px]">
-                <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  Proposed Projects
-                </p>
-                <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                  {projectStats.proposedProjects}
-                </p>
-              </div>
-            </div>
+        <div className="max-w-full mx-auto space-y-6">
+          {/* Page Title */}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           </div>
 
-          {/* Right: Project Statistics Pie Chart */}
-          <Card className="border border-[#e9ecf1]">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-['Inter'] font-medium text-[16px] text-[#2e2e30]">
-                  Project Statistics
-                </CardTitle>
-                {/* Month/Year Picker */}
-                <DropdownMenu open={showMonthPicker} onOpenChange={setShowMonthPicker}>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-[25px] rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[8px] flex items-center gap-2"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      {formatMonthYear(selectedMonth, selectedYear)}
-                      <ChevronDown className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[280px] p-4">
-                    <div className="space-y-4">
-                      {/* Year Selector */}
-                      <div className="flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const newYear = selectedYear - 1;
-                            setSelectedYear(newYear);
-                            handleMonthChange(selectedMonth, newYear);
-                          }}
-                          className="h-8 px-2"
-                        >
-                          ←
-                        </Button>
-                        <span className="text-sm font-semibold">{selectedYear}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const newYear = selectedYear + 1;
-                            setSelectedYear(newYear);
-                            handleMonthChange(selectedMonth, newYear);
-                          }}
-                          className="h-8 px-2"
-                        >
-                          →
-                        </Button>
-                      </div>
-                      {/* Month Grid */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-                        ].map((monthName, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                              "h-8 text-xs",
-                              selectedMonth === index && "bg-blue-100 border-blue-500"
-                            )}
-                            onClick={() => handleMonthChange(index, selectedYear)}
-                          >
-                            {monthName}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                {/* Pie Chart */}
-                <div className="h-[200px] w-[200px] relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                        animationBegin={0}
-                        animationDuration={800}
-                        animationEasing="ease-in-out"
-                        isAnimationActive={true}
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={entry.fill}
-                            style={{
-                              filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))',
-                              transition: 'all 0.3s ease-in-out'
-                            }}
-                          />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #e0e0e0',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                        }}
-                        itemStyle={{
-                          color: '#333',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Center Text - Shows monthly total with smooth animation */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-500 ease-in-out">
-                    <p className="font-['Inter'] font-semibold text-[20px] text-black leading-[23px] transition-all duration-300">
-                      {monthlyProjectStats.total}
-                    </p>
-                    <p className="font-['Inter'] font-normal text-[12px] text-black leading-[12px] mt-1">
+          {/* TOP ROW: Statistics Cards + Project Chart Side by Side */}
+          {(isAdmin || (accessibleProjectIds && accessibleProjectIds.size > 0)) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Project Statistics Cards */}
+              <div className="grid grid-cols-2 gap-[15px]">
+                {/* Total Projects Card */}
+                <div className="bg-[#4a8cd7] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                  {/* Decorative Circle - Creates light blue gradient effect on top */}
+                  <div className="absolute left-[-85px] top-[-135px] w-[256px] h-[256px] rotate-[5.438deg]">
+                    <div className="w-full h-full rounded-full bg-[#6ba9e3] opacity-40"></div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-[15px]">
+                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       Total Projects
+                    </p>
+                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {projectStats.totalProjects}
                     </p>
                   </div>
                 </div>
 
-                {/* Legend with animations */}
-                <div className="flex flex-col gap-[15px]">
-                  {chartData.map((item, index) => (
-                    <div
-                      key={item.name}
-                      className="flex items-center justify-between gap-8 min-w-[120px] transition-all duration-300 hover:scale-105"
-                      style={{
-                        animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
-                      }}
-                    >
-                      <div className="flex items-center gap-[5px]">
-                        <div
-                          className="w-[10px] h-[10px] rounded-full transition-all duration-300 hover:scale-125"
-                          style={{
-                            backgroundColor: item.fill,
-                            boxShadow: `0 2px 6px ${item.fill}40`
-                          }}
-                        />
-                        <span className="font-['Inter'] font-semibold text-[12px] text-[#767676]">
-                          {item.name}
-                        </span>
-                      </div>
-                      <span className="font-['Inter'] font-bold text-[12px] text-neutral-700 transition-all duration-300">
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
+                {/* Ongoing Projects Card */}
+                <div className="bg-[#479c39] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                  {/* Decorative Pattern - White wavy lines */}
+                  <div className="absolute left-[50px] top-[8px] w-[200.5px] h-[126.5px]">
+                    <img
+                      src="/assets/2b063dca51b5ca11609fc603566283ea564647cb.svg"
+                      alt=""
+                      className="block max-w-none w-full h-full"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-[15px]">
+                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      Ongoing Projects
+                    </p>
+                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {projectStats.ongoingProjects}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Completed Projects Card */}
+                <div className="bg-[#6647bf] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                  {/* Decorative Circle - Purple circle at top right */}
+                  <div className="absolute left-[111px] top-[-40px] w-[100px] h-[100px]">
+                    <img
+                      src="/assets/1b64fa6c63104807e4e78a514d253af1cf83e472.svg"
+                      alt=""
+                      className="block max-w-none w-full h-full"
+                    />
+                  </div>
+
+                  {/* Decorative Pattern - Bottom left pattern */}
+                  <div className="absolute left-[0.5px] top-[37.5px] w-[138px] h-[82.5px]">
+                    <img
+                      src="/assets/2cc8d5759ab199ac352266e7f212d8c7f1f25fcb.svg"
+                      alt=""
+                      className="block max-w-none w-full h-full"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-[15px]">
+                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      Completed Projects
+                    </p>
+                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {projectStats.completedProjects}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Proposed Projects Card */}
+                <div className="bg-[#f27944] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                  {/* Decorative Shape - Left side light shape */}
+                  <div className="absolute left-[-80px] top-[-55px] w-[148.992px] h-[136px]">
+                    <img
+                      src="/assets/c22bb55b4bce2667347f808cb73b615654287850.svg"
+                      alt=""
+                      className="block max-w-none w-full h-full"
+                    />
+                  </div>
+
+                  {/* Decorative Pattern - Right side pattern */}
+                  <div className="absolute left-[124px] top-[-33px] w-[100.186px] h-[111.296px]">
+                    <img
+                      src="/assets/c8c774b0bd6d6628bb3416cb3eb48d96f38697cd.svg"
+                      alt=""
+                      className="block max-w-none w-full h-full"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-[15px]">
+                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      Proposed Projects
+                    </p>
+                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {projectStats.proposedProjects}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        )}
 
-        {/* BOTTOM ROW: Recent Projects Table + Task Overview Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left: Recent Ongoing Projects Table (2/3 width) */}
-          <div className="lg:col-span-2">
-            <Card className="shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
-              <CardHeader className="px-[20px] py-[15px]">
-                <div className="flex flex-col gap-[20px]">
+              {/* Right: Project Statistics Pie Chart */}
+              <Card className="border border-[#e9ecf1]">
+                <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-[16px]">
-                      <div>
-                        <h3 className="font-['Inter'] font-normal text-[16px] text-black leading-[20px]">
-                          All Projects
-                        </h3>
-                        <p className="font-['Inter'] font-medium text-[20px] text-black leading-[20px] inline ml-2">
-                          {recentProjects.length}
+                    <CardTitle className="font-['Inter'] font-medium text-[16px] text-[#2e2e30]">
+                      Project Statistics
+                    </CardTitle>
+                    {/* Month/Year Picker */}
+                    <DropdownMenu open={showMonthPicker} onOpenChange={setShowMonthPicker}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-[25px] rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[8px] flex items-center gap-2"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          {formatMonthYear(selectedMonth, selectedYear)}
+                          <ChevronDown className="w-3 h-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[280px] p-4">
+                        <div className="space-y-4">
+                          {/* Year Selector */}
+                          <div className="flex items-center justify-between gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newYear = selectedYear - 1;
+                                setSelectedYear(newYear);
+                                handleMonthChange(selectedMonth, newYear);
+                              }}
+                              className="h-8 px-2"
+                            >
+                              ←
+                            </Button>
+                            <span className="text-sm font-semibold">{selectedYear}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newYear = selectedYear + 1;
+                                setSelectedYear(newYear);
+                                handleMonthChange(selectedMonth, newYear);
+                              }}
+                              className="h-8 px-2"
+                            >
+                              →
+                            </Button>
+                          </div>
+                          {/* Month Grid */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+                            ].map((monthName, index) => (
+                              <Button
+                                key={index}
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "h-8 text-xs",
+                                  selectedMonth === index && "bg-blue-100 border-blue-500"
+                                )}
+                                onClick={() => handleMonthChange(index, selectedYear)}
+                              >
+                                {monthName}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    {/* Pie Chart */}
+                    <div className="h-[200px] w-[200px] relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={2}
+                            dataKey="value"
+                            animationBegin={0}
+                            animationDuration={800}
+                            animationEasing="ease-in-out"
+                            isAnimationActive={true}
+                          >
+                            {chartData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={entry.fill}
+                                style={{
+                                  filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))',
+                                  transition: 'all 0.3s ease-in-out'
+                                }}
+                              />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            }}
+                            itemStyle={{
+                              color: '#333',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {/* Center Text - Shows monthly total with smooth animation */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-all duration-500 ease-in-out">
+                        <p className="font-['Inter'] font-semibold text-[20px] text-black leading-[23px] transition-all duration-300">
+                          {monthlyProjectStats.total}
+                        </p>
+                        <p className="font-['Inter'] font-normal text-[12px] text-black leading-[12px] mt-1">
+                          Total Projects
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-[15px]">
-                      {/* Workspace Dropdown (visible only to global admin) */}
-                      {user?.role === "admin" ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                            >
-                              <Building2 className="w-4 h-4" />
-                              {currentWorkspace?.name || "Workspace"}
-                              <ChevronDown className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[200px]">
-                            {workspaces.map((workspace) => (
-                              <DropdownMenuItem
-                                key={workspace._id}
-                                onClick={() => handleSwitchWorkspace(workspace._id)}
-                                className={cn(
-                                  "cursor-pointer",
-                                  currentWorkspace?._id === workspace._id && "bg-blue-50"
-                                )}
-                              >
-                                {workspace.name}
-                                {currentWorkspace?._id === workspace._id && (
-                                  <span className="ml-auto text-blue-600">✓</span>
-                                )}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : null}
 
-                      {/* Project Type Filter - HIDDEN */}
-                      {/* <DropdownMenu>
+                    {/* Legend with animations */}
+                    <div className="flex flex-col gap-[15px]">
+                      {chartData.map((item, index) => (
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between gap-8 min-w-[120px] transition-all duration-300 hover:scale-105"
+                          style={{
+                            animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
+                          }}
+                        >
+                          <div className="flex items-center gap-[5px]">
+                            <div
+                              className="w-[10px] h-[10px] rounded-full transition-all duration-300 hover:scale-125"
+                              style={{
+                                backgroundColor: item.fill,
+                                boxShadow: `0 2px 6px ${item.fill}40`
+                              }}
+                            />
+                            <span className="font-['Inter'] font-semibold text-[12px] text-[#767676]">
+                              {item.name}
+                            </span>
+                          </div>
+                          <span className="font-['Inter'] font-bold text-[12px] text-neutral-700 transition-all duration-300">
+                            {item.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* BOTTOM ROW: Recent Projects Table + Task Overview Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left: Recent Ongoing Projects Table (2/3 width) */}
+            <div className="lg:col-span-2">
+              <Card className="shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                <CardHeader className="px-[20px] py-[15px]">
+                  <div className="flex flex-col gap-[20px]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-[16px]">
+                        <div>
+                          <h3 className="font-['Inter'] font-normal text-[16px] text-black leading-[20px]">
+                            All Projects
+                          </h3>
+                          <p className="font-['Inter'] font-medium text-[20px] text-black leading-[20px] inline ml-2">
+                            {recentProjects.length}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-[15px]">
+                        {/* Workspace Dropdown (visible only to global admin) */}
+                        {user?.role === "admin" ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                              >
+                                <Building2 className="w-4 h-4" />
+                                {currentWorkspace?.name || "Workspace"}
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-[200px]">
+                              {workspaces.map((workspace) => (
+                                <DropdownMenuItem
+                                  key={workspace._id}
+                                  onClick={() => handleSwitchWorkspace(workspace._id)}
+                                  className={cn(
+                                    "cursor-pointer",
+                                    currentWorkspace?._id === workspace._id && "bg-blue-50"
+                                  )}
+                                >
+                                  {workspace.name}
+                                  {currentWorkspace?._id === workspace._id && (
+                                    <span className="ml-auto text-blue-600">✓</span>
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+
+                        {/* Project Type Filter - HIDDEN */}
+                        {/* <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
@@ -1041,8 +1058,8 @@ const Dashboard = () => {
                         </DropdownMenuContent>
                       </DropdownMenu> */}
 
-                      {/* Date Filter - HIDDEN */}
-                      {/* <DropdownMenu>
+                        {/* Date Filter - HIDDEN */}
+                        {/* <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
@@ -1093,427 +1110,427 @@ const Dashboard = () => {
                           </div>
                         </DropdownMenuContent>
                       </DropdownMenu> */}
+                      </div>
                     </div>
+                    <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
+                      Complete project profile including milestones and task details
+                    </p>
                   </div>
-                  <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
-                    Complete project profile including milestones and task details
-                  </p>
-                </div>
-              </CardHeader>
-              <CardContent className="px-[20px] pb-[15px]">
-                <div className="border border-[#cccccc] rounded-[10px] overflow-hidden">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-[#d5e5ff]">
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px] w-[60px]">
-                          <div className="flex items-center gap-2">
-                            S.No
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px]">
-                          <div className="flex items-center gap-2">
-                            Title
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          <div className="flex items-center gap-2">
-                            Description
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          <div className="flex items-center gap-2">
-                            Status
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          <div className="flex items-center gap-2">
-                            Duration
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          <div className="flex items-center gap-2">
-                            Days
-                            <Filter className="w-3 h-3" />
-                          </div>
-                        </th>
-                        <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentProjects.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
-                            No projects found
-                          </td>
+                </CardHeader>
+                <CardContent className="px-[20px] pb-[15px]">
+                  <div className="border border-[#cccccc] rounded-[10px] overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-[#d5e5ff]">
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px] w-[60px]">
+                            <div className="flex items-center gap-2">
+                              S.No
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px]">
+                            <div className="flex items-center gap-2">
+                              Title
+                              <Filter className="w-3 h-3" />
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                            <div className="flex items-center gap-2">
+                              Description
+                              <Filter className="w-3 h-3" />
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                            <div className="flex items-center gap-2">
+                              Status
+                              <Filter className="w-3 h-3" />
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                            <div className="flex items-center gap-2">
+                              Duration
+                              <Filter className="w-3 h-3" />
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                            <div className="flex items-center gap-2">
+                              Days
+                              <Filter className="w-3 h-3" />
+                            </div>
+                          </th>
+                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                            Action
+                          </th>
                         </tr>
-                      ) : (
-                        recentProjects.map((project, index) => (
-                          <tr
-                            key={project._id}
-                            className={index % 2 === 1 ? "bg-[#f2f7ff]" : ""}
-                          >
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
-                              {index + 1}
-                            </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.title}>
-                              {limitWords(project.title, 2)}
-                            </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.description || "No description"}>
-                              {limitWords(project.description || "No description", 3)}
-                            </td>
-                            <td className="px-[16px] py-[14px]">
-                              <StatusBadge status={project.status} />
-                            </td>
-                            <td className="px-[16px] py-[14px]">
-                              <div className="flex flex-col gap-1">
-                                <div className="text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
-                                  {formatDate(project.startDate)}
-                                </div>
-                                <div className="text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
-                                  {formatDate(project.endDate)}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
-                              {calculateDaysBetween(project.startDate, project.endDate)} days
-                            </td>
-                            <td className="px-[16px] py-[14px]">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-auto px-[10px] py-[5px] text-[12px] font-['Inter'] font-normal text-[#344bfd] hover:text-[#344bfd] hover:underline hover:bg-transparent"
-                                onClick={() => handleViewProject(project._id)}
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </Button>
+                      </thead>
+                      <tbody>
+                        {recentProjects.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
+                              No projects found
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right: Task Overview Panel (1/3 width) */}
-          <div className="lg:col-span-1">
-            <Card className="overflow-hidden px-[10px] py-[15px]">
-              <div className="px-[10px]">
-                {/* Header */}
-                <div className="flex items-center justify-between gap-[10px] mb-[15px]">
-                  <h3 className="font-['Inter'] font-medium text-[16px] text-[#2e2e30] leading-normal flex-1">
-                    Task Overview
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                  >
-                    See All
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Search and Filter */}
-                <div className="space-y-[10px] mb-[15px]">
-                  <div className="relative bg-[#f5f4f9] rounded-[8px] h-[37px] px-[10px] flex items-center justify-between">
-                    <div className="flex items-center gap-[10px]">
-                      <Search className="w-[15px] h-[15px] text-[#040110] opacity-60" />
-                      <input
-                        type="text"
-                        placeholder="Search..."
-                        value={taskSearchQuery}
-                        onChange={(e) => setTaskSearchQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none text-[14px] font-['Inter'] text-[#040110] opacity-60 placeholder:text-[#040110] placeholder:opacity-60"
-                      />
-                    </div>
-                    {/* <Filter className="w-4 h-4 text-[#040110]" /> */}
-                  </div>
-
-                  <div className="flex items-center gap-[10px]">
-                    <button
-                      onClick={() => setTaskStatusFilter("all")}
-                      className={cn(
-                        "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "all"
-                          ? "border-b-[1px] border-[#f2761b] opacity-100"
-                          : "opacity-60"
-                      )}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => setTaskStatusFilter("to-do")}
-                      className={cn(
-                        "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "to-do"
-                          ? "border-b-[1px] border-[#f2761b] opacity-100"
-                          : "opacity-60"
-                      )}
-                    >
-                      To Do
-                    </button>
-                    <button
-                      onClick={() => setTaskStatusFilter("in-progress")}
-                      className={cn(
-                        "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "in-progress"
-                          ? "border-b-[1px] border-[#f2761b] opacity-100"
-                          : "opacity-60"
-                      )}
-                    >
-                      In Progress
-                    </button>
-                    <button
-                      onClick={() => setTaskStatusFilter("done")}
-                      className={cn(
-                        "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
-                        taskStatusFilter === "done"
-                          ? "border-b-[1px] border-[#f2761b] opacity-100"
-                          : "opacity-60"
-                      )}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-
-                {/* Task List */}
-                <ScrollArea className="h-[600px]">
-                  <div className="space-y-[10px]">
-                    {filteredTasks.length === 0 ? (
-                      <div className="text-center py-8 text-[#717182] text-[14px] font-['Inter']">
-                        {taskSearchQuery ? "No tasks match your search" : "No tasks found"}
-                      </div>
-                    ) : (
-                      filteredTasks.map((task) => {
-                        return (
-                          <div
-                            key={task._id}
-                            onClick={() => navigate(`/task/${task._id}`)}
-                            className={cn(
-                              "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer",
-                              "flex gap-3 items-start"
-                            )}
-                          >
-                            {/* Status indicator */}
-                            <div 
-                              className={cn(
-                                "w-1 h-16 rounded-full shrink-0 mt-1",
-                                task.status === "to-do" && "bg-blue-500",
-                                task.status === "in-progress" && "bg-amber-500", 
-                                task.status === "done" && "bg-green-500"
-                              )}
-                            />
-                            
-                            {/* Task content */}
-                            <div className="flex-1 min-w-0">
-                              {/* Task title */}
-                              <h4 className="font-medium text-gray-900 text-sm leading-5 mb-2 truncate">
-                                {task.title}
-                              </h4>
-                              
-                              {/* Task description */}
-                              {task.description && (
-                                <p className="text-gray-600 text-xs leading-4 mb-3 line-clamp-2">
-                                  {task.description}
-                                </p>
-                              )}
-                              
-                              {/* Task metadata */}
-                              <div className="flex items-center justify-between">
-                                {/* Assignee */}
-                                {task.assignedTo && (
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
-                                      {task.assignedTo.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="text-gray-700 text-xs font-medium truncate max-w-24">
-                                      {task.assignedTo.name}
-                                    </span>
+                        ) : (
+                          recentProjects.map((project, index) => (
+                            <tr
+                              key={project._id}
+                              className={index % 2 === 1 ? "bg-[#f2f7ff]" : ""}
+                            >
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
+                                {index + 1}
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.title}>
+                                {limitWords(project.title, 2)}
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.description || "No description"}>
+                                {limitWords(project.description || "No description", 3)}
+                              </td>
+                              <td className="px-[16px] py-[14px]">
+                                <StatusBadge status={project.status} />
+                              </td>
+                              <td className="px-[16px] py-[14px]">
+                                <div className="flex flex-col gap-1">
+                                  <div className="text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
+                                    {formatDate(project.startDate)}
                                   </div>
+                                  <div className="text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
+                                    {formatDate(project.endDate)}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
+                                {calculateDaysBetween(project.startDate, project.endDate)} days
+                              </td>
+                              <td className="px-[16px] py-[14px]">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-auto px-[10px] py-[5px] text-[12px] font-['Inter'] font-normal text-[#344bfd] hover:text-[#344bfd] hover:underline hover:bg-transparent"
+                                  onClick={() => handleViewProject(project._id)}
+                                >
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  View
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right: Task Overview Panel (1/3 width) */}
+            <div className="lg:col-span-1">
+              <Card className="overflow-hidden px-[10px] py-[15px]">
+                <div className="px-[10px]">
+                  {/* Header */}
+                  <div className="flex items-center justify-between gap-[10px] mb-[15px]">
+                    <h3 className="font-['Inter'] font-medium text-[16px] text-[#2e2e30] leading-normal flex-1">
+                      Task Overview
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                    >
+                      See All
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Search and Filter */}
+                  <div className="space-y-[10px] mb-[15px]">
+                    <div className="relative bg-[#f5f4f9] rounded-[8px] h-[37px] px-[10px] flex items-center justify-between">
+                      <div className="flex items-center gap-[10px]">
+                        <Search className="w-[15px] h-[15px] text-[#040110] opacity-60" />
+                        <input
+                          type="text"
+                          placeholder="Search..."
+                          value={taskSearchQuery}
+                          onChange={(e) => setTaskSearchQuery(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[14px] font-['Inter'] text-[#040110] opacity-60 placeholder:text-[#040110] placeholder:opacity-60"
+                        />
+                      </div>
+                      {/* <Filter className="w-4 h-4 text-[#040110]" /> */}
+                    </div>
+
+                    <div className="flex items-center gap-[10px]">
+                      <button
+                        onClick={() => setTaskStatusFilter("all")}
+                        className={cn(
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          taskStatusFilter === "all"
+                            ? "border-b-[1px] border-[#f2761b] opacity-100"
+                            : "opacity-60"
+                        )}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setTaskStatusFilter("to-do")}
+                        className={cn(
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          taskStatusFilter === "to-do"
+                            ? "border-b-[1px] border-[#f2761b] opacity-100"
+                            : "opacity-60"
+                        )}
+                      >
+                        To Do
+                      </button>
+                      <button
+                        onClick={() => setTaskStatusFilter("in-progress")}
+                        className={cn(
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          taskStatusFilter === "in-progress"
+                            ? "border-b-[1px] border-[#f2761b] opacity-100"
+                            : "opacity-60"
+                        )}
+                      >
+                        In Progress
+                      </button>
+                      <button
+                        onClick={() => setTaskStatusFilter("done")}
+                        className={cn(
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          taskStatusFilter === "done"
+                            ? "border-b-[1px] border-[#f2761b] opacity-100"
+                            : "opacity-60"
+                        )}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Task List */}
+                  <ScrollArea className="h-[600px]">
+                    <div className="space-y-[10px]">
+                      {filteredTasks.length === 0 ? (
+                        <div className="text-center py-8 text-[#717182] text-[14px] font-['Inter']">
+                          {taskSearchQuery ? "No tasks match your search" : "No tasks found"}
+                        </div>
+                      ) : (
+                        filteredTasks.map((task) => {
+                          return (
+                            <div
+                              key={task._id}
+                              onClick={() => navigate(`/task/${task._id}`)}
+                              className={cn(
+                                "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer",
+                                "flex gap-3 items-start"
+                              )}
+                            >
+                              {/* Status indicator */}
+                              <div
+                                className={cn(
+                                  "w-1 h-16 rounded-full shrink-0 mt-1",
+                                  task.status === "to-do" && "bg-blue-500",
+                                  task.status === "in-progress" && "bg-amber-500",
+                                  task.status === "done" && "bg-green-500"
+                                )}
+                              />
+
+                              {/* Task content */}
+                              <div className="flex-1 min-w-0">
+                                {/* Task title */}
+                                <h4 className="font-medium text-gray-900 text-sm leading-5 mb-2 truncate">
+                                  {task.title}
+                                </h4>
+
+                                {/* Task description */}
+                                {task.description && (
+                                  <p className="text-gray-600 text-xs leading-4 mb-3 line-clamp-2">
+                                    {task.description}
+                                  </p>
                                 )}
 
-                                <div className="flex items-center gap-2">
-                                  {/* Status badge */}
-                                  <div className={cn(
-                                    "px-2 py-1 rounded-full text-xs font-medium",
-                                    task.status === "to-do" && "bg-blue-100 text-blue-700",
-                                    task.status === "in-progress" && "bg-amber-100 text-amber-700",
-                                    task.status === "done" && "bg-green-100 text-green-700"
-                                  )}>
-                                    {task.status === "to-do" ? "To Do" :
-                                     task.status === "in-progress" ? "In Progress" : "Done"}
-                                  </div>
+                                {/* Task metadata */}
+                                <div className="flex items-center justify-between">
+                                  {/* Assignee */}
+                                  {task.assignedTo && (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                                        {task.assignedTo.name.charAt(0).toUpperCase()}
+                                      </div>
+                                      <span className="text-gray-700 text-xs font-medium truncate max-w-24">
+                                        {task.assignedTo.name}
+                                      </span>
+                                    </div>
+                                  )}
 
-                                  {/* 3-dot menu */}
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 w-7 p-0 hover:bg-gray-100"
-                                      >
-                                        <MoreVertical className="h-4 w-4 text-gray-600" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenUpdateModal(task);
-                                        }}
-                                        className="cursor-pointer"
-                                      >
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Update
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenDeleteDialog(task);
-                                        }}
-                                        className="cursor-pointer text-red-600 focus:text-red-600"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <div className="flex items-center gap-2">
+                                    {/* Status badge */}
+                                    <div className={cn(
+                                      "px-2 py-1 rounded-full text-xs font-medium",
+                                      task.status === "to-do" && "bg-blue-100 text-blue-700",
+                                      task.status === "in-progress" && "bg-amber-100 text-amber-700",
+                                      task.status === "done" && "bg-green-100 text-green-700"
+                                    )}>
+                                      {task.status === "to-do" ? "To Do" :
+                                        task.status === "in-progress" ? "In Progress" : "Done"}
+                                    </div>
+
+                                    {/* 3-dot menu */}
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 p-0 hover:bg-gray-100"
+                                        >
+                                          <MoreVertical className="h-4 w-4 text-gray-600" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenUpdateModal(task);
+                                          }}
+                                          className="cursor-pointer"
+                                        >
+                                          <Pencil className="mr-2 h-4 w-4" />
+                                          Update
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenDeleteDialog(task);
+                                          }}
+                                          className="cursor-pointer text-red-600 focus:text-red-600"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            </Card>
+                          );
+                        })
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Update Task Modal */}
-    <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Update Task</DialogTitle>
-          <DialogDescription>
-            Make changes to the task details below.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              value={updateForm.title}
-              onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
-              placeholder="Enter task title"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={updateForm.description}
-              onChange={(e) => setUpdateForm({ ...updateForm, description: e.target.value })}
-              placeholder="Enter task description"
-              rows={3}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+      {/* Update Task Modal */}
+      <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Update Task</DialogTitle>
+            <DialogDescription>
+              Make changes to the task details below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="priority">Priority</Label>
-              <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="to-do">To Do</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="startDate">Start Date</Label>
+              <Label htmlFor="title">Title *</Label>
               <Input
-                id="startDate"
-                type="date"
-                value={updateForm.startDate}
-                onChange={(e) => setUpdateForm({ ...updateForm, startDate: e.target.value })}
+                id="title"
+                value={updateForm.title}
+                onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
+                placeholder="Enter task title"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={updateForm.dueDate}
-                onChange={(e) => setUpdateForm({ ...updateForm, dueDate: e.target.value })}
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={updateForm.description}
+                onChange={(e) => setUpdateForm({ ...updateForm, description: e.target.value })}
+                placeholder="Enter task description"
+                rows={3}
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="to-do">To Do</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="startDate">Start Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={updateForm.startDate}
+                  onChange={(e) => setUpdateForm({ ...updateForm, startDate: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={updateForm.dueDate}
+                  onChange={(e) => setUpdateForm({ ...updateForm, dueDate: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowUpdateModal(false)} disabled={isUpdating}>
-            Cancel
-          </Button>
-          <Button onClick={handleUpdateTask} disabled={isUpdating || !updateForm.title.trim()}>
-            {isUpdating ? "Updating..." : "Update Task"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpdateModal(false)} disabled={isUpdating}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateTask} disabled={isUpdating || !updateForm.title.trim()}>
+              {isUpdating ? "Updating..." : "Update Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    {/* Delete Task Dialog */}
-    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Delete Task</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{selectedTask?.title}"? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
-            {isDeleting ? "Deleting..." : "Delete Task"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {/* Delete Task Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Task</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{selectedTask?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
