@@ -31,7 +31,7 @@ const TaskLifecyclePage = () => {
           setWorkspaceId(wps[0]._id)
           localStorage.setItem('currentWorkspaceId', wps[0]._id)
         }
-      } catch {}
+      } catch { }
     }
     init()
   }, [])
@@ -53,7 +53,7 @@ const TaskLifecyclePage = () => {
         } else {
           setProjectId('')
         }
-      } catch {}
+      } catch { }
     }
     loadProjects()
   }, [workspaceId])
@@ -73,7 +73,7 @@ const TaskLifecyclePage = () => {
         const ts: Task[] = (res.data?.tasks || []).map((t: any) => ({ _id: t._id, title: t.title }))
         setTasks(ts)
         if (ts.length > 0) setTaskId(ts[0]._id)
-      } catch (err:any) {
+      } catch (err: any) {
         console.warn('Failed to load tasks for project', projectId, err?.response?.status)
         setTasks([])
         setTaskId('')
@@ -90,7 +90,7 @@ const TaskLifecyclePage = () => {
         const res = await axios.get(`/analytics/task/${taskId}/lifecycle`)
         setTimeline(res.data?.timeline || [])
         setMetrics(res.data?.metrics || {})
-      } catch {}
+      } catch { }
       finally { setLoading(false) }
     }
     loadLifecycle()
@@ -111,14 +111,16 @@ const TaskLifecyclePage = () => {
     URL.revokeObjectURL(link.href)
   }
 
-  const chartData = timeline.map((e: any) => ({
-    date: new Date(e.timestamp).toLocaleString(),
-    Approved: e.eventType === 'approved' ? 1 : 0,
-    Completed: e.eventType === 'completed' ? 1 : 0,
-    Assigned: e.eventType === 'assigned' ? 1 : 0,
-    Created: e.eventType === 'created' ? 1 : 0,
-    Reassigned: e.eventType === 'reassigned' ? 1 : 0,
-  }))
+  const chartData = [...timeline]
+    .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .map((e: any) => ({
+      date: new Date(e.timestamp).toLocaleString(),
+      Approved: e.eventType === 'approved' ? 1 : 0,
+      Completed: e.eventType === 'completed' ? 1 : 0,
+      Assigned: e.eventType === 'assigned' ? 1 : 0,
+      Created: e.eventType === 'created' ? 1 : 0,
+      Reassigned: e.eventType === 'reassigned' ? 1 : 0,
+    }))
 
   return (
     <div className="p-6">
@@ -132,19 +134,19 @@ const TaskLifecyclePage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[12px] text-[#717182] mb-1">Workspace</label>
-              <select className="w-full border rounded px-3 py-2 text-[14px]" value={workspaceId} onChange={e=>{ const v = e.target.value; setWorkspaceId(v); localStorage.setItem('currentWorkspaceId', v); setProjectId(''); setTasks([]); setTaskId(''); }}>
+              <select className="w-full border rounded px-3 py-2 text-[14px]" value={workspaceId} onChange={e => { const v = e.target.value; setWorkspaceId(v); localStorage.setItem('currentWorkspaceId', v); setProjectId(''); setTasks([]); setTaskId(''); }}>
                 {workspaces.map(w => (<option key={w._id} value={w._id}>{w.name || w._id}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-[12px] text-[#717182] mb-1">Project</label>
-              <select className="w-full border rounded px-3 py-2 text-[14px]" value={projectId} onChange={e=>setProjectId(e.target.value)} disabled={!workspaceId}>
+              <select className="w-full border rounded px-3 py-2 text-[14px]" value={projectId} onChange={e => setProjectId(e.target.value)} disabled={!workspaceId}>
                 {projects.map(p => (<option key={p._id} value={p._id}>{p.title}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-[12px] text-[#717182] mb-1">Task</label>
-              <select className="w-full border rounded px-3 py-2 text-[14px]" value={taskId} onChange={e=>setTaskId(e.target.value)} disabled={!projectId || tasks.length === 0}>
+              <select className="w-full border rounded px-3 py-2 text-[14px]" value={taskId} onChange={e => setTaskId(e.target.value)} disabled={!projectId || tasks.length === 0}>
                 {tasks.map(t => (<option key={t._id} value={t._id}>{t.title}</option>))}
               </select>
             </div>
@@ -193,19 +195,19 @@ const TaskLifecyclePage = () => {
                   <th className="text-left p-2">Task Status</th>
                   <th className="text-left p-2">Field</th>
                   <th className="text-left p-2">Old → New</th>
-                  <th className="text-left p-2">IP</th>
+                  {/* <th className="text-left p-2">IP</th> */}
                 </tr>
               </thead>
               <tbody>
                 {(() => {
-                  const sorted = [...timeline].sort((a:any,b:any)=> new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  const isId = (v:any) => typeof v === 'string' && /^[a-f\d]{24}$/i.test(v)
-                  const fmt = (v:any) => {
+                  const sorted = [...timeline].sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                  const isId = (v: any) => typeof v === 'string' && /^[a-f\d]{24}$/i.test(v)
+                  const fmt = (v: any) => {
                     if (v === null || v === undefined || v === '') return '—'
                     return isId(v) ? '—' : String(v)
                   }
                   let currStatus = 'to-do'
-                  return sorted.map((e:any, idx:number) => {
+                  return sorted.map((e: any, idx: number) => {
                     if (e.changes?.field === 'status') {
                       currStatus = String(e.changes?.newValue || currStatus)
                     } else if (e.eventType === 'completed') {
@@ -221,7 +223,7 @@ const TaskLifecyclePage = () => {
                         <td className="p-2">{currStatus}</td>
                         <td className="p-2">{e.changes?.field || '—'}</td>
                         <td className="p-2">{fmt(e.changes?.oldValue)} → {fmt(e.changes?.newValue)}</td>
-                        <td className="p-2">{e.metadata?.ipAddress || '—'}</td>
+                        {/* <td className="p-2">{e.metadata?.ipAddress || '—'}</td> */}
                       </tr>
                     )
                   })
