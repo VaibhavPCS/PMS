@@ -1,0 +1,142 @@
+/* Target date picker buttons with specific classes */
+button[data-slot="popover-trigger"][class*="h-[44px]"] {
+  height: 35px !important; /* 44px * 0.8 = 35.2px */
+  padding: 6px 11px !important; /* Reduced px-[14px] py-[8px] by 20% */
+  border-radius: 6px !important; /* Reduced rounded-[8px] by 20% */
+  font-size: 11px !important; /* Reduced text-[14px] by ~20% */
+}
+
+/* Calendar icon size reduction */
+button[data-slot="popover-trigger"][class*="h-[44px]"] svg {
+  width: 16px !important; /* Reduced from default size */
+  height: 16px !important; /* Reduced from default size */
+  margin-right: 6px !important; /* Reduced mr-2 by 20% */
+}
+
+/* Calendar popover size reduction */
+.date-picker-calendar {
+  max-height: 280px !important; /* Reduced default height */
+  overflow-y: auto !important; /* Add vertical scrollbar when needed */
+}
+
+/* Calendar header and cell size reduction */
+.date-picker-calendar .rdp-month_caption {
+  height: 28px !important; /* Reduced from default */
+  font-size: 12px !important; /* Reduced caption font size */
+}
+
+.date-picker-calendar .rdp-day {
+  width: 32px !important; /* Reduced day cell size */
+  height: 32px !important; /* Reduced day cell size */
+  font-size: 11px !important; /* Reduced day number font size */
+}
+
+/* Weekday header size reduction */
+.date-picker-calendar .rdp-weekday {
+  font-size: 10px !important; /* Reduced weekday font size */
+  padding: 4px !important; /* Reduced weekday padding */
+}
+
+/* Scrollbar styling for calendar */
+.date-picker-calendar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* For Firefox */
+.date-picker-calendar {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Ensure calendar doesn't overflow container */
+.date-picker-container {
+  max-height: 320px;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Calendar popover container with scrollbar */
+[data-radix-popover-content] {
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Scrollbar styling for calendar popover */
+[data-radix-popover-content]::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Calendar component specific reductions */
+.rdp-month {
+  max-height: 280px !important;
+  overflow-y: auto !important;
+}
+
+.rdp-month_caption {
+  height: 28px !important;
+  font-size: 12px !important;
+}
+
+.rdp-day {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 11px !important;
+}
+
+.rdp-weekday {
+  font-size: 10px !important;
+  padding: 4px !important;
+}
+
+/* Specific overrides for Tailwind classes seen in the HTML */
+button[data-slot="popover-trigger"].h-\[44px\] {
+  height: 35px !important;
+}
+
+button[data-slot="popover-trigger"].px-\[14px\] {
+  padding-left: 11px !important;
+  padding-right: 11px !important;
+}
+
+button[data-slot="popover-trigger"].py-\[8px\] {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+button[data-slot="popover-trigger"].rounded-\[8px\] {
+  border-radius: 6px !important;
+}
+
+button[data-slot="popover-trigger"].text-\[14px\] {
+  font-size: 11px !important;
+}

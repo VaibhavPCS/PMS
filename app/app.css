@@ -202,3 +202,6 @@ body {
 [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
   background: #717182;
 }
+
+/* Date Picker Size Reduction and Scrollbar Overrides */
+@import "./styles/date-picker-overrides.css";
