@@ -98,7 +98,7 @@ button[data-slot="popover-trigger"][class*="h-[44px]"] svg {
 
 /* Calendar component specific reductions */
 .rdp-month {
-  max-height: 280px !important;
+  max-height: 300px !important;
   overflow-y: auto !important;
 }
 
