@@ -1138,11 +1138,10 @@ const TaskDetail = () => {
     return false;
   };
 
-  // ✅ NEW: Check if user can reassign approved tasks
+  // ✅ NEW: Check if user can reassign tasks (only admin and project lead)
   const canReassignTask = () => {
     const me = activeUser;
     if (!me || !task) return false;
-    if (task.approvalStatus === "approved") return false;
 
     // Check if user is admin or super admin
     if (["super_admin", "admin"].includes(me.role)) return true;
@@ -1153,11 +1152,7 @@ const TaskDetail = () => {
 
     if (projectHeadId && meIdStr === projectHeadId) return true;
 
-    const isAssignee = (task.assignee?._id || "").toString() === meIdStr;
-    if (!isAssignee) return false;
-
-    const hasDelegationTargets = (assignableMembers || []).some(m => (m._id || "").toString() !== meIdStr);
-    return hasDelegationTargets;
+    return false;
   };
 
   // ✅ NEW: Pre-fill rejection modal with current task dates

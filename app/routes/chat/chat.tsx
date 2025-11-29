@@ -104,7 +104,7 @@ const Chat: React.FC = () => {
     //   }
     // });
 
-    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'https://pms.upda.co.in:5001', {
+    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
       auth: {
         token: localStorage.getItem('token')
       }

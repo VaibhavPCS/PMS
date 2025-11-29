@@ -17,7 +17,7 @@ const getBackendBaseUrl = () => {
     return envApiUrl;
   }
   // Production API endpoint (updated to HTTPS)
-  return 'https://pms.upda.co.in:5001';
+  return 'http://localhost:5000';
   
   // Previous configuration (commented out for reference)
   // return 'http://pms.upda.co.in:5001';

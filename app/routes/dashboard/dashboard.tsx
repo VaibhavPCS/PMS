@@ -263,22 +263,27 @@ const Dashboard = () => {
       const response = await fetchData("/project/recent?limit=1000&sortBy=startDate");
       const allProjects = response.projects || [];
       let filtered = [];
-      if (isAdmin) {
-        filtered = allProjects;
-      } else {
-        filtered = allProjects.filter((p: any) => {
-          const inMembers = Array.isArray(p.members)
-            ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
-            : Array.isArray(p.categories)
-              ? p.categories.some(
-                (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
-              )
-              : false;
-          const isHead = p?.projectHead?._id === currentUserId;
-          const isCreator = p?.creator?._id === currentUserId;
-          return inMembers || isHead || isCreator;
-        });
-      }
+      // Remove role-based filtering - show all projects to all users
+      filtered = allProjects;
+      // if (isAdmin) {
+      //   filtered = allProjects;
+      // } else {
+      //   filtered = allProjects.filter((p: any) => {
+      //     const inMembers = Array.isArray(p.members)
+      //       ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+      //       : Array.isArray(p.categories)
+      //         ? p.categories.some(
+      //           (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+      //         )
+      //         : false;
+      //     const isHead = p?.projectHead?._id === currentUserId;
+      //     const isCreator = p?.creator?._id === currentUserId;
+      //     const shouldInclude = inMembers || isHead || isCreator;
+      //     console.log('Accessible project filter:', p.title, 'inMembers:', inMembers, 'isHead:', isHead, 'isCreator:', isCreator, 'shouldInclude:', shouldInclude);
+      //     return shouldInclude;
+      //   });
+      // }
+
       setAccessibleProjects(filtered);
       setAccessibleProjectIds(new Set(filtered.map((p: any) => p._id)));
       return filtered;
@@ -360,20 +365,24 @@ const Dashboard = () => {
         });
       }
 
-      if (!isAdmin) {
-        projects = projects.filter((p: any) => {
-          const inMembers = Array.isArray(p.members)
-            ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
-            : Array.isArray(p.categories)
-              ? p.categories.some(
-                (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
-              )
-              : false;
-          const isHead = p?.projectHead?._id === currentUserId;
-          const isCreator = p?.creator?._id === currentUserId;
-          return inMembers || isHead || isCreator;
-        });
-      }
+      // Remove role-based filtering - show all projects to all users
+      // if (!isAdmin) {
+      //   projects = projects.filter((p: any) => {
+      //     const inMembers = Array.isArray(p.members)
+      //       ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
+      //       : Array.isArray(p.categories)
+      //         ? p.categories.some(
+      //           (c: any) => Array.isArray(c.members) && c.members.some((m: any) => m?.userId?._id === currentUserId)
+      //         )
+      //         : false;
+      //     const isHead = p?.projectHead?._id === currentUserId;
+      //     const isCreator = p?.creator?._id === currentUserId;
+      //     const shouldInclude = inMembers || isHead || isCreator;
+      //     console.log('Project filter check:', p.title, 'inMembers:', inMembers, 'isHead:', isHead, 'isCreator:', isCreator, 'shouldInclude:', shouldInclude);
+      //     return shouldInclude;
+      //   });
+      // }
+
 
       setRecentProjects(projects);
     } catch (error) {
@@ -388,13 +397,14 @@ const Dashboard = () => {
       const response = await fetchData("/workspace/all-tasks");
       let tasksData = response.tasks || [];
 
-      if (!isAdmin) {
-        if (isLead && accessibleProjectIds && accessibleProjectIds.size > 0) {
-          tasksData = tasksData.filter((t: any) => t?.project?._id && accessibleProjectIds.has(t.project._id));
-        } else {
-          tasksData = tasksData.filter((t: any) => t?.assignedTo?._id === currentUserId);
-        }
-      }
+      // Remove role-based filtering - show all tasks to all users
+      // if (!isAdmin) {
+      //   if (isLead && accessibleProjectIds && accessibleProjectIds.size > 0) {
+      //     tasksData = tasksData.filter((t: any) => t?.project?._id && accessibleProjectIds.has(t.project._id));
+      //   } else {
+      //     tasksData = tasksData.filter((t: any) => t?.assignedTo?._id === currentUserId);
+      //   }
+      // }
 
       setTasks(tasksData);
     } catch (error) {
@@ -968,20 +978,19 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-[15px]">
-                        {/* Workspace Dropdown (visible only to global admin) */}
-                        {user?.role === "admin" ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                              >
-                                <Building2 className="w-4 h-4" />
-                                {currentWorkspace?.name || "Workspace"}
-                                <ChevronDown className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
+                        {/* Workspace Dropdown (visible to all users) */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                            >
+                              <Building2 className="w-4 h-4" />
+                              {currentWorkspace?.name || "Workspace"}
+                              <ChevronDown className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-[200px]">
                               {workspaces.map((workspace) => (
                                 <DropdownMenuItem
@@ -997,10 +1006,9 @@ const Dashboard = () => {
                                     <span className="ml-auto text-blue-600">✓</span>
                                   )}
                                 </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : null}
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
 
                         {/* Project Type Filter - HIDDEN */}
                         {/* <DropdownMenu>
