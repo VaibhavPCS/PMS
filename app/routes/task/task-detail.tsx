@@ -46,6 +46,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -692,10 +695,16 @@ const TaskDetail = () => {
   const [subtaskDescription, setSubtaskDescription] = useState("");
   const [subtaskAssigneeId, setSubtaskAssigneeId] = useState("");
   const [subtaskPriority, setSubtaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
-  const [subtaskDueDate, setSubtaskDueDate] = useState<string>("");
+  const [subtaskStartDate, setSubtaskStartDate] = useState<string>("");
+  const [subtaskEndDate, setSubtaskEndDate] = useState<string>("");
 
   // ✅ NEW: Fetch assignable members for reassignment
   const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
+
+  // ✅ NEW: Assign task modal for unassigned tasks
+  const [showAssignTaskModal, setShowAssignTaskModal] = useState(false);
+  const [assignTaskAssigneeId, setAssignTaskAssigneeId] = useState("");
+  const [isAssigningTask, setIsAssigningTask] = useState(false);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -786,6 +795,11 @@ const TaskDetail = () => {
       }
 
       setTask(data.task);
+      
+      // ✅ NEW: Show assign task modal if task is unassigned
+      if (!data.task.assignee) {
+        setShowAssignTaskModal(true);
+      }
     } catch (error) {
       console.error("Failed to fetch task details:", error);
       const errorMessage =
@@ -854,6 +868,28 @@ const TaskDetail = () => {
       toast.error("Subtask title is required");
       return;
     }
+
+    // Date validation
+    if (subtaskStartDate && subtaskEndDate) {
+      const startDate = new Date(subtaskStartDate);
+      const endDate = new Date(subtaskEndDate);
+      
+      if (startDate > endDate) {
+        toast.error("End date must be after or equal to start date");
+        return;
+      }
+
+      // Check if dates are within parent task date range
+      if (task) {
+        const taskStartDate = new Date(task.startDate);
+        const taskDueDate = new Date(task.dueDate);
+        
+        if (startDate < taskStartDate || endDate > taskDueDate) {
+          toast.error("Subtask dates must be within the parent task date range");
+          return;
+        }
+      }
+    }
     try {
       const res = await fetch(buildApiUrl(`/task/${taskId}/subtasks`), {
         method: "POST",
@@ -867,7 +903,9 @@ const TaskDetail = () => {
           description: subtaskDescription,
           assigneeId: subtaskAssigneeId || undefined,
           priority: subtaskPriority,
-          dueDate: subtaskDueDate || undefined,
+          startDate: subtaskStartDate || undefined,
+          dueDate: subtaskEndDate || undefined,
+          approvalStatus: "pending-approval", // Subtasks require TL approval
         }),
       });
       if (res.ok) {
@@ -876,12 +914,14 @@ const TaskDetail = () => {
         setSubtaskTitle("");
         setSubtaskDescription("");
         setSubtaskAssigneeId("");
-        setSubtaskDueDate("");
+        setSubtaskStartDate("");
+        setSubtaskEndDate("");
         setSubtaskPriority("medium");
         fetchSubtasks();
       } else {
-        const err = await res.json();
-        toast.error(err.message || "Failed to create subtask");
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Subtask creation error:', errorData);
+        toast.error(errorData.message || 'Failed to create subtask');
       }
     } catch (e: any) {
       toast.error(e?.message || "Failed to create subtask");
@@ -896,6 +936,21 @@ const TaskDetail = () => {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
+
+    // Check if this is a subtask that requires approval before being marked as done
+    if (newStatus === "done" && task.approvalStatus === "pending-approval") {
+      toast.error("This subtask must be approved by a TL before it can be marked as done");
+      return;
+    }
+
+    // Check if all subtasks are done before allowing parent task to be marked as done
+    if (newStatus === "done" && subtasks.length > 0) {
+      const allSubtasksDone = subtasks.every(subtask => subtask.status === "done");
+      if (!allSubtasksDone) {
+        toast.error("All subtasks must be completed before marking this task as done");
+        return;
+      }
+    }
 
     try {
       await postData(`/task/${taskId}/status`, { status: newStatus });
@@ -1116,6 +1171,32 @@ const TaskDetail = () => {
     }
   };
 
+  // ✅ NEW: Assign unassigned task
+  const handleAssignTask = async () => {
+    if (!task) return;
+    if (!assignTaskAssigneeId) {
+      toast.error("Please select an assignee");
+      return;
+    }
+
+    try {
+      setIsAssigningTask(true);
+      await putData(`/task/${task._id}`, {
+        assigneeId: assignTaskAssigneeId
+      });
+      toast.success("Task assigned successfully");
+      setShowAssignTaskModal(false);
+      setAssignTaskAssigneeId("");
+      // Refresh task details
+      await fetchTaskDetails();
+    } catch (error: any) {
+      console.error("Failed to assign task:", error);
+      toast.error(error.message || "Failed to assign task");
+    } finally {
+      setIsAssigningTask(false);
+    }
+  };
+
   const canApproveTask = () => {
     const me = activeUser;
     if (!me || !task) return false;
@@ -1181,6 +1262,8 @@ const TaskDetail = () => {
     if (task.approvalStatus === "approved") return false;
     // Allow deletion if user is the assignee, admin, or super_admin
     if (["super_admin", "admin"].includes(me.role)) return true;
+    // Check if assignee exists before accessing _id
+    if (!task.assignee) return false;
     return task.assignee._id === me._id;
   };
 
@@ -1589,6 +1672,78 @@ const TaskDetail = () => {
     );
   }
 
+  // ✅ NEW: Block access to unassigned tasks - show only modal
+  if (!task.assignee && showAssignTaskModal) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8">
+          <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Task Not Assigned
+          </h2>
+          <p className="text-gray-600 mb-6">
+            This task needs to be assigned before you can access it.
+          </p>
+          <p className="text-sm text-gray-500">
+            Please complete the assignment modal to proceed.
+          </p>
+        </div>
+        {/* Assign Task Modal */}
+        <Dialog open={showAssignTaskModal} onOpenChange={setShowAssignTaskModal}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <User className="w-5 h-5 text-blue-600" />
+                <span>Assign Task</span>
+              </DialogTitle>
+              <DialogDescription>
+                This task is currently unassigned. Please assign it to a team member before proceeding.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                  Assign To <span className="text-red-500">*</span>
+                </label>
+                <Select value={assignTaskAssigneeId} onValueChange={setAssignTaskAssigneeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableMembers.map((member) => (
+                      <SelectItem key={member._id} value={member._id}>
+                        {member.name} {member.role === 'project-head' && '(Project Head)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAssignTaskModal(false);
+                  navigate(-1);
+                }}
+                disabled={isAssigningTask}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignTask}
+                disabled={isAssigningTask || !assignTaskAssigneeId}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isAssigningTask ? "Assigning..." : "Assign Task"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1772,10 +1927,26 @@ const TaskDetail = () => {
                       <span>In Progress</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="done">
+                  <SelectItem 
+                    value="done" 
+                    disabled={
+                      (subtasks.length > 0 && !subtasks.every(subtask => subtask.status === "done")) ||
+                      (task.approvalStatus === "pending-approval")
+                    }
+                    className={
+                      (subtasks.length > 0 && !subtasks.every(subtask => subtask.status === "done")) ||
+                      (task.approvalStatus === "pending-approval") ? "opacity-50 cursor-not-allowed" : ""
+                    }
+                  >
                     <div className="flex items-center space-x-2">
                       {/* <CheckCircle className="w-4 h-4 text-green-600" /> */}
                       <span>Done</span>
+                      {subtasks.length > 0 && !subtasks.every(subtask => subtask.status === "done") && (
+                        <span className="text-xs text-gray-500 ml-1">(Complete all subtasks first)</span>
+                      )}
+                      {task.approvalStatus === "pending-approval" && (
+                        <span className="text-xs text-gray-500 ml-1">(Pending TL approval)</span>
+                      )}
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -2042,9 +2213,41 @@ const TaskDetail = () => {
                         <div key={st._id} className="p-2 border rounded flex items-center justify-between">
                           <div>
                             <div className="text-sm font-medium">{st.title}</div>
-                            <div className="text-xs text-gray-500">{st.status} • {st.priority} {st.assignee?.name ? `• ${st.assignee.name}` : ''}</div>
+                            <div className="text-xs text-gray-500">
+                              {st.status} • {st.priority} {st.assignee?.name ? `• ${st.assignee.name}` : ''}
+                              {st.approvalStatus && st.approvalStatus !== "not-required" && (
+                                <span className={`ml-1 px-1 py-0.5 rounded text-xs ${
+                                  st.approvalStatus === "pending-approval" ? "bg-yellow-100 text-yellow-800" :
+                                  st.approvalStatus === "approved" ? "bg-green-100 text-green-800" :
+                                  "bg-red-100 text-red-800"
+                                }`}>
+                                  {st.approvalStatus === "pending-approval" ? "Pending Approval" :
+                                   st.approvalStatus === "approved" ? "Approved" : "Rejected"}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={()=>navigate(`/task/${st._id}`)}>Open</Button>
+                          <div className="flex items-center gap-2">
+                            {st.approvalStatus === "pending-approval" && canApproveTask() && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={async () => {
+                                  try {
+                                    await postData(`/task/${st._id}/approve`, {});
+                                    toast.success("Subtask approved successfully");
+                                    fetchSubtasks();
+                                  } catch (error) {
+                                    console.error("Failed to approve subtask:", error);
+                                    toast.error("Failed to approve subtask");
+                                  }
+                                }}
+                              >
+                                Approve
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" onClick={()=>navigate(`/task/${st._id}`)}>Open</Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2175,7 +2378,94 @@ const TaskDetail = () => {
                 <SelectItem value="urgent">Urgent</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="date" value={subtaskDueDate} onChange={(e: React.ChangeEvent<HTMLInputElement>)=>setSubtaskDueDate(e.target.value)} />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Start Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {subtaskStartDate ? format(new Date(subtaskStartDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={subtaskStartDate ? new Date(subtaskStartDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setSubtaskStartDate(formattedDate);
+                        }
+                      }}
+                      disabled={(date) => {
+                        const taskStart = task?.startDate ? new Date(task.startDate) : null;
+                        const taskDue = task?.dueDate ? new Date(task.dueDate) : null;
+                        return Boolean(
+                          (taskStart && date < taskStart) ||
+                          (taskDue && date > taskDue)
+                        );
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">End Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {subtaskEndDate ? format(new Date(subtaskEndDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={subtaskEndDate ? new Date(subtaskEndDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setSubtaskEndDate(formattedDate);
+                        }
+                      }}
+                      disabled={(date) => {
+                        const taskStart = task?.startDate ? new Date(task.startDate) : null;
+                        const taskDue = task?.dueDate ? new Date(task.dueDate) : null;
+                        const startDate = subtaskStartDate ? new Date(subtaskStartDate) : null;
+                        return Boolean(
+                          (taskStart && date < taskStart) ||
+                          (taskDue && date > taskDue) ||
+                          (startDate && date < startDate)
+                        );
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={()=>setShowCreateSubtask(false)}>Cancel</Button>
               <Button onClick={handleCreateSubtask}>Create</Button>
@@ -2505,6 +2795,8 @@ const TaskDetail = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 };

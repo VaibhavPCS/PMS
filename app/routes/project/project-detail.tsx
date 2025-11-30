@@ -809,8 +809,8 @@ const TaskCard = React.memo<{
 
   // Show dropdown menu if any actionable permission exists (matches backend capabilities)
   const canManageTask = useMemo(() => {
-    return isAssigneeOrCreator || isAdmin || isProjectLead;
-  }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
+    return isAdmin || isProjectLead;
+  }, [isAdmin, isProjectLead]);
 
   // Edit allowed for assignee, creator, admin, or project lead (backend: updateTask)
   const canEditTask = useMemo(() => {
