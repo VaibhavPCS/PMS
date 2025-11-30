@@ -88,7 +88,35 @@ export function AttachmentUpload({
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to upload attachments');
+      console.error('Upload error details:', err);
+      let errorMessage = 'Failed to upload attachments';
+      
+      // Handle different types of errors
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', err.response.data);
+        console.error('Error response status:', err.response.status);
+        console.error('Error response headers:', err.response.headers);
+        
+        if (err.response.data && err.response.data.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.response.data && typeof err.response.data === 'string') {
+          errorMessage = err.response.data;
+        } else {
+          errorMessage = `Server error: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        // The request was made but no response was received
+        console.error('Error request:', err.request);
+        errorMessage = 'No response from server';
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', err.message);
+        errorMessage = err.message || 'Unknown error occurred';
+      }
+      
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }

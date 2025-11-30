@@ -1380,40 +1380,42 @@ const Dashboard = () => {
                                         task.status === "in-progress" ? "In Progress" : "Done"}
                                     </div>
 
-                                    {/* 3-dot menu */}
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 w-7 p-0 hover:bg-gray-100"
-                                        >
-                                          <MoreVertical className="h-4 w-4 text-gray-600" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenUpdateModal(task);
-                                          }}
-                                          className="cursor-pointer"
-                                        >
-                                          <Pencil className="mr-2 h-4 w-4" />
-                                          Update
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenDeleteDialog(task);
-                                          }}
-                                          className="cursor-pointer text-red-600 focus:text-red-600"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    {/* 3-dot menu - Admin only */}
+                                    {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-7 p-0 hover:bg-gray-100"
+                                          >
+                                            <MoreVertical className="h-4 w-4 text-gray-600" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOpenUpdateModal(task);
+                                            }}
+                                            className="cursor-pointer"
+                                          >
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Update
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOpenDeleteDialog(task);
+                                            }}
+                                            className="cursor-pointer text-red-600 focus:text-red-600"
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
                                   </div>
                                 </div>
                               </div>
