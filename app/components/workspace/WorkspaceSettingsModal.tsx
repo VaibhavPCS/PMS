@@ -60,6 +60,13 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
 
   const [deleting, setDeleting] = useState(false);
   
+  // Migration state
+  const [showMigration, setShowMigration] = useState(false);
+  const [migrationData, setMigrationData] = useState<{ tasks: any[], projects: any[], subordinates: any[], memberName: string }>({ tasks: [], projects: [], subordinates: [], memberName: '' });
+  const [newAssignee, setNewAssignee] = useState<string>("");
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
+  const [migrating, setMigrating] = useState(false);
+
   // Determine current user's role within this workspace for permission gating (used for display only)
   const currentUserRole = members.find((m) => m._id === user?._id)?.role || 'member';
   
@@ -209,6 +216,8 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
     }
   };
 
+
+
   const handleRemoveMember = async (member: MemberItem) => {
     if (!workspaceId) return;
     // Block owner removal at UI level; backend also enforces this
@@ -216,16 +225,54 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
       toast.error('Cannot remove the owner. Transfer ownership first.');
       return;
     }
+
+    // Check dependencies
+    try {
+      const [tasksRes, projectsRes] = await Promise.all([
+        fetchData('/workspace/all-tasks'),
+        fetchData('/project/recent?limit=1000')
+      ]);
+      
+      const allTasks = tasksRes.tasks || [];
+      const allProjects = projectsRes.projects || [];
+
+    const userTasks = allTasks.filter((t: any) => 
+       (t.assignedTo?._id === member._id || t.assignedTo === member._id) && 
+       (['todo', 'to-do', 'in_progress', 'in-progress'].includes(t.status) || t.approvalStatus === 'pending-approval')
+     );
+      const leadProjects = allProjects.filter((p: any) => p.projectHead?._id === member._id);
+      
+      let subordinates: any[] = [];
+      allProjects.forEach((p: any) => {
+        if (Array.isArray(p.members)) {
+          const subs = p.members.filter((m: any) => m.reportsTo === member._id);
+          if (subs.length > 0) {
+            subordinates = [...subordinates, ...subs.map((s: any) => ({ ...s, projectId: p._id, projectName: p.name }))];
+          }
+        }
+      });
+
+      if (userTasks.length > 0 || leadProjects.length > 0 || subordinates.length > 0) {
+        setMigrationData({
+          tasks: userTasks,
+          projects: leadProjects,
+          subordinates,
+          memberName: member.name
+        });
+        setPendingRemovalId(member._id);
+        setShowMigration(true);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking dependencies:", error);
+    }
+
     const confirmRemove = window.confirm(`Remove ${member.name} (${member.email}) from workspace?`);
     if (!confirmRemove) return;
     try {
       const res = await deleteData(`/workspace/${workspaceId}/members/${member._id}`);
       toast.success(res?.message || 'Employee removed');
       setMembers((prev) => prev.filter((m) => m._id !== member._id));
-      // setAuditLogs((logs) => [
-      //   { type: 'remove', message: `Removed ${member.email} from workspace`, status: 'success', timestamp: new Date().toISOString() },
-      //   ...logs,
-      // ]);
     } catch (error: any) {
       toast.error(
         getErrorMessage(error, 'Failed to remove employee', {
@@ -234,15 +281,56 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
           400: 'Cannot remove the owner. Transfer ownership first.',
         })
       );
-      // setAuditLogs((logs) => [
-      //   { type: 'remove', message: `Remove failed for ${member.email}: ${error?.message || 'error'}`, status: 'error', timestamp: new Date().toISOString() },
-      //   ...logs,
-      // ]);
     }
   };
 
+  const renderMigrationContent = () => {
+    return (
+      <div className="space-y-4 py-4">
+        <div className="text-sm text-gray-600">
+          <p className="mb-2">
+            <span className="font-semibold">{migrationData.memberName}</span> cannot be removed yet because they have:
+          </p>
+          <ul className="list-disc list-inside pl-2 mb-4">
+            {migrationData.tasks.length > 0 && (
+              <li>{migrationData.tasks.length} active tasks (Todo/In Progress/Pending Approval)</li>
+            )}
+            {migrationData.projects.length > 0 && (
+              <li>Lead of {migrationData.projects.length} projects</li>
+            )}
+            {migrationData.subordinates.length > 0 && (
+              <li>{migrationData.subordinates.length} subordinates across projects</li>
+            )}
+          </ul>
+          <p className="mb-2 font-medium text-red-600">
+            Please manually reassign these responsibilities before removing the member.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setShowMigration(false);
+              setPendingRemovalId(null);
+            }}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => {
+      if (!o) {
+        setShowMigration(false);
+        setPendingRemovalId(null);
+        setNewAssignee("");
+        onClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -260,6 +348,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
           </div>
         </DialogHeader>
 
+        {showMigration ? renderMigrationContent() : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0 mb-2">
             <TabsTrigger value="general" className="px-[12px] py-[8px] text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B]">
@@ -433,10 +522,13 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
             </div>
           </TabsContent>
         </Tabs>
+        )}
 
-        <div className="flex justify-end mt-4">
-          <Button variant="outline" onClick={onClose} aria-label="Close settings">Close</Button>
-        </div>
+        {!showMigration && (
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={onClose} aria-label="Close settings">Close</Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

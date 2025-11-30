@@ -220,7 +220,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
           {/* Header */}
           <div className="flex items-center justify-between">
             <StatusBadge status={project.status} />
-          {(isAdmin || isProjectLead) && (
+          {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
