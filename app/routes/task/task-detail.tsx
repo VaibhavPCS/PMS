@@ -1891,7 +1891,7 @@ const TaskDetail = () => {
                   </div> */}
                 </div>
 
-                {task.rejectionReason && task.approvalStatus === "rejected" && (
+                {task.rejectionReason && task.approvalStatus !== "approved" && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-start space-x-2">
                       <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

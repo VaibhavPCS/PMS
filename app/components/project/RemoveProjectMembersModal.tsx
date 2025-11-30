@@ -82,6 +82,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
   const [editing, setEditing] = useState<{ _id: string; name: string; email: string; role?: string; reportsTo?: string } | null>(null);
   const [editRole, setEditRole] = useState<string>('member');
   const [editReportsTo, setEditReportsTo] = useState<string>('');
+  
 
   const reportingOptions = useMemo(() => {
     const opts: Array<{ id: string; label: string }> = [];
@@ -264,7 +265,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
               className="h-9 text-sm"
             />
 
-            <ScrollArea className="max-h-64">
+            <ScrollArea className="h-48">
               <div className="space-y-2">
                 {filteredMembers.length === 0 ? (
                   <div className="text-xs text-gray-500 text-center py-4">No matching employees</div>

@@ -220,7 +220,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
           {/* Header */}
           <div className="flex items-center justify-between">
             <StatusBadge status={project.status} />
-          {isAdmin && (
+          {(isAdmin || isProjectLead) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -293,27 +293,31 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
 
                   <DropdownMenuSeparator />
 
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    setShowEdit(true);
-                  }}
-                  className="font-['Inter']"
-                >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Project
-                  </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.stopPropagation();
+                      setShowEdit(true);
+                    }}
+                    className="font-['Inter']"
+                  >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Project
+                    </DropdownMenuItem>
+                )}
 
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    handleDelete();
-                  }}
-                  className="font-['Inter'] text-red-600 focus:text-red-600"
-                >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Project
-                  </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.stopPropagation();
+                      handleDelete();
+                    }}
+                    className="font-['Inter'] text-red-600 focus:text-red-600"
+                  >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Project
+                    </DropdownMenuItem>
+                )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

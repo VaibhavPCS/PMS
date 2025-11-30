@@ -1028,15 +1028,19 @@ const TaskCard = React.memo<{
       {/* ✅ NEW: Quick Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Quick Edit Task</DialogTitle>
+          <DialogHeader className="pb-3">
+            <DialogTitle className="text-base">Edit Task</DialogTitle>
+            <p className="text-sm text-gray-600">Update task details</p>
           </DialogHeader>
-          <QuickEditTaskForm
+          <ScrollArea className="max-h-[70vh]">
+            <QuickEditTaskForm
             task={task}
             onClose={() => setShowEditModal(false)}
             onUpdate={onTaskUpdate}
             assignableMembers={assignableMembers}
+            project={project}
           />
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
@@ -1113,7 +1117,8 @@ const QuickEditTaskForm: React.FC<{
   onClose: () => void;
   onUpdate?: () => void;
   assignableMembers?: AssignableMember[];
-}> = ({ task, onClose, onUpdate, assignableMembers = [] }) => {
+  project?: Project | null;
+}> = ({ task, onClose, onUpdate, assignableMembers = [], project = null }) => {
   const [formData, setFormData] = useState({
     title: task.title,
     description: task.description,
@@ -1122,6 +1127,14 @@ const QuickEditTaskForm: React.FC<{
     dueDate: new Date(task.dueDate).toISOString().split("T")[0],
     assigneeId: task.assignee?._id || "",
   });
+
+  // Date objects for calendar popovers
+  const [startDateObj, setStartDateObj] = useState<Date | undefined>(
+    task.startDate ? new Date(task.startDate) : undefined
+  );
+  const [dueDateObj, setDueDateObj] = useState<Date | undefined>(
+    task.dueDate ? new Date(task.dueDate) : undefined
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1147,18 +1160,19 @@ const QuickEditTaskForm: React.FC<{
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-          <Label className="text-sm">Title</Label>
+    <form onSubmit={handleSubmit} className="space-y-3 pr-1">
+      <div className="space-y-1">
+          <Label className="text-sm">Title *</Label>
           <Input
             value={formData.title}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, title: e.target.value })}
             className="h-8"
+            placeholder="Task title"
             required
           />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1">
         <Label className="text-sm">Assignee (optional)</Label>
         <Select
           value={formData.assigneeId}
@@ -1168,7 +1182,6 @@ const QuickEditTaskForm: React.FC<{
             <SelectValue placeholder="Select" />
           </SelectTrigger>
           <SelectContent>
-            {/* <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem> */}
             {assignableMembers.map((member) => (
               <SelectItem key={member._id} value={member._id}>
                 <div className="flex items-center gap-2">
@@ -1183,8 +1196,25 @@ const QuickEditTaskForm: React.FC<{
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-sm">Status</Label>
+          <Select
+            value={task.status}
+            disabled
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="to-do">To Do</SelectItem>
+              <SelectItem value="in-progress">In Progress</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
           <Label className="text-sm">Priority</Label>
           <Select
             value={formData.priority}
@@ -1201,51 +1231,106 @@ const QuickEditTaskForm: React.FC<{
             </SelectContent>
           </Select>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <Label className="text-sm">Status</Label>
-          <div className="flex gap-1">
-            <Badge variant={task.status === "to-do" ? "default" : "outline"} className="text-xs">
-              To Do
-            </Badge>
-            <Badge variant={task.status === "in-progress" ? "default" : "outline"} className="text-xs">
-              Active
-            </Badge>
-            <Badge variant={task.status === "done" ? "default" : "outline"} className="text-xs">
-              Done
-            </Badge>
-          </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-sm">Start Date *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal",
+                  !startDateObj && "text-[#717680]"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDateObj ? format(startDateObj, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={startDateObj}
+                onSelect={(date) => {
+                  if (!date) return;
+                  setStartDateObj(date);
+                  setFormData({ ...formData, startDate: format(date, "yyyy-MM-dd") });
+                  // Ensure due date baseline respects start date
+                  if (dueDateObj && dueDateObj < date) {
+                    setDueDateObj(date);
+                    setFormData({ ...formData, startDate: format(date, "yyyy-MM-dd"), dueDate: format(date, "yyyy-MM-dd") });
+                  }
+                }}
+                disabled={(date) => {
+                  const projStart = project ? new Date(project.startDate) : new Date();
+                  projStart.setHours(0, 0, 0, 0);
+                  const projEnd = project ? new Date(project.endDate) : undefined;
+                  if (projEnd) projEnd.setHours(0, 0, 0, 0);
+                  return Boolean(date < projStart || (projEnd && date > projEnd));
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-sm">Due Date *</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal",
+                  !dueDateObj && "text-[#717680]"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dueDateObj ? format(dueDateObj, "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={dueDateObj}
+                onSelect={(date) => {
+                  if (!date) return;
+                  const projEnd = project ? new Date(project.endDate) : undefined;
+                  if (projEnd) {
+                    projEnd.setHours(0, 0, 0, 0);
+                  }
+                  if (projEnd && date > projEnd) {
+                    toast.error("Due date cannot be after project end date");
+                    setDueDateObj(projEnd);
+                    setFormData({ ...formData, dueDate: format(projEnd, "yyyy-MM-dd") });
+                    return;
+                  }
+                  setDueDateObj(date);
+                  setFormData({ ...formData, dueDate: format(date, "yyyy-MM-dd") });
+                }}
+                disabled={(date) => {
+                  const projStart = project ? new Date(project.startDate) : new Date();
+                  projStart.setHours(0, 0, 0, 0);
+                  const startBaseline = startDateObj || projStart;
+                  const projEnd = project ? new Date(project.endDate) : undefined;
+                  if (projEnd) projEnd.setHours(0, 0, 0, 0);
+                  return Boolean(date < startBaseline || (projEnd && date > projEnd));
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label className="text-sm">Start Date</Label>
-          <Input
-            type="date"
-            value={formData.startDate}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, startDate: e.target.value })}
-            className="h-8"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-sm">Due Date</Label>
-          <Input
-            type="date"
-            value={formData.dueDate}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, dueDate: e.target.value })}
-            className="h-8"
-            min={formData.startDate}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
+      <div className="space-y-1">
         <Label className="text-sm">Description</Label>
         <Textarea
           value={formData.description}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Task details..."
           rows={3}
           className="resize-none text-sm"
         />
@@ -1261,7 +1346,7 @@ const QuickEditTaskForm: React.FC<{
           ) : (
             <Edit className="w-3 h-3 mr-1" />
           )}
-          {isSubmitting ? "Updating..." : "Update"}
+          {isSubmitting ? "Updating..." : "Update Task"}
         </Button>
       </div>
     </form>
