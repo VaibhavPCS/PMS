@@ -1165,9 +1165,9 @@ const Dashboard = () => {
                               <Filter className="w-3 h-3" />
                             </div>
                           </th>
-                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
+                          {/* <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)]">
                             Action
-                          </th>
+                          </th> */}
                         </tr>
                       </thead>
                       <tbody>
@@ -1208,7 +1208,7 @@ const Dashboard = () => {
                               <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
                                 {calculateDaysBetween(project.startDate, project.endDate)} days
                               </td>
-                              <td className="px-[16px] py-[14px]">
+                              {/* <td className="px-[16px] py-[14px]">
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1218,7 +1218,7 @@ const Dashboard = () => {
                                   <Eye className="w-4 h-4 mr-1" />
                                   View
                                 </Button>
-                              </td>
+                              </td> */}
                             </tr>
                           ))
                         )}
@@ -1491,6 +1491,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              {/* Date fields commented out
               <div className="grid gap-2">
                 <Label htmlFor="startDate">Start Date</Label>
                 <Input
@@ -1509,6 +1510,7 @@ const Dashboard = () => {
                   onChange={(e) => setUpdateForm({ ...updateForm, dueDate: e.target.value })}
                 />
               </div>
+              */}
             </div>
           </div>
           <DialogFooter>

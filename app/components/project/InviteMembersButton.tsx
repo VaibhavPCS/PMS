@@ -20,6 +20,8 @@ import { toast } from "sonner";
 
 interface InviteMembersButtonProps {
   projectId: string;
+  // Optional workspaceId to avoid relying only on localStorage
+  workspaceId?: string;
   // Optional categories prop to align with usage in project-detail
   categories?: Array<{
     name: string;
@@ -33,6 +35,7 @@ interface InviteMembersButtonProps {
 
 export function InviteMembersButton({
   projectId,
+  workspaceId: propWorkspaceId,
   onInviteSuccess
 }: InviteMembersButtonProps) {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -44,6 +47,8 @@ export function InviteMembersButton({
   const [reportsTo, setReportsTo] = useState<string>("");
   const [tls, setTls] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [projectHead, setProjectHead] = useState<{ _id: string; name: string; email: string } | null>(null);
+  const [workspaceMembers, setWorkspaceMembers] = useState<Array<{ _id: string; name: string; email: string }>>([]);
+  const [selectedMemberEmail, setSelectedMemberEmail] = useState<string>("");
 
   // Consistent error message extraction for API failures
   const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
@@ -63,11 +68,13 @@ export function InviteMembersButton({
   const handleInviteClick = () => {
     setShowInviteDialog(true);
     setEmail("");
+    setSelectedMemberEmail("");
     setError(null);
     setSuccess(null);
     setRole("member");
     setReportsTo("");
     fetchProjectTls();
+    fetchWorkspaceMembers();
   };
 
   const fetchProjectTls = async () => {
@@ -88,11 +95,45 @@ export function InviteMembersButton({
     }
   };
 
+  const fetchWorkspaceMembers = async () => {
+    try {
+      // Use prop workspaceId first, then fall back to localStorage
+      const workspaceId = propWorkspaceId || localStorage.getItem("currentWorkspaceId");
+      if (!workspaceId) {
+        console.warn("No workspace ID found in props or localStorage");
+        setWorkspaceMembers([]);
+        return;
+      }
+      
+      console.log(`Fetching workspace members for workspace ID: ${workspaceId}`);
+      const response = await fetchData(`/workspace/${workspaceId}`);
+      console.log("Workspace API response:", response);
+      
+      const workspace = response?.workspace || response;
+      const members = workspace?.members || [];
+      
+      console.log(`Found ${members.length} workspace members`);
+      const mappedMembers = members.map((member: any) => ({
+        _id: member.userId?._id || member.userId,
+        name: member.userId?.name || 'Unknown',
+        email: member.userId?.email || ''
+      })).filter((member: any) => member.email);
+      
+      console.log(`Filtered to ${mappedMembers.length} members with email addresses`);
+      setWorkspaceMembers(mappedMembers);
+    } catch (error) {
+      console.error("Error fetching workspace members:", error);
+      // If we can't fetch workspace members, just show an empty dropdown
+      // The user can still manually type the email if needed
+      setWorkspaceMembers([]);
+    }
+  };
+
   const handleSendInvite = async () => {
     // Validation
-    if (!email || !email.includes('@')) {
-      setError("Please enter a valid email address");
-      toast.error("Please enter a valid email address");
+    if (!selectedMemberEmail || !selectedMemberEmail.includes('@')) {
+      setError("Please select a workspace member");
+      toast.error("Please select a workspace member");
       return;
     }
 
@@ -108,7 +149,7 @@ export function InviteMembersButton({
 
     try {
       const res = await postData(`/projects/${projectId}/members`, {
-        memberEmail: email,
+        memberEmail: selectedMemberEmail,
         role,
         reportsTo: reportsTo || undefined
       });
@@ -116,7 +157,7 @@ export function InviteMembersButton({
       const successMsg = res?.message || 'Employee added successfully!';
       setSuccess(successMsg);
       toast.success(successMsg);
-      setEmail("");
+      setSelectedMemberEmail("");
 
       // Wait a bit to show success message
       setTimeout(() => {
@@ -171,19 +212,23 @@ export function InviteMembersButton({
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Email Input */}
+            {/* Workspace Member Selector */}
             <div>
               <label className="text-[14px] font-medium font-['Inter'] text-[#040110] mb-1.5 block">
-                Email<span className="text-red-500">*</span>
+                Select Employee<span className="text-red-500">*</span>
               </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter workspace employee email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3a5afe] text-[14px] font-['Inter']"
-                disabled={loading}
-              />
+              <Select value={selectedMemberEmail} onValueChange={setSelectedMemberEmail}>
+                <SelectTrigger className="h-10 w-full border border-gray-300 rounded-lg px-3 text-[14px] font-['Inter']" disabled={workspaceMembers.length === 0}>
+                  <SelectValue placeholder={workspaceMembers.length === 0 ? "No workspace members found" : "Select a workspace employee"} />
+                </SelectTrigger>
+                <SelectContent className="font-['Inter']">
+                  {workspaceMembers.map((member) => (
+                    <SelectItem key={member._id} value={member.email} className="text-[14px]">
+                      {member.name} ({member.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-[12px] font-normal font-['Inter'] text-[#717680] mt-1">
                 Employee must already be part of the workspace
               </p>

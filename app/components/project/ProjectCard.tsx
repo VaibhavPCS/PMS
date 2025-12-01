@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Badge } from '@/components/ui/badge';
-import { MoreVertical, Users, Edit, Trash2, CheckCircle2, PlayCircle, Pause, XCircle } from 'lucide-react';
+import { MoreVertical, Users, Edit, Trash2, CheckCircle2, PlayCircle, Pause, XCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router';
 import { TruncatedTextModal } from '@/components/ui/truncated-text-modal';
@@ -18,8 +18,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { putData } from '@/lib/fetch-util';
+import { putData, fetchData } from '@/lib/fetch-util';
 import { EditProjectModal } from '@/components/project/EditProjectModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { QuickEditTaskForm } from '@/components/task/QuickEditTaskForm';
 
 
 type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
@@ -47,6 +50,7 @@ interface Project {
       _id: string;
       name: string;
       email: string;
+      role: string;
     };
     addedAt: string;
   }>;
@@ -89,6 +93,9 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
   const navigate = useNavigate();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showTaskEdit, setShowTaskEdit] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
   const { user } = useAuth();
 
 
@@ -201,6 +208,40 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
     }
   };
 
+  // ✅ NEW: Handle task edit from workspace
+  const handleTaskEdit = async () => {
+    try {
+      // Fetch project tasks to get the first task for editing
+      const response = await fetchData(`/project/${project._id}/tasks`);
+      const tasks = response.tasks || [];
+      
+      if (tasks.length === 0) {
+        toast.info('No tasks found in this project');
+        return;
+      }
+
+      // Get the first task for editing (you can modify this logic as needed)
+      const firstTask = tasks[0];
+      setSelectedTask(firstTask);
+
+      // Fetch assignable members for the project
+      const membersResponse = await fetchData(`/project/${project._id}/assignable-members`);
+      setAssignableMembers(membersResponse.members || []);
+
+      setShowTaskEdit(true);
+    } catch (error) {
+      console.error('Error loading project tasks:', error);
+      toast.error('Failed to load project tasks');
+    }
+  };
+
+  const handleTaskUpdate = () => {
+    setShowTaskEdit(false);
+    setSelectedTask(null);
+    // Refresh project data if needed
+    onUpdated?.();
+  };
+
 
   // Restrict rendering: show only to project members or admins
   if (!isAdmin && !isProjectMember) {
@@ -310,6 +351,19 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.stopPropagation();
+                      handleTaskEdit();
+                    }}
+                    className="font-['Inter']"
+                  >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Edit Task
+                    </DropdownMenuItem>
+                )}
+
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.stopPropagation();
                       handleDelete();
                     }}
                     className="font-['Inter'] text-red-600 focus:text-red-600"
@@ -393,6 +447,30 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
             onUpdated?.();
           }}
         />
+      )}
+
+      {/* ✅ NEW: Task Edit Modal */}
+      {selectedTask && (
+        <Dialog open={showTaskEdit} onOpenChange={setShowTaskEdit}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="pb-3">
+              <DialogTitle className="text-base">Edit Task</DialogTitle>
+              <p className="text-sm text-gray-600">Update task details</p>
+            </DialogHeader>
+            <ScrollArea className="max-h-[70vh]">
+              <QuickEditTaskForm
+                task={selectedTask}
+                onClose={() => {
+                  setShowTaskEdit(false);
+                  setSelectedTask(null);
+                }}
+                onUpdate={handleTaskUpdate}
+                assignableMembers={assignableMembers}
+                project={project}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

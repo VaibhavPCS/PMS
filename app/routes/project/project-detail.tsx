@@ -2067,6 +2067,7 @@ const ProjectDetail = () => {
             {isProjectLead && (
               <InviteMembersButton
                 projectId={project._id}
+                workspaceId={localStorage.getItem("currentWorkspaceId") || undefined}
                 onInviteSuccess={async () => {
                   await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
                 }}

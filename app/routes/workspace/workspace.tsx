@@ -50,6 +50,7 @@ interface Project {
       _id: string;
       name: string;
       email: string;
+      role: string;
     };
     addedAt?: string;
   }>;
