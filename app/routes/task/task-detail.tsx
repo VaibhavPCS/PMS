@@ -325,12 +325,7 @@ const FilePreview: React.FC<{
   };
 
   const downloadFile = (attachment: any) => {
-    const link = document.createElement("a");
-    link.href = buildBackendUrl(attachment.fileUrl);
-    link.download = attachment.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.open(buildBackendUrl(attachment.fileUrl), '_blank');
   };
 
   const openImagePreview = (index: number) => {
@@ -655,6 +650,7 @@ const TaskDetail = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [handoverNotes, setHandoverNotes] = useState("");
+  const handoverTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const [handoverFiles, setHandoverFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -705,6 +701,88 @@ const TaskDetail = () => {
   const [showAssignTaskModal, setShowAssignTaskModal] = useState(false);
   const [assignTaskAssigneeId, setAssignTaskAssigneeId] = useState("");
   const [isAssigningTask, setIsAssigningTask] = useState(false);
+
+  // ✅ NEW: Check if task and related resources exist before allowing access
+  const checkResourceExistence = async (taskId: string) => {
+    try {
+      // First check if task exists
+      const taskResponse = await fetch(
+        buildApiUrl(`/task/${taskId}/exists`),
+        {
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+        }
+      );
+
+      if (!taskResponse.ok) {
+        if (taskResponse.status === 404) {
+          toast.error("This task has been deleted or no longer exists");
+          return false;
+        } else if (taskResponse.status === 403) {
+          toast.error("You don't have permission to access this task");
+          return false;
+        }
+      }
+
+      // If task exists, check if it's archived by fetching full task details
+      try {
+        const taskDetailsResponse = await fetch(
+          buildApiUrl(`/task/${taskId}`),
+          {
+            credentials: 'include',
+            headers: {
+              "Content-Type": "application/json",
+              "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+            },
+          }
+        );
+        
+        if (taskDetailsResponse.ok) {
+          const taskData = await taskDetailsResponse.json();
+          if (taskData.task?.isArchived) {
+            toast.error("This task has been archived");
+            return false;
+          }
+          if (taskData.task?.deletedAt) {
+            toast.error("This task has been deleted");
+            return false;
+          }
+        }
+      } catch (detailError) {
+        console.error("Error fetching task details:", detailError);
+        // Continue even if detail fetch fails, as existence check passed
+      }
+
+      // If task exists, check if workspace still exists
+      const workspaceId = localStorage.getItem("currentWorkspaceId");
+      if (workspaceId) {
+        const workspaceResponse = await fetch(
+          buildApiUrl(`/workspace/${workspaceId}/exists`),
+          {
+            credentials: 'include',
+            headers: {
+              "Content-Type": "application/json",
+              "workspace-id": workspaceId,
+            },
+          }
+        );
+
+        if (!workspaceResponse.ok && workspaceResponse.status === 404) {
+          toast.error("This workspace has been deleted or no longer exists");
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error checking resource existence:", error);
+      toast.error("Unable to verify task access");
+      return false;
+    }
+  };
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -807,11 +885,11 @@ const TaskDetail = () => {
       if (errorMessage.includes("403")) {
         toast.error("You don't have permission to view this task");
       } else if (errorMessage.includes("404")) {
-        toast.error("Task not found");
+        // Check if task exists when we get a 404
+        await checkResourceExistence(taskId);
       } else {
         toast.error("Failed to load task details");
       }
-      setTimeout(() => navigate("/dashboard"), 2000);
     } finally {
       setLoading(false);
     }
@@ -991,7 +1069,18 @@ const TaskDetail = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save handover notes");
+        // Try to get the backend error message
+        let errorMessage = "Failed to save handover notes";
+        try {
+          const errorData = await response.json();
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (parseError) {
+          // Fallback to response status text if JSON parsing fails
+          errorMessage = response.statusText || "Failed to save handover notes";
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -1012,7 +1101,14 @@ const TaskDetail = () => {
       await fetchTaskDetails();
     } catch (error) {
       console.error("Failed to save handover notes:", error);
-      toast.error("Failed to save handover notes");
+      // Try to extract the backend error message
+      let errorMessage = "Failed to save handover notes";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      toast.error(errorMessage);
     } finally {
       setSavingHandover(false);
     }
@@ -2078,7 +2174,7 @@ const TaskDetail = () => {
 
             {/* Handover Notes with Rich Text Toolbar */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
+              <Card className="w-[370px]">
                 <CardHeader>
                   <CardTitle>Handover Notes</CardTitle>
                   <CardDescription>
@@ -2087,10 +2183,11 @@ const TaskDetail = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                   <Textarea
+                    ref={handoverTextareaRef}
                     placeholder="Share your progress, blockers, or handover notes..."
                     value={handoverNotes}
                     onChange={(e) => setHandoverNotes(e.target.value)}
-                    className="min-h-32 border-0 rounded-b-none focus-visible:ring-0"
+                    className="min-h-32 border border-gray-300 rounded-md focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 p-2 m-2 disabled:cursor-not-allowed disabled:opacity-50 w-[355px]"
                     disabled={savingHandover}
                   />
                   {/* Display selected files */}
@@ -2105,6 +2202,7 @@ const TaskDetail = () => {
                     </div>
                   )}
                   {<RichTextToolbar
+                    textareaRef={handoverTextareaRef}
                     onAttachClick={() => {
                       // Trigger file input
                       const input = document.createElement('input');
@@ -2167,7 +2265,7 @@ const TaskDetail = () => {
               <Card>
                 <CardHeader className="grid grid-cols-[1fr_auto] items-center px-6">
                   <CardTitle className="leading-none font-semibold">Attachments</CardTitle>
-                  {canUploadAttachments() && (
+                  {/* {canUploadAttachments() && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -2189,7 +2287,7 @@ const TaskDetail = () => {
                     >
                       <Upload className="w-4 h-4" />
                     </Button>
-                  )}
+                  )} */}
                 </CardHeader>
               <CardContent className="p-0">
                   <AttachmentsPanel
@@ -2259,7 +2357,7 @@ const TaskDetail = () => {
 
       {/* Task Attachments Section */}
           <div className="lg:col-span-1">
-            <Card className="h-fit mb-6">
+            <Card className="h-fit mb-6 bg-[#E5EFFF]">
               <CardHeader className="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6">
                 <CardTitle className="leading-none font-semibold">Attachments</CardTitle>
               {canUploadAttachments() && (
@@ -2295,24 +2393,19 @@ const TaskDetail = () => {
                   </div>
                 ) : (
                   <>
-                    <ScrollArea className="h-48 px-3">
+                    <ScrollArea className="h-48 px-3 overflow-x-auto">
                       <div className="space-y-0 py-2">
                         {task.attachments.map((attachment, index) => (
                           <div
                             key={index}
-                            className="flex items-center justify-between h-11 hover:bg-white/50 transition-colors rounded-md px-2.5 py-1.5 group"
+                            className="flex items-center justify-between h-11 hover:bg-white/50 transition-colors rounded-md px-2.5 py-1.5 group overflow-x-auto"
                           >
                             <div
                               className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
                               role="button"
                               tabIndex={0}
                               onClick={() => {
-                                const link = document.createElement('a');
-                                link.href = buildBackendUrl(attachment.fileUrl);
-                                link.download = attachment.fileName;
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
+                                window.open(buildBackendUrl(attachment.fileUrl), '_blank');
                               }}
                             >
                               <File className="w-6 h-6 text-gray-500 flex-shrink-0" />
@@ -2325,8 +2418,19 @@ const TaskDetail = () => {
                                 </div>
                               </div>
                             </div>
-                            {canDeleteTaskAttachments() && (
-                              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  window.open(buildBackendUrl(attachment.fileUrl), '_blank');
+                                }}
+                                className="p-1 hover:bg-blue-100 rounded transition-colors h-auto"
+                                title="Open in new tab"
+                              >
+                                <Download className="w-4 h-4 text-blue-600" />
+                              </Button>
+                              {canDeleteTaskAttachments() && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -2336,8 +2440,8 @@ const TaskDetail = () => {
                                 >
                                   <Trash2 className="w-4 h-4 text-red-600" />
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -2639,23 +2743,75 @@ const TaskDetail = () => {
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
                   New Start Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  value={rejectStartDate}
-                  onChange={(e) => setRejectStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      data-slot="popover-trigger"
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {rejectStartDate ? format(new Date(rejectStartDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={rejectStartDate ? new Date(rejectStartDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setRejectStartDate(formattedDate);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
                   New Due Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  value={rejectDueDate}
-                  onChange={(e) => setRejectDueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      data-slot="popover-trigger"
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {rejectDueDate ? format(new Date(rejectDueDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={rejectDueDate ? new Date(rejectDueDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setRejectDueDate(formattedDate);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -2746,23 +2902,87 @@ const TaskDetail = () => {
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
                   Start Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  value={reassignStartDate}
-                  onChange={(e) => setReassignStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      data-slot="popover-trigger"
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {reassignStartDate ? format(new Date(reassignStartDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={reassignStartDate ? new Date(reassignStartDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setReassignStartDate(formattedDate);
+                        }
+                      }}
+                      disabled={(date) => {
+                        if (!task) return false;
+                        const taskStart = new Date(task.startDate);
+                        const taskEnd = new Date(task.dueDate);
+                        return date < taskStart || date > taskEnd;
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
                   Due Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  value={reassignDueDate}
-                  onChange={(e) => setReassignDueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      data-slot="popover-trigger"
+                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded="false"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                        <path d="M8 2v4"></path>
+                        <path d="M16 2v4"></path>
+                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                        <path d="M3 10h18"></path>
+                      </svg>
+                      {reassignDueDate ? format(new Date(reassignDueDate), 'PPP') : 'Pick a date'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={reassignDueDate ? new Date(reassignDueDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = format(date, 'yyyy-MM-dd');
+                          setReassignDueDate(formattedDate);
+                        }
+                      }}
+                      disabled={(date) => {
+                        if (!task) return false;
+                        const taskStart = new Date(task.startDate);
+                        const taskEnd = new Date(task.dueDate);
+                        return date < taskStart || date > taskEnd;
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

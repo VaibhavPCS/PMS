@@ -12,6 +12,7 @@ interface RichTextToolbarProps {
   actionLoading?: boolean;
   showFormattingButtons?: boolean;
   className?: string;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export function RichTextToolbar({
@@ -22,6 +23,7 @@ export function RichTextToolbar({
   actionLoading = false,
   showFormattingButtons = true,
   className,
+  textareaRef,
 }: RichTextToolbarProps) {
   return (
     <div className={cn('flex items-center justify-between py-2 px-3 bg-gray-50 border-t', className)}>
@@ -46,7 +48,7 @@ export function RichTextToolbar({
         )}
 
         {/* Formatting Buttons */}
-        {showFormattingButtons && (
+        {/* {showFormattingButtons && (
           <div className="flex items-center gap-1">
             <Button
               type="button"
@@ -54,7 +56,23 @@ export function RichTextToolbar({
               size="sm"
               className="h-8 w-8 p-0"
               title="Bold"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
+                if (textareaRef?.current) {
+                  const textarea = textareaRef.current;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const selectedText = textarea.value.substring(start, end);
+                  const newText = `**${selectedText}**`;
+                  const newValue = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+                  textarea.value = newValue;
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 2, start + 2 + selectedText.length);
+                  // Trigger onChange event
+                  const event = new Event('input', { bubbles: true });
+                  textarea.dispatchEvent(event);
+                }
+              }}
             >
               <Bold className="h-4 w-4 text-gray-600" />
             </Button>
@@ -64,7 +82,23 @@ export function RichTextToolbar({
               size="sm"
               className="h-8 w-8 p-0"
               title="Italic"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
+                if (textareaRef?.current) {
+                  const textarea = textareaRef.current;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const selectedText = textarea.value.substring(start, end);
+                  const newText = `*${selectedText}*`;
+                  const newValue = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+                  textarea.value = newValue;
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 1, start + 1 + selectedText.length);
+                  // Trigger onChange event
+                  const event = new Event('input', { bubbles: true });
+                  textarea.dispatchEvent(event);
+                }
+              }}
             >
               <Italic className="h-4 w-4 text-gray-600" />
             </Button>
@@ -74,12 +108,28 @@ export function RichTextToolbar({
               size="sm"
               className="h-8 w-8 p-0"
               title="Underline"
-              onClick={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault();
+                if (textareaRef?.current) {
+                  const textarea = textareaRef.current;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const selectedText = textarea.value.substring(start, end);
+                  const newText = `<u>${selectedText}</u>`;
+                  const newValue = textarea.value.substring(0, start) + newText + textarea.value.substring(end);
+                  textarea.value = newValue;
+                  textarea.focus();
+                  textarea.setSelectionRange(start + 3, start + 3 + selectedText.length);
+                  // Trigger onChange event
+                  const event = new Event('input', { bubbles: true });
+                  textarea.dispatchEvent(event);
+                }
+              }}
             >
               <Underline className="h-4 w-4 text-gray-600" />
             </Button>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Action Button */}

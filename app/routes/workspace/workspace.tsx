@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../provider/auth-context';
 import { Navigate } from 'react-router';
 import { fetchData, postData, deleteData } from '@/lib/fetch-util';
+import { buildApiUrl } from '@/lib/config';
 import { toast } from 'sonner';
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -89,16 +90,84 @@ const WorkspacePage = () => {
     projectsRef.current = projects;
   }, [projects]);
 
+  // Check if workspace exists and is accessible (not archived/deleted)
+  const checkWorkspaceExistence = async (workspaceId: string) => {
+    try {
+      // First check if workspace exists via exists endpoint
+      const existsResponse = await fetch(
+        buildApiUrl(`/workspace/${workspaceId}/exists`),
+        {
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": workspaceId,
+          },
+        }
+      );
+      
+      if (!existsResponse.ok) {
+        if (existsResponse.status === 404) {
+          toast.error("This workspace has been deleted or no longer exists");
+          return false;
+        } else if (existsResponse.status === 403) {
+          toast.error("You don't have permission to access this workspace");
+          return false;
+        }
+      }
+      
+      // If exists, check if it's archived by fetching full workspace details
+      try {
+        const workspaceResponse = await fetch(
+          buildApiUrl(`/workspace/${workspaceId}`),
+          {
+            credentials: 'include',
+            headers: {
+              "Content-Type": "application/json",
+              "workspace-id": workspaceId,
+            },
+          }
+        );
+        
+        if (workspaceResponse.ok) {
+          const workspaceData = await workspaceResponse.json();
+          if (workspaceData.workspace?.isArchived) {
+            toast.error("This workspace has been archived");
+            return false;
+          }
+          if (workspaceData.workspace?.deletedAt) {
+            toast.error("This workspace has been deleted");
+            return false;
+          }
+        }
+      } catch (detailError) {
+        console.error("Error fetching workspace details:", detailError);
+        // Continue even if detail fetch fails, as existence check passed
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking workspace existence:", error);
+      toast.error("Unable to verify workspace access");
+      return false;
+    }
+  };
+
 const fetchWorkspaces = useCallback(async () => {
   try {
     const response = await fetchData('/workspace'); // ✅ Keep singular (already correct)
     const workspaceList = response.workspaces?.map((w: any) => w.workspaceId).filter(Boolean) || [];
+    
     setWorkspaces(workspaceList);
     setCurrentWorkspace(response.currentWorkspace);
     // Persist current workspace id for request headers
     if (response.currentWorkspace?._id) {
       localStorage.setItem('workspace-id', response.currentWorkspace._id);
       localStorage.setItem('currentWorkspaceId', response.currentWorkspace._id);
+      
+      // Check if current workspace exists (show notification but don't block)
+      checkWorkspaceExistence(response.currentWorkspace._id).catch(err => {
+        console.error("Workspace existence check failed:", err);
+      });
     }
   } catch (error) {
     console.error('Failed to load workspaces', error);

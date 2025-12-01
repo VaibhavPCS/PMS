@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, File, Image } from 'lucide-react';
 import { Button } from './button';
+import { toast } from 'sonner';
 
 interface FileUploadProps {
   onFilesSelect: (files: File[]) => void;
@@ -55,7 +56,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     });
 
     if (errors.length > 0) {
-      alert(errors.join('\n'));
+      toast.error(errors.join('\n'));
     }
 
     if (validFiles.length > 0) {

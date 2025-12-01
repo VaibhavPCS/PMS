@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { fetchData, postData, deleteData, putData } from "@/lib/fetch-util"; // ✅ UPDATED: Added putData import
+import { buildApiUrl } from "@/lib/config"; // ✅ NEW: Added buildApiUrl import
 import {
   ArrowLeft,
   Plus,
@@ -18,6 +19,7 @@ import {
   Pause,
   BarChart3,
   Filter,
+  X,
   Search,
   MoreVertical,
   Edit,
@@ -1483,6 +1485,16 @@ const ProjectDetail = () => {
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
   const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
+  const taskFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Function to remove a specific attachment
+  const removeTaskAttachment = (index: number) => {
+    setTaskAttachments(prev => prev.filter((_, i) => i !== index));
+    // Clear the file input to allow reselecting the same file if needed
+    if (taskFileInputRef.current) {
+      taskFileInputRef.current.value = '';
+    }
+  };
 
   // Derived role flags
   const isAdmin = useMemo(() => ["admin", "super_admin", "super-admin"].includes(userRole), [userRole]);
@@ -1685,7 +1697,89 @@ const ProjectDetail = () => {
     [allTasks]
   );
 
-  // All existing API functions (unchanged)
+  // All existing API functions (unchanged)  
+  // ✅ NEW: Check if project and related resources exist before allowing access
+  const checkResourceExistence = async (projectId: string) => {
+    try {
+      // First check if project exists
+      const projectResponse = await fetch(
+        buildApiUrl(`/project/${projectId}/exists`),
+        {
+          credentials: 'include',
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+        }
+      );
+
+      if (!projectResponse.ok) {
+        if (projectResponse.status === 404) {
+          toast.error("This project has been deleted or no longer exists");
+          return false;
+        } else if (projectResponse.status === 403) {
+          toast.error("You don't have permission to access this project");
+          return false;
+        }
+      }
+
+      // If project exists, check if it's archived by fetching full project details
+      try {
+        const projectDetailsResponse = await fetch(
+          buildApiUrl(`/project/${projectId}`),
+          {
+            credentials: 'include',
+            headers: {
+              "Content-Type": "application/json",
+              "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+            },
+          }
+        );
+        
+        if (projectDetailsResponse.ok) {
+          const projectData = await projectDetailsResponse.json();
+          if (projectData.project?.isArchived) {
+            toast.error("This project has been archived");
+            return false;
+          }
+          if (projectData.project?.deletedAt) {
+            toast.error("This project has been deleted");
+            return false;
+          }
+        }
+      } catch (detailError) {
+        console.error("Error fetching project details:", detailError);
+        // Continue even if detail fetch fails, as existence check passed
+      }
+
+      // If project exists, check if workspace still exists
+      const workspaceId = localStorage.getItem("currentWorkspaceId");
+      if (workspaceId) {
+        const workspaceResponse = await fetch(
+          buildApiUrl(`/workspace/${workspaceId}/exists`),
+          {
+            credentials: 'include',
+            headers: {
+              "Content-Type": "application/json",
+              "workspace-id": workspaceId,
+            },
+          }
+        );
+
+        if (!workspaceResponse.ok && workspaceResponse.status === 404) {
+          toast.error("This workspace has been deleted or no longer exists");
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error checking resource existence:", error);
+      toast.error("Unable to verify project access");
+      return false;
+    }
+  };
+
   const fetchUserRole = useCallback(async () => {
     try {
       const response = await fetchData("/auth/me");
@@ -1704,15 +1798,23 @@ const ProjectDetail = () => {
 
   const fetchProjectDetails = useCallback(async () => {
     try {
+      if (!projectId) {
+        setLoading(false);
+        return;
+      }
+      
       const response = await fetchData(`/project/${projectId}`);
       setProject(response.project);
-    } catch {
+    } catch (error) {
+      // Check if project exists when we get an error
+      if (projectId) {
+        await checkResourceExistence(projectId);
+      }
       toast.error("Project not found");
-      navigate("/workspace");
     } finally {
       setLoading(false);
     }
-  }, [projectId, navigate]);
+  }, [projectId]);
 
   const fetchAllTasks = useCallback(async () => {
     try {
@@ -1742,6 +1844,15 @@ const ProjectDetail = () => {
       toast.error("Failed to load employees");
     }
   }, [projectId]);
+
+  // Utility function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   const handleCreateTask = useCallback(
     async (e: React.FormEvent) => {
@@ -1801,8 +1912,20 @@ const ProjectDetail = () => {
           );
 
           if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || "Failed to create task");
+            // Try to get the backend error message with file name details
+            let errorMessage = "Failed to create task";
+            try {
+              const errorData = await response.json();
+              if (errorData.message) {
+                errorMessage = errorData.message;
+              } else if (errorData.status === 'fail' && errorData.message) {
+                errorMessage = errorData.message;
+              }
+            } catch (parseError) {
+              // Fallback to response status text if JSON parsing fails
+              errorMessage = response.statusText || "Failed to create task";
+            }
+            throw new Error(errorMessage);
           }
         } else {
           const payload: any = { ...newTask, projectId };
@@ -1825,10 +1948,23 @@ const ProjectDetail = () => {
         setStartDateObj(undefined);
         setDueDateObj(undefined);
         setTaskAttachments([]);
+        // Clear the file input
+        if (taskFileInputRef.current) {
+          taskFileInputRef.current.value = '';
+        }
         await Promise.all([fetchAllTasks(), fetchUserTasks()]);
         toast.success("Task created!");
       } catch (error: any) {
-        toast.error(error.response?.data?.message || error.message || "Failed to create task");
+        // Extract the error message properly
+        let errorMessage = "Failed to create task";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = String(error.message);
+        } else if (error && typeof error === 'object' && 'response' in error && error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        toast.error(errorMessage);
       } finally {
         setSubmittingTask(false);
       }
@@ -2775,29 +2911,84 @@ const ProjectDetail = () => {
 
               <div className="space-y-1">
                 <Label className="text-sm">Attachments (optional)</Label>
-                <Input
-                  type="file"
-                  multiple
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                  className="h-8 text-sm cursor-pointer"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      const fileArray = Array.from(files);
-                      if (fileArray.length > 3) {
-                        toast.error("Maximum 3 files allowed");
-                        return;
+                <div className="border border-[#d5d7da] rounded-[8px]">
+                  <label htmlFor="attachments" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
+                    <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">Upload</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-upload text-[#717680]" aria-hidden="true">
+                      <path d="M12 3v12"></path>
+                      <path d="m17 8-5-5-5 5"></path>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    </svg>
+                  </label>
+                  <input 
+                    ref={taskFileInputRef}
+                    id="attachments"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept="image/*,.pdf,.docx"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const files = e.target.files;
+                      if (files && files.length > 0) {
+                        const newFiles = Array.from(files) as File[];
+                        
+                        // Check total files limit (3 files max)
+                        const totalFiles = taskAttachments.length + newFiles.length;
+                        if (totalFiles > 3) {
+                          toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
+                          return;
+                        }
+                        
+                        // Check file sizes (5MB limit)
+                        const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
+                        const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
+                        if (oversizedFiles.length > 0) {
+                          const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
+                          toast.error(`${fileNames}: File too large (max 5MB per file)`);
+                          return;
+                        }
+                        
+                        // Append new files to existing ones
+                        setTaskAttachments(prev => [...prev, ...newFiles]);
                       }
-                      setTaskAttachments(fileArray);
-                    }
-                  }}
-                />
+                    }}
+                  />
+                </div>
                 {taskAttachments.length > 0 && (
-                  <div className="text-xs text-gray-600 mt-1">
-                    {taskAttachments.length} file(s) selected
+                  <div className="space-y-[6px] mt-[8px]">
+                    <div className="flex justify-between items-center mb-[4px]">
+                      <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setTaskAttachments([]);
+                          if (taskFileInputRef.current) {
+                            taskFileInputRef.current.value = '';
+                          }
+                        }}
+                        className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    {taskAttachments.map((file, index) => (
+                      <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
+                        <span className="flex-1 truncate">{file.name}</span>
+                        <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => removeTaskAttachment(index)}
+                          className="text-[#cd2818] hover:text-[#a01f10]"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" aria-hidden="true">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <p className="text-xs text-gray-500">Max 3 files (images or documents)</p>
               </div>
 
               <div className="flex gap-2 pt-3 border-t">

@@ -107,7 +107,12 @@ export function AttachmentsPanel({
             </div>
 
             {/* File Info */}
-            <div className="flex-1 min-w-0">
+            <div 
+              className="flex-1 min-w-0 cursor-pointer"
+              onClick={() => {
+                window.open(buildBackendUrl(attachment.fileUrl), '_blank');
+              }}
+            >
               <p className="text-sm font-medium text-gray-900 truncate">
                 {attachment.fileName}
               </p>
@@ -116,7 +121,8 @@ export function AttachmentsPanel({
               </p>
             </div>
 
-            {/* Actions */}
+            {/* Actions - Commented out as requested */}
+            {/*
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
@@ -156,6 +162,7 @@ export function AttachmentsPanel({
                 </Button>
               )}
             </div>
+            */}
           </div>
         ))}
       </div>
