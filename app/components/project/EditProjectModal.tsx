@@ -74,7 +74,7 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
   }, [open, project]);
 
   const projectDuration = useMemo(() => {
-    return startDate && endDate ? differenceInDays(endDate, startDate) : 0;
+    return startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 0;
   }, [startDate, endDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

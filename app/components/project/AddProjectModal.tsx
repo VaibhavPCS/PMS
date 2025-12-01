@@ -53,6 +53,18 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
 
+  const allowedTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+  ];
+  const maxFiles = 5;
+  const maxFileSizeMB = 5;
+
   // Fetch workspace members
   useEffect(() => {
     if (open) {
@@ -77,27 +89,42 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
   };
 
   const projectDuration = startDate && endDate
-    ? differenceInDays(endDate, startDate)
+    ? differenceInDays(endDate, startDate) + 1
     : 0;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 5) {
-      toast.error('Maximum 5 files allowed');
-      return;
+    const newFiles = e.target.files;
+    if (!newFiles) return;
+
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    Array.from(newFiles).forEach((file) => {
+      if (!allowedTypes.includes(file.type)) {
+        errors.push(`${file.name}: Invalid file type`);
+        return;
+      }
+
+      if (file.size > maxFileSizeMB * 1024 * 1024) {
+        errors.push(`${file.name}: File too large (max ${maxFileSizeMB}MB)`);
+        return;
+      }
+
+      if (files.length + validFiles.length >= maxFiles) {
+        errors.push(`Maximum ${maxFiles} files allowed`);
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    if (errors.length > 0) {
+      toast.error(errors.join('\n'));
     }
-    // Validate file types against backend-allowed set
-    const allowedMimes = new Set([
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ]);
-    const valid = selectedFiles.filter(
-      (f) => f.type.startsWith('image/') || allowedMimes.has(f.type)
-    );
-    if (valid.length !== selectedFiles.length) {
-      toast.error('Only images, PDF, and DOCX files are allowed.');
+
+    if (validFiles.length > 0) {
+      setFiles([...files, ...validFiles]);
     }
-    setFiles([...files, ...valid]);
   };
 
   const handleRemoveFile = (index: number) => {
@@ -372,7 +399,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                     multiple
                     onChange={handleFileChange}
                     className="hidden"
-                    accept="image/*,.pdf,.docx"
+                    accept={allowedTypes.join(',')}
                   />
                 </div>
                 {files.length > 0 && (
