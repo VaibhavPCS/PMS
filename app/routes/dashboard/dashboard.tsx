@@ -1442,6 +1442,22 @@ const Dashboard = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-1">
+                  <Label>Project</Label>
+                  <div className="text-sm text-gray-700">{selectedTask?.project?.title || "—"}</div>
+                </div>
+                <div className="grid gap-1">
+                  <Label>Workspace</Label>
+                  <div className="text-sm text-gray-700">{currentWorkspace?.name || "—"}</div>
+                </div>
+                <div className="grid gap-1">
+                  <Label>Assigned To</Label>
+                  <div className="text-sm text-gray-700">{selectedTask?.assignedTo?.name || "—"}</div>
+                </div>
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="title">Title *</Label>
               <Input
