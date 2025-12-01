@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { buildApiUrl } from '@/lib/config';
+import { toast } from 'sonner';
 
 interface Notification {
   _id: string;
@@ -175,7 +177,7 @@ const Sidebar = () => {
     }
   };
 
-  // Navigate to relevant page for a notification and mark as read
+  // Navigate to relevant page for a notification and mark as read with existence checks
   const handleNotificationClick = async (notification: Notification) => {
     try {
       if (!notification.isRead) {
@@ -185,16 +187,84 @@ const Sidebar = () => {
       setShowNotifications(false);
 
       const { data } = notification;
-      // Persist and switch workspace on backend if provided
-      if (data.workspaceId) {
-        try {
-          localStorage.setItem('currentWorkspaceId', data.workspaceId);
-        } catch {}
-        try {
-          await postData('/workspace/switch', { workspaceId: data.workspaceId });
-        } catch (err) {
-          console.error('Failed to switch workspace from notification:', err);
+      
+      // Check resource existence before navigation
+      try {
+        if (data.taskId) {
+          const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include' });
+          if (!existsResponse.ok) {
+            toast.error("This task no longer exists.");
+            return;
+          }
+          // Check if task is archived or deleted
+          const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
+          if (taskResponse.ok) {
+            const taskData = await taskResponse.json();
+            if (taskData.task?.isArchived) {
+              toast.error("This task has been archived");
+              return;
+            }
+            if (taskData.task?.deletedAt) {
+              toast.error("This task has been deleted");
+              return;
+            }
+          }
+        } else if (data.projectId) {
+          const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include' });
+          if (!existsResponse.ok) {
+            toast.error("This project no longer exists or you don't have access to it");
+            return;
+          }
+          // Check if project is archived or deleted
+          const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include' });
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json();
+            if (projectData.project?.isArchived) {
+              toast.error("This project has been archived");
+              return;
+            }
+            if (projectData.project?.deletedAt) {
+              toast.error("This project has been deleted");
+              return;
+            }
+          }
         }
+        
+        // Check workspace existence if provided
+        if (data.workspaceId) {
+          const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
+          if (!existsResponse.ok) {
+            toast.error("This workspace no longer exists or you don't have access to it");
+            return;
+          }
+          // Check if workspace is archived or deleted
+          const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include' });
+          if (workspaceResponse.ok) {
+            const workspaceData = await workspaceResponse.json();
+            if (workspaceData.workspace?.isArchived) {
+              toast.error("This workspace has been archived");
+              return;
+            }
+            if (workspaceData.workspace?.deletedAt) {
+              toast.error("This workspace has been deleted");
+              return;
+            }
+          }
+          
+          // Persist and switch workspace on backend if provided
+          try {
+            localStorage.setItem('currentWorkspaceId', data.workspaceId);
+          } catch {}
+          try {
+            await postData('/workspace/switch', { workspaceId: data.workspaceId });
+          } catch (err) {
+            console.error('Failed to switch workspace from notification:', err);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking resource existence:', error);
+        toast.error("Unable to verify resource access");
+        return;
       }
 
       // Choose the most specific route first
