@@ -687,6 +687,8 @@ const TaskDetail = () => {
   const [reassignStartDate, setReassignStartDate] = useState("");
   const [reassignDueDate, setReassignDueDate] = useState("");
   const [isReassigning, setIsReassigning] = useState(false);
+  const [reassignProjectStart, setReassignProjectStart] = useState<Date | null>(null);
+  const [reassignProjectEnd, setReassignProjectEnd] = useState<Date | null>(null);
   const [subtasks, setSubtasks] = useState<any[]>([]);
   const [showCreateSubtask, setShowCreateSubtask] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -1261,6 +1263,27 @@ const TaskDetail = () => {
       return;
     }
 
+    const s = new Date(reassignStartDate);
+    const d = new Date(reassignDueDate);
+    s.setHours(0,0,0,0);
+    d.setHours(0,0,0,0);
+    if (s > d) {
+      toast.error("Start date cannot be after due date");
+      return;
+    }
+    if (reassignProjectStart && s < reassignProjectStart) {
+      toast.error("Start date cannot be before project start date");
+      return;
+    }
+    if (reassignProjectEnd) {
+      const pePlusOne = new Date(reassignProjectEnd);
+      pePlusOne.setDate(pePlusOne.getDate() + 1);
+      if (d.getTime() >= pePlusOne.getTime()) {
+        toast.error("Due date cannot be after project end date");
+        return;
+      }
+    }
+
     try {
       setIsReassigning(true);
       const me = activeUser;
@@ -1395,6 +1418,22 @@ const TaskDetail = () => {
     }
     setShowReassignDialog(true);
   };
+
+  useEffect(() => {
+    const fetchReassignBounds = async () => {
+      if (!showReassignDialog || !task?.project?._id) return;
+      try {
+        const res = await fetchData(`/projects/${(task.project as any)._id}`);
+        const ps = new Date(res.project.startDate);
+        const pe = new Date(res.project.endDate);
+        ps.setHours(0, 0, 0, 0);
+        pe.setHours(0, 0, 0, 0);
+        setReassignProjectStart(ps);
+        setReassignProjectEnd(pe);
+      } catch {}
+    };
+    fetchReassignBounds();
+  }, [showReassignDialog, task?.project?._id]);
 
   const canDeleteAttachments = () => {
     const me = activeUser;
@@ -1830,7 +1869,7 @@ const TaskDetail = () => {
         </div>
         {/* Assign Task Modal */}
         <Dialog open={showAssignTaskModal} onOpenChange={setShowAssignTaskModal}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg" showCloseButton={false}>
             <DialogHeader>
               <DialogTitle className="flex items-center space-x-2">
                 <User className="w-5 h-5 text-blue-600" />
@@ -3048,16 +3087,50 @@ const TaskDetail = () => {
                       mode="single"
                       selected={reassignStartDate ? new Date(reassignStartDate) : undefined}
                       onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = format(date, 'yyyy-MM-dd');
-                          setReassignStartDate(formattedDate);
+                        if (!date) return;
+                        const d = new Date(date);
+                        d.setHours(0,0,0,0);
+                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) pe.setHours(0,0,0,0);
+                        if (ps && d < ps) {
+                          const f = format(ps, 'yyyy-MM-dd');
+                          setReassignStartDate(f);
+                          // Ensure due >= start
+                          if (reassignDueDate) {
+                            const due = new Date(reassignDueDate);
+                            due.setHours(0,0,0,0);
+                            if (due < ps) setReassignDueDate(f);
+                          }
+                          return;
+                        }
+                        if (pe && d > pe) {
+                          const f = format(pe, 'yyyy-MM-dd');
+                          setReassignStartDate(f);
+                          if (reassignDueDate) {
+                            const due = new Date(reassignDueDate);
+                            due.setHours(0,0,0,0);
+                            if (due < pe) setReassignDueDate(f);
+                          }
+                          return;
+                        }
+                        const f = format(d, 'yyyy-MM-dd');
+                        setReassignStartDate(f);
+                        if (reassignDueDate) {
+                          const due = new Date(reassignDueDate);
+                          due.setHours(0,0,0,0);
+                          if (due < d) setReassignDueDate(f);
                         }
                       }}
                       disabled={(date) => {
-                        if (!task) return false;
-                        const taskStart = new Date(task.startDate);
-                        const taskEnd = new Date(task.dueDate);
-                        return date < taskStart || date > taskEnd;
+                        const d = new Date(date as Date);
+                        d.setHours(0,0,0,0);
+                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) pe.setHours(0,0,0,0);
+                        return Boolean((ps && d < ps) || (pe && d > pe));
                       }}
                       initialFocus
                     />
@@ -3091,16 +3164,46 @@ const TaskDetail = () => {
                       mode="single"
                       selected={reassignDueDate ? new Date(reassignDueDate) : undefined}
                       onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = format(date, 'yyyy-MM-dd');
-                          setReassignDueDate(formattedDate);
+                        if (!date) return;
+                        const d = new Date(date);
+                        d.setHours(0,0,0,0);
+                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) {
+                          pe.setHours(0,0,0,0);
+                          const pePlusOne = new Date(pe);
+                          pePlusOne.setDate(pePlusOne.getDate() + 1);
+                          if (d.getTime() >= pePlusOne.getTime()) {
+                            setReassignDueDate(format(pe, 'yyyy-MM-dd'));
+                            return;
+                          }
                         }
+                        const startBaseline = reassignStartDate ? new Date(reassignStartDate) : (ps || undefined);
+                        if (startBaseline) {
+                          startBaseline.setHours(0,0,0,0);
+                          if (d < startBaseline) {
+                            setReassignDueDate(format(startBaseline, 'yyyy-MM-dd'));
+                            return;
+                          }
+                        }
+                        setReassignDueDate(format(d, 'yyyy-MM-dd'));
                       }}
                       disabled={(date) => {
-                        if (!task) return false;
-                        const taskStart = new Date(task.startDate);
-                        const taskEnd = new Date(task.dueDate);
-                        return date < taskStart || date > taskEnd;
+                        const d = new Date(date as Date);
+                        d.setHours(0,0,0,0);
+                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        let pePlusOne: Date | null = null;
+                        if (pe) {
+                          pe.setHours(0,0,0,0);
+                          pePlusOne = new Date(pe);
+                          pePlusOne.setDate(pePlusOne.getDate() + 1);
+                        }
+                        const startBaseline = reassignStartDate ? new Date(reassignStartDate) : ps || undefined;
+                        if (startBaseline) startBaseline.setHours(0,0,0,0);
+                        return Boolean((startBaseline && d < startBaseline) || (pePlusOne && d.getTime() >= pePlusOne.getTime()));
                       }}
                       initialFocus
                     />
