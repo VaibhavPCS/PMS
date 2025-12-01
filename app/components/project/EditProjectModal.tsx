@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { putData } from '@/lib/fetch-util';
+import { putData, fetchData, postData } from '@/lib/fetch-util';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -39,6 +39,7 @@ interface Project {
   progress: number;
   startDate: string;
   endDate: string;
+  projectHead?: { _id: string; name?: string; email?: string };
 }
 
 interface EditProjectModalProps {
@@ -55,6 +56,10 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [workspaceMembers, setWorkspaceMembers] = useState<Array<{ _id: string; name: string; email: string }>>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(project.projectHead?._id || '');
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState<any>(null);
   const originalStartDate = useMemo(() => project.startDate ? new Date(project.startDate) : undefined, [project.startDate]);
   const today = useMemo(() => {
     const d = new Date();
@@ -70,6 +75,32 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
       setStartDate(project.startDate ? new Date(project.startDate) : undefined);
       setEndDate(project.endDate ? new Date(project.endDate) : undefined);
       setIsSubmitting(false);
+      setSelectedLeadId(project.projectHead?._id || '');
+      const fetchMembers = async () => {
+        try {
+          const wsId = localStorage.getItem('currentWorkspaceId');
+          if (!wsId) {
+            setWorkspaceMembers([]);
+            return;
+          }
+          const response = await fetchData(`/workspace/${wsId}`);
+          const workspace = (response as any)?.workspace || response;
+          const rawMembers = (workspace?.members || []);
+          const leadMembers = rawMembers.filter((m: any) => (m.role || '').toLowerCase() === 'lead');
+          const members = leadMembers.map((m: any) => ({
+            _id: m.userId?._id || m.userId,
+            name: m.userId?.name || '',
+            email: m.userId?.email || ''
+          })).filter((x: any) => x.email);
+          setWorkspaceMembers(members);
+          if (project.projectHead?._id && !members.some((mm: any) => mm._id === project.projectHead?._id)) {
+            setSelectedLeadId('');
+          }
+        } catch {
+          setWorkspaceMembers([]);
+        }
+      };
+      fetchMembers();
     }
   }, [open, project]);
 
@@ -111,9 +142,23 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
         endDate: endDate.toISOString(),
       };
       const response = await putData(`/project/${project._id}`, updates);
-      const updated = (response as any)?.project || { ...project, ...updates };
-      toast.success('Project updated successfully');
-      onProjectUpdated?.(updated);
+      let updatedProject = (response as any)?.project || { ...project, ...updates };
+      if (selectedLeadId && selectedLeadId !== (project.projectHead?._id || '')) {
+        try {
+          const changeRes = await postData(`/projects/${project._id}/change-head`, { newHeadId: selectedLeadId });
+          updatedProject = (changeRes as any)?.project || updatedProject;
+          const summary = (changeRes as any)?.summary || null;
+          if (summary) {
+            setSummaryData(summary);
+            setShowSummary(true);
+          }
+          toast.success('Project lead changed successfully');
+        } catch (err: any) {
+          const msg = err?.response?.data?.message || err?.message || 'Failed to change project lead';
+          toast.error(msg);
+        }
+      }
+      onProjectUpdated?.(updatedProject);
       onClose();
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to update project';
@@ -124,6 +169,7 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[552px] p-0 gap-0 rounded-[16px] max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
@@ -149,7 +195,7 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
         {/* Form Content - Scrollable */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="px-[24px] pr-[14px] overflow-y-auto flex-1">
-            <div className="pr-[10px] space-y-[16px]">
+          <div className="pr-[10px] space-y-[16px]">
               {/* Project Name */}
               <div className="space-y-[6px]">
                 <Label htmlFor="title" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
@@ -274,6 +320,23 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
                   className="border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] placeholder:text-[#717680] resize-none"
                 />
               </div>
+              <div className="space-y-[6px]">
+                <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  Project Lead
+                </Label>
+                <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
+                  <SelectTrigger className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] font-['Inter'] text-[14px]">
+                    <SelectValue placeholder="Select project lead" />
+                  </SelectTrigger>
+                  <SelectContent className="font-['Inter']">
+                    {workspaceMembers.map((m) => (
+                      <SelectItem key={m._id} value={m._id}>
+                        {m.name || m.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -298,6 +361,47 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
         </form>
       </DialogContent>
     </Dialog>
+    <Dialog open={showSummary} onOpenChange={setShowSummary}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Project Lead Migration</DialogTitle>
+          <DialogDescription>Reporting and tasks migrated to the new lead</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium">Reporting moved: {(summaryData?.reportingChangedMembers || []).length}</p>
+            <div className="mt-2 max-h-40 overflow-y-auto border rounded-md p-2">
+              {(summaryData?.reportingChangedMembers || []).length === 0 ? (
+                <p className="text-xs text-gray-500">No members affected</p>
+              ) : (
+                (summaryData?.reportingChangedMembers || []).map((m: any) => (
+                  <p key={m._id} className="text-xs">{m.name || m.email} ({m.email})</p>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Tasks reassigned: {(summaryData?.reassignedTasks || []).length}</p>
+            <div className="mt-2 max-h-40 overflow-y-auto border rounded-md p-2">
+              {(summaryData?.reassignedTasks || []).length === 0 ? (
+                <p className="text-xs text-gray-500">No tasks affected</p>
+              ) : (
+                (summaryData?.reassignedTasks || []).map((t: any) => (
+                  <p key={t._id} className="text-xs">{t.title}</p>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm">Approvals shifted: {summaryData?.approvalShiftedTasksCount || 0}</p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowSummary(false)} className="bg-[#344bfd] hover:bg-[#344bfd]/90 text-white">Close</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
