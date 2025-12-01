@@ -441,6 +441,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
             progress: project.progress,
             startDate: project.startDate,
             endDate: project.endDate,
+            projectHead: project.projectHead,
           } as any}
           onProjectUpdated={() => {
             setShowEdit(false);
