@@ -2,7 +2,7 @@ import React from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TruncatedTextModal } from "@/components/ui/truncated-text-modal";
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 interface ProjectOverviewPanelProps {
   projectManager: string;

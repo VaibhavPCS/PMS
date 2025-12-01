@@ -1944,9 +1944,9 @@ const TaskDetail = () => {
                       {subtasks.length > 0 && !subtasks.every(subtask => subtask.status === "done") && (
                         <span className="text-xs text-gray-500 ml-1">(Complete all subtasks first)</span>
                       )}
-                      {task.approvalStatus === "pending-approval" && (
+                      {/* {task.approvalStatus === "pending-approval" && (
                         <span className="text-xs text-gray-500 ml-1">(Pending TL approval)</span>
-                      )}
+                      )} */}
                     </div>
                   </SelectItem>
                 </SelectContent>

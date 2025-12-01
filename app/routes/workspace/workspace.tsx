@@ -31,7 +31,7 @@ import { AddProjectModal } from '../../components/project/AddProjectModal';
 import { CreateWorkspaceModal } from '../../components/layout/CreateWorkspaceModal';
 import { ProjectCardSkeleton } from '../../components/project/project-card-skeleton';
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 interface Project {
   _id: string;

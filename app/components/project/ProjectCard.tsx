@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { QuickEditTaskForm } from '@/components/task/QuickEditTaskForm';
 
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 
 interface Project {
@@ -76,7 +76,7 @@ const statusBorderColors: Record<ProjectStatus, string> = {
   'In Progress': 'border-[#F59E0B]',
   'On Hold': 'border-[#CD2812]',
   'Completed': 'border-[#479C39]',
-  'Cancelled': 'border-gray-500'
+  // 'Cancelled': 'border-gray-500'
 };
 
 
@@ -85,7 +85,7 @@ const statusProgressColors: Record<ProjectStatus, string> = {
   'In Progress': 'bg-[#F59E0B]',
   'On Hold': 'bg-[#CD2812]',
   'Completed': 'bg-[#479C39]',
-  'Cancelled': 'bg-gray-500'
+  // 'Cancelled': 'bg-gray-500'
 };
 
 
@@ -125,7 +125,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     if (isUpdating) return;
     // Defensive checks
-    const allowedStatuses: ProjectStatus[] = ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    const allowedStatuses: ProjectStatus[] = ['Planning', 'In Progress', 'On Hold', 'Completed'];
     if (!project || !project._id) {
       toast.error('Invalid project reference.');
       return;
@@ -149,7 +149,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
         'In Progress': 50,
         'On Hold': 30,
         'Completed': 100,
-        'Cancelled': 0
+        // 'Cancelled': 0
       };
       const newProgress = typeof updated.progress === 'number' ? updated.progress : statusProgressMap[newStatus];
       toast.success(`Project status updated to ${newStatus}`);
@@ -347,7 +347,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
                     </DropdownMenuItem>
                 )}
 
-                {isAdmin && (
+                {/* {isAdmin && (
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.stopPropagation();
@@ -358,7 +358,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
                       <FileText className="mr-2 h-4 w-4" />
                       Edit Task
                     </DropdownMenuItem>
-                )}
+                )} */}
 
                 {isAdmin && (
                   <DropdownMenuItem

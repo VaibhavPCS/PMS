@@ -81,7 +81,7 @@ interface ProjectStatistics {
   proposedProjects: number;
 }
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' ;
 
 interface Project {
   _id: string;

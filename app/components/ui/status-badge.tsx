@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' | 'Cancelled';
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 interface StatusBadgeProps {
   status: ProjectStatus;
@@ -25,10 +25,10 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
     label: 'Completed',
     className: 'bg-[#479C39] text-white hover:bg-[#479C39]/90'
   },
-  'Cancelled': {
-    label: 'Cancelled',
-    className: 'bg-gray-500 text-white hover:bg-gray-500/90'
-  }
+  // 'Cancelled': {
+  //   label: 'Cancelled',
+  //   className: 'bg-gray-500 text-white hover:bg-gray-500/90'
+  // }
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

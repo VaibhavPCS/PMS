@@ -180,7 +180,7 @@ export function EditProjectModal({ open, onClose, project, onProjectUpdated }: E
                     <SelectItem value="In Progress">In Progress</SelectItem>
                     <SelectItem value="On Hold">On Hold</SelectItem>
                     <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    {/* <SelectItem value="Cancelled">Cancelled</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>
