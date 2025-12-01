@@ -1465,6 +1465,8 @@ const Dashboard = () => {
                 value={updateForm.title}
                 onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
                 placeholder="Enter task title"
+                disabled={(selectedTask as any)?.approvalStatus === "approved"}
+                className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""}
               />
             </div>
             <div className="grid gap-2">
@@ -1475,13 +1477,15 @@ const Dashboard = () => {
                 onChange={(e) => setUpdateForm({ ...updateForm, description: e.target.value })}
                 placeholder="Enter task description"
                 rows={3}
+                disabled={(selectedTask as any)?.approvalStatus === "approved"}
+                className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="priority">Priority</Label>
                 <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1495,7 +1499,7 @@ const Dashboard = () => {
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
                 <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1533,7 +1537,7 @@ const Dashboard = () => {
             <Button variant="outline" onClick={() => setShowUpdateModal(false)} disabled={isUpdating}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateTask} disabled={isUpdating || !updateForm.title.trim()}>
+            <Button onClick={handleUpdateTask} disabled={(selectedTask as any)?.approvalStatus === "approved" || isUpdating || !updateForm.title.trim()} className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""}>
               {isUpdating ? "Updating..." : "Update Task"}
             </Button>
           </DialogFooter>

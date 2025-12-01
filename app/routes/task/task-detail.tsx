@@ -678,6 +678,8 @@ const TaskDetail = () => {
   const [rejectStartDate, setRejectStartDate] = useState("");
   const [rejectDueDate, setRejectDueDate] = useState("");
   const [rejectReassigneeId, setRejectReassigneeId] = useState("");
+  const [rejectProjectStart, setRejectProjectStart] = useState<Date | null>(null);
+  const [rejectProjectEnd, setRejectProjectEnd] = useState<Date | null>(null);
 
   // ✅ NEW: Reassignment modal states
   const [showReassignDialog, setShowReassignDialog] = useState(false);
@@ -1015,6 +1017,11 @@ const TaskDetail = () => {
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
 
+    if (task.approvalStatus === "approved") {
+      toast.error("Approved tasks are locked and cannot change status");
+      return;
+    }
+
     // Check if this is a subtask that requires approval before being marked as done
     if (newStatus === "done" && task.approvalStatus === "pending-approval") {
       toast.error("This subtask must be approved by a TL before it can be marked as done");
@@ -1197,6 +1204,27 @@ const TaskDetail = () => {
       return;
     }
 
+    const s = new Date(rejectStartDate);
+    const d = new Date(rejectDueDate);
+    s.setHours(0,0,0,0);
+    d.setHours(0,0,0,0);
+    if (s > d) {
+      toast.error("Start date cannot be after due date");
+      return;
+    }
+    if (rejectProjectStart && s < rejectProjectStart) {
+      toast.error("Start date cannot be before project start date");
+      return;
+    }
+    if (rejectProjectEnd) {
+      const pePlusOne = new Date(rejectProjectEnd);
+      pePlusOne.setDate(pePlusOne.getDate() + 1);
+      if (d.getTime() >= pePlusOne.getTime()) {
+        toast.error("Due date cannot be after project end date");
+        return;
+      }
+    }
+
     try {
       setIsRejecting(true);
       await postData(`/task/${task._id}/reject`, {
@@ -1341,6 +1369,22 @@ const TaskDetail = () => {
     }
     setShowRejectDialog(true);
   };
+
+  useEffect(() => {
+    const fetchProjectBounds = async () => {
+      if (!showRejectDialog || !task?.project?._id) return;
+      try {
+        const res = await fetchData(`/projects/${(task.project as any)._id}`);
+        const ps = new Date(res.project.startDate);
+        const pe = new Date(res.project.endDate);
+        ps.setHours(0, 0, 0, 0);
+        pe.setHours(0, 0, 0, 0);
+        setRejectProjectStart(ps);
+        setRejectProjectEnd(pe);
+      } catch {}
+    };
+    fetchProjectBounds();
+  }, [showRejectDialog, task?.project?._id]);
 
   // ✅ NEW: Pre-fill reassignment modal with current task dates
   const openReassignDialog = () => {
@@ -2004,7 +2048,7 @@ const TaskDetail = () => {
               )}
 
               <Select value={task.status} onValueChange={handleStatusChange}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className={cn("w-40", task.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")} disabled={task.approvalStatus === "approved"}>
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(task.status)}
                     <SelectValue />
@@ -2766,10 +2810,49 @@ const TaskDetail = () => {
                       mode="single"
                       selected={rejectStartDate ? new Date(rejectStartDate) : undefined}
                       onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = format(date, 'yyyy-MM-dd');
-                          setRejectStartDate(formattedDate);
+                        if (!date) return;
+                        const d = new Date(date);
+                        d.setHours(0,0,0,0);
+                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) pe.setHours(0,0,0,0);
+                        if (ps && d < ps) {
+                          const f = format(ps, 'yyyy-MM-dd');
+                          setRejectStartDate(f);
+                          if (rejectDueDate) {
+                            const due = new Date(rejectDueDate);
+                            due.setHours(0,0,0,0);
+                            if (due < ps) setRejectDueDate(f);
+                          }
+                          return;
                         }
+                        if (pe && d > pe) {
+                          const f = format(pe, 'yyyy-MM-dd');
+                          setRejectStartDate(f);
+                          if (rejectDueDate) {
+                            const due = new Date(rejectDueDate);
+                            due.setHours(0,0,0,0);
+                            if (due < pe) setRejectDueDate(f);
+                          }
+                          return;
+                        }
+                        const f = format(d, 'yyyy-MM-dd');
+                        setRejectStartDate(f);
+                        if (rejectDueDate) {
+                          const due = new Date(rejectDueDate);
+                          due.setHours(0,0,0,0);
+                          if (due < d) setRejectDueDate(f);
+                        }
+                      }}
+                      disabled={(date) => {
+                        const d = new Date(date as Date);
+                        d.setHours(0,0,0,0);
+                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) pe.setHours(0,0,0,0);
+                        return Boolean((ps && d < ps) || (pe && d > pe));
                       }}
                       initialFocus
                     />
@@ -2803,10 +2886,50 @@ const TaskDetail = () => {
                       mode="single"
                       selected={rejectDueDate ? new Date(rejectDueDate) : undefined}
                       onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = format(date, 'yyyy-MM-dd');
-                          setRejectDueDate(formattedDate);
+                        if (!date) return;
+                        const d = new Date(date);
+                        d.setHours(0,0,0,0);
+                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        if (pe) {
+                          pe.setHours(0,0,0,0);
+                          const pePlusOne = new Date(pe);
+                          pePlusOne.setDate(pePlusOne.getDate() + 1);
+                          if (d.getTime() >= pePlusOne.getTime()) {
+                            setRejectDueDate(format(pe, 'yyyy-MM-dd'));
+                            return;
+                          }
                         }
+                        if (ps && d < ps) {
+                          setRejectDueDate(format(ps, 'yyyy-MM-dd'));
+                          return;
+                        }
+                        if (rejectStartDate) {
+                          const s = new Date(rejectStartDate);
+                          s.setHours(0,0,0,0);
+                          if (d < s) {
+                            setRejectDueDate(format(s, 'yyyy-MM-dd'));
+                            return;
+                          }
+                        }
+                        setRejectDueDate(format(d, 'yyyy-MM-dd'));
+                      }}
+                      disabled={(date) => {
+                        const d = new Date(date as Date);
+                        d.setHours(0,0,0,0);
+                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
+                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
+                        if (ps) ps.setHours(0,0,0,0);
+                        let pePlusOne: Date | null = null;
+                        if (pe) {
+                          pe.setHours(0,0,0,0);
+                          pePlusOne = new Date(pe);
+                          pePlusOne.setDate(pePlusOne.getDate() + 1);
+                        }
+                        const startBaseline = rejectStartDate ? new Date(rejectStartDate) : ps || undefined;
+                        if (startBaseline) startBaseline.setHours(0,0,0,0);
+                        return Boolean((startBaseline && d < startBaseline) || (pePlusOne && d.getTime() >= pePlusOne.getTime()));
                       }}
                       initialFocus
                     />

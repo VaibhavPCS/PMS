@@ -2841,7 +2841,9 @@ const ProjectDetail = () => {
                           projStart.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
-                          return Boolean(date < projStart || (projEnd && date > projEnd));
+                          const d = new Date(date);
+                          d.setHours(0, 0, 0, 0);
+                          return Boolean(d < projStart || (projEnd && d > projEnd));
                         }}
                         initialFocus
                       />
@@ -2874,22 +2876,33 @@ const ProjectDetail = () => {
                           if (projEnd) {
                             projEnd.setHours(0, 0, 0, 0);
                           }
-                          if (projEnd && date > projEnd) {
+                          const selected = new Date(date);
+                          selected.setHours(0, 0, 0, 0);
+                          const projEndPlusOne = projEnd ? new Date(projEnd) : undefined;
+                          if (projEndPlusOne) {
+                            projEndPlusOne.setDate(projEndPlusOne.getDate() + 1);
+                          }
+                          if (projEndPlusOne && selected.getTime() >= projEndPlusOne.getTime()) {
                             toast.error("Due date cannot be after project end date");
                             setDueDateObj(projEnd);
-                            setNewTask({ ...newTask, dueDate: format(projEnd, "yyyy-MM-dd") });
+                            setNewTask({ ...newTask, dueDate: projEnd ? format(projEnd, "yyyy-MM-dd") : "" });
                             return;
                           }
-                          setDueDateObj(date);
-                          setNewTask({ ...newTask, dueDate: format(date, "yyyy-MM-dd") });
+                          setDueDateObj(selected);
+                          setNewTask({ ...newTask, dueDate: format(selected, "yyyy-MM-dd") });
                         }}
                         disabled={(date) => {
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
-                          const startBaseline = startDateObj || projStart;
+                          const startBaseline = startDateObj ? new Date(startDateObj) : projStart;
+                          startBaseline.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
-                          return Boolean(date < startBaseline || (projEnd && date > projEnd));
+                          const projEndPlusOne = projEnd ? new Date(projEnd) : undefined;
+                          if (projEndPlusOne) projEndPlusOne.setDate(projEndPlusOne.getDate() + 1);
+                          const d = new Date(date);
+                          d.setHours(0, 0, 0, 0);
+                          return Boolean(d < startBaseline || (projEndPlusOne && d >= projEndPlusOne));
                         }}
                         initialFocus
                       />
