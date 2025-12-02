@@ -304,6 +304,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         return '📋';
       case 'task_updated':
         return '✏️';
+      case 'task_reassigned':
+        return '🔄';
       case 'task_comment':
         return '💬';
       default:

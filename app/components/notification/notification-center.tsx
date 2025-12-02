@@ -250,6 +250,7 @@ const NotificationCenter = () => {
       case 'workspace_invite': return '🏢';
       case 'task_assigned': return '📋';
       case 'task_updated': return '✏️';
+      case 'task_reassigned': return '🔄';
       case 'task_comment': return '💬';
       default: return '📢';
     }
