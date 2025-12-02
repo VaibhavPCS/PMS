@@ -18,7 +18,7 @@ interface UserRef {
 interface ProjectMember {
   userId: UserRef;
   role?: string;
-  reportsTo?: string;
+  reportsTo?: string | UserRef;  // Can be ID string or populated object
 }
 
 interface RemoveProjectMembersModalProps {
@@ -28,6 +28,8 @@ interface RemoveProjectMembersModalProps {
   projectHead?: UserRef | null;
   members?: ProjectMember[];
   onRemoveSuccess?: () => Promise<void> | void;
+  userRole?: string;  // User's workspace role for permission checks
+  currentUserId?: string;  // Current user's ID to check if they're project head
 }
 
 const getErrorMessage = (error: any, fallback?: string): string => {
@@ -50,6 +52,8 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
   projectHead,
   members = [],
   onRemoveSuccess,
+  userRole = '',
+  currentUserId = '',
 }) => {
   const [query, setQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -60,14 +64,24 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
 
   const allMembers = useMemo(() => {
-    const list: Array<{ _id: string; name: string; email: string; isHead?: boolean; role?: string; reportsTo?: string }> = [];
+    const list: Array<{ _id: string; name: string; email: string; isHead?: boolean; role?: string; reportsTo?: string; reportsToName?: string }> = [];
     if (projectHead?._id) {
       list.push({ _id: projectHead._id, name: projectHead.name, email: projectHead.email, isHead: true, role: 'project-head' });
     }
     for (const m of members) {
       const u = m?.userId;
       if (u?._id && !list.some(x => x._id === u._id)) {
-        list.push({ _id: u._id, name: u.name, email: u.email, role: m.role, reportsTo: m.reportsTo });
+        // Handle reportsTo as either string ID or populated object
+        const reportsToId = typeof m.reportsTo === 'string' ? m.reportsTo : m.reportsTo?._id;
+        const reportsToName = typeof m.reportsTo === 'object' && m.reportsTo ? m.reportsTo.name : undefined;
+        list.push({
+          _id: u._id,
+          name: u.name,
+          email: u.email,
+          role: m.role,
+          reportsTo: reportsToId,
+          reportsToName: reportsToName
+        });
       }
     }
     return list;
@@ -79,7 +93,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
     return allMembers.filter(m => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
   }, [allMembers, query]);
 
-  const [editing, setEditing] = useState<{ _id: string; name: string; email: string; role?: string; reportsTo?: string } | null>(null);
+  const [editing, setEditing] = useState<{ _id: string; name: string; email: string; role?: string; reportsTo?: string; reportsToName?: string } | null>(null);
   const [editRole, setEditRole] = useState<string>('member');
   const [editReportsTo, setEditReportsTo] = useState<string>('');
   
@@ -97,7 +111,25 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
     return opts;
   }, [projectHead, members]);
 
-  const openEdit = (m: { _id: string; name: string; email: string; role?: string; reportsTo?: string }) => {
+  // Check if current user can edit members
+  const canEditMembers = () => {
+    // Check if user is project head
+    const isProjectHead = projectHead?._id === currentUserId;
+    // Check workspace role
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    const isOwner = userRole === 'owner';
+    const isLead = userRole === 'lead' || userRole === 'head';
+
+    return isProjectHead || isAdmin || isOwner || isLead;
+  };
+
+  const openEdit = (m: { _id: string; name: string; email: string; role?: string; reportsTo?: string; reportsToName?: string }) => {
+    // Check permissions before opening edit dialog
+    if (!canEditMembers()) {
+      toast.error('Only project lead, admin, or workspace owner can edit members');
+      return;
+    }
+
     setEditing(m);
     setEditRole(m.role || 'member');
     setEditReportsTo(m.reportsTo || '');
@@ -272,7 +304,10 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
                 ) : (
                   filteredMembers.map((m) => (
                     <div key={m._id} className="flex items-center justify-between p-2 border rounded-md">
-                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => !m.isHead && openEdit(m)}>
+                      <div
+                        className={`flex items-center gap-3 ${!m.isHead && canEditMembers() ? 'cursor-pointer hover:bg-accent/30 rounded-md p-1 -m-1' : ''}`}
+                        onClick={() => !m.isHead && canEditMembers() && openEdit(m)}
+                      >
                         <Avatar className="w-8 h-8">
                           <AvatarFallback className="text-xs">
                             {(m.name?.charAt(0) || m.email?.charAt(0) || '?').toUpperCase()}
@@ -283,9 +318,16 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
                             {m.name} {m.isHead && <span className="ml-1 text-[10px] text-blue-600">(Project Head)</span>}
                           </div>
                           <div className="text-xs text-gray-600">{m.email}</div>
-                          {m.role && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">Role: {m.role}</div>
-                          )}
+                          <div className="flex items-center gap-3 mt-0.5">
+                            {m.role && (
+                              <div className="text-[10px] text-gray-500">Role: {m.role}</div>
+                            )}
+                            {m.reportsTo && (
+                              <div className="text-[10px] text-blue-600">
+                                Reports to: {m.reportsToName || allMembers.find(mem => mem._id === m.reportsTo)?.name || 'Unknown'}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Button
