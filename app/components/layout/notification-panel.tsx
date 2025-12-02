@@ -80,6 +80,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       /*
       // Check resource existence before navigation
       try {
+        // Check task existence and active status
         if (data.taskId) {
           const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include' });
           if (!existsResponse.ok) {
@@ -90,16 +91,15 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
           const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
           if (taskResponse.ok) {
             const taskData = await taskResponse.json();
+            // If isActive is false, task is deleted - don't redirect
             if (taskData.task?.isActive === false) {
               toast.error("This task has been deleted or archived");
               return;
             }
-            if (taskData.task?.deletedAt) {
-              toast.error("This task has been deleted");
-              return;
-            }
           }
-        } else if (data.projectId) {
+        }
+        // Check project existence and active status
+        else if (data.projectId) {
           const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include' });
           if (!existsResponse.ok) {
             toast.error("This project no longer exists or you don't have access to it");
@@ -109,34 +109,28 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
           const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include' });
           if (projectResponse.ok) {
             const projectData = await projectResponse.json();
+            // If isActive is false, project is deleted - don't redirect
             if (projectData.project?.isActive === false) {
               toast.error("This project has been deleted or archived");
-              return;
-            }
-            if (projectData.project?.deletedAt) {
-              toast.error("This project has been deleted");
               return;
             }
           }
         }
 
-        // Check workspace existence if provided
+        // Check workspace existence and archived status if provided
         if (data.workspaceId) {
           const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
           if (!existsResponse.ok) {
             toast.error("This workspace no longer exists or you don't have access to it");
             return;
           }
-          // Check if workspace is archived or deleted
+          // Check if workspace is archived
           const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include' });
           if (workspaceResponse.ok) {
             const workspaceData = await workspaceResponse.json();
-            if (workspaceData.workspace?.isArchived) {
+            // If isArchived is true, workspace is archived - don't redirect
+            if (workspaceData.workspace?.isArchived === true) {
               toast.error("This workspace has been archived");
-              return;
-            }
-            if (workspaceData.workspace?.deletedAt) {
-              toast.error("This workspace has been deleted");
               return;
             }
           }
