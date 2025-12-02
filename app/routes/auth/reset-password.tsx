@@ -1,22 +1,15 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Link, useLocation, useNavigate } from 'react-router';
-import { useResetPasswordMutation } from '@/hooks/use-auth';
-import { toast } from 'sonner';
-
-const resetPasswordSchema = z.object({
-  newPassword: z.string().min(8, "Password must be at least 8 characters long"),
-  confirmPassword: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+import React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Link, useLocation, useNavigate } from "react-router";
+import { useResetPasswordMutation } from "@/hooks/use-auth";
+import { toast } from "sonner";
+import AuthPanelLayout from "@/components/layout/auth-panel-layout";
+import { resetPasswordSchema } from "@/lib/schema";
+import type { z } from "zod";
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
@@ -28,18 +21,17 @@ const ResetPassword = () => {
   const form = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      newPassword: '',
-      confirmPassword: '',
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
   const { mutate, isPending } = useResetPasswordMutation();
 
-  // Redirect if no reset data provided
   React.useEffect(() => {
     if (!userId || !resetToken) {
       toast.error("Invalid access");
-      navigate('/forgot-password');
+      navigate("/forgot-password");
     }
   }, [userId, resetToken, navigate]);
 
@@ -57,7 +49,7 @@ const ResetPassword = () => {
           });
 
           form.reset();
-          navigate('/sign-in');
+          navigate("/sign-in");
         },
         onError: (error: any) => {
           const errorMessage = error.response?.data?.message || "Failed to reset password";
@@ -72,68 +64,73 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className='min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4'>
-      <Card className='max-w-md w-full shadow-xl'>
-        <CardHeader className='text-center'>
-          <CardTitle className='text-2xl font-bold'>Reset Password</CardTitle>
-          <CardDescription className='text-sm text-muted-foreground'>
-            Enter your new password below.
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
+    <AuthPanelLayout>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2.5">
+          <h1 className="text-2xl font-semibold text-[#1a1a1a]">Reset Password</h1>
+          <p className="text-sm text-gray-500">Enter your new password below.</p>
+        </div>
+
+        <div className="flex flex-col gap-5">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleOnSubmit)} noValidate className='space-y-4'>
-              <FormField 
-                control={form.control} 
-                name="newPassword" 
-                render={({field}) => (
+            <form onSubmit={form.handleSubmit(handleOnSubmit)} noValidate className="flex flex-col gap-4">
+              <FormField
+                control={form.control}
+                name="newPassword"
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel className="text-sm text-[#333333] px-4">New Password</FormLabel>
                     <FormControl>
-                      <Input 
-                        type='password' 
-                        placeholder='Enter new password' 
-                        {...field} 
+                      <Input
+                        type="password"
+                        placeholder="Enter new password"
+                        className="h-12 bg-[#f2f2f2] border-[0.5px] border-neutral-200 rounded-md px-4 text-sm placeholder:text-gray-500"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
-                )} 
+                )}
               />
 
-              <FormField 
-                control={form.control} 
-                name="confirmPassword" 
-                render={({field}) => (
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel className="text-sm text-[#333333] px-4">Confirm Password</FormLabel>
                     <FormControl>
-                      <Input 
-                        type='password' 
-                        placeholder='Confirm new password' 
-                        {...field} 
+                      <Input
+                        type="password"
+                        placeholder="Confirm new password"
+                        className="h-12 bg-[#f2f2f2] border-[0.5px] border-neutral-200 rounded-md px-4 text-sm placeholder:text-gray-500"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
-                )} 
+                )}
               />
 
-              <Button type='submit' className='w-full' disabled={isPending}>
-                {isPending ? 'Updating Password...' : 'Update Password'}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="w-full h-10 bg-[#007aff] hover:bg-[#0066cc] text-white font-bold text-[15px] rounded-md px-6 py-2.5 transition-colors"
+              >
+                {isPending ? "Updating Password..." : "Update Password"}
               </Button>
             </form>
           </Form>
+        </div>
 
-          <div className='mt-6 text-center'>
-            <div className='text-sm text-muted-foreground'>
-              Remember your password? <Link to='/sign-in' className='text-primary'>Sign In</Link>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <div className="flex items-center justify-center gap-2 text-xs">
+          <span className="text-[#1a1a1a]">Remember your password?</span>
+          <Link to="/sign-in" className="text-[#007aff] hover:underline">
+            Back to Sign
+          </Link>
+        </div>
+      </div>
+    </AuthPanelLayout>
   );
 };
 

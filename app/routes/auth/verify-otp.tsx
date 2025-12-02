@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useVerifyOTPMutation } from "@/hooks/use-auth";
+import { useVerifyOTPMutation, useVerifyResetOTPMutation } from "@/hooks/use-auth";
 import { useAuth } from "../../provider/auth-context";
 import { toast } from "sonner";
 import AuthPanelLayout from "@/components/layout/auth-panel-layout";
@@ -41,7 +41,8 @@ const VerifyOtp = () => {
     },
   });
 
-  const { mutate: verifyOTP, isPending } = useVerifyOTPMutation();
+  const { mutate: verifyOTP, isPending: isPendingVerify } = useVerifyOTPMutation();
+  const { mutate: verifyResetOTP, isPending: isPendingReset } = useVerifyResetOTPMutation();
 
   useEffect(() => {
     if (!userId || !email || !type) {
@@ -65,38 +66,41 @@ const VerifyOtp = () => {
   }, [userId, email, type, navigate]);
 
   const handleSubmit = (values: VerifyOtpFormData) => {
+    if (type === "password-reset") {
+      verifyResetOTP(
+        { userId, otp: values.otp },
+        {
+          onSuccess: (data: any) => {
+            toast.success("Verification successful!");
+            navigate("/reset-password", { state: { userId: data.userId, resetToken: data.resetToken } });
+          },
+          onError: (error: any) => {
+            const errorMessage = error.response?.data?.message || "Verification failed";
+            toast.error(errorMessage);
+          },
+        }
+      );
+      return;
+    }
+
     verifyOTP(
       { userId, otp: values.otp, type },
       {
-        onSuccess: async (data: any) => {
+        onSuccess: async () => {
           toast.success("Verification successful!");
-
-          // Handle both login and registration verification
-          if (type === "login" || type === "registration") {
-            // Show appropriate message
-            if (type === "registration") {
-              toast.success("Welcome! Your account is ready.");
-            }
-
-            try {
-              // Force auth check to update context with HTTP-only cookie
-              await forceAuthCheck();
-
-              // Navigate to dashboard after auth context is updated
-              navigate("/dashboard");
-            } catch (error) {
-              console.error("Failed to fetch user info after verification:", error);
-              toast.error("Login successful but failed to load user data. Please try refreshing.");
-              navigate("/dashboard");
-            }
-          } else {
-            // Fallback for password-reset or other types
-            navigate("/sign-in");
+          if (type === "registration") {
+            toast.success("Welcome! Your account is ready.");
+          }
+          try {
+            await forceAuthCheck();
+            navigate("/dashboard");
+          } catch {
+            toast.error("Login successful but failed to load user data. Please try refreshing.");
+            navigate("/dashboard");
           }
         },
         onError: (error: any) => {
-          const errorMessage =
-            error.response?.data?.message || "Verification failed";
+          const errorMessage = error.response?.data?.message || "Verification failed";
           toast.error(errorMessage);
         },
       }
@@ -177,10 +181,10 @@ const VerifyOtp = () => {
               {/* Verify OTP Button */}
               <Button
                 type="submit"
-                disabled={isPending || countdown === 0}
+                disabled={isPendingVerify || isPendingReset || countdown === 0}
                 className="w-full h-10 bg-[#007aff] hover:bg-[#0066cc] text-white font-bold text-[15px] rounded-md px-6 py-2.5 transition-colors"
               >
-                {isPending ? "Verifying..." : "Verify OTP"}
+                {isPendingVerify || isPendingReset ? "Verifying..." : "Verify OTP"}
               </Button>
             </form>
           </Form>
@@ -190,9 +194,9 @@ const VerifyOtp = () => {
         <div className="flex items-center justify-center gap-2 text-xs">
           {type === "password-reset" ? (
             <>
-              <Link to="/forgot-password" className="text-[#007aff] hover:underline">
+              {/* <Link to="/forgot-password" className="text-[#007aff] hover:underline">
                 Wrong Password?
-              </Link>
+              </Link> */}
             </>
           ) : (
             <>

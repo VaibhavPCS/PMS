@@ -25,12 +25,10 @@ export const useSignInMutation = () => {
 export const useVerifyOTPMutation = () => {
   return useMutation({
     mutationFn: (data: { userId: string; otp: string; type: string }) => {
-      // All OTP verification (login, registration, etc.) uses the same endpoint
       return postData('/auth/verify-otp', { 
         token: {
           userId: data.userId,
           otp: data.otp,
-          type: data.type
         }
       });
     },
