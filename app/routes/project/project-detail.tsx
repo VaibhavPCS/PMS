@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
-import { fetchData, postData, deleteData, putData } from "@/lib/fetch-util"; // ✅ UPDATED: Added putData import
+import { fetchData, postData, deleteData, putData, postMultipart } from "@/lib/fetch-util";
 import { buildApiUrl } from "@/lib/config"; // ✅ NEW: Added buildApiUrl import
 import {
   ArrowLeft,
@@ -1894,39 +1894,11 @@ const ProjectDetail = () => {
           formData.append("dueDate", newTask.dueDate);
           formData.append("projectId", projectId || "");
 
-          // Append files
           taskAttachments.forEach((file) => {
             formData.append("attachments", file);
           });
 
-          const response = await fetch(
-            `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api-v1/task`,
-            {
-              method: "POST",
-              credentials: "include",
-              headers: {
-                "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-              },
-              body: formData,
-            }
-          );
-
-          if (!response.ok) {
-            // Try to get the backend error message with file name details
-            let errorMessage = "Failed to create task";
-            try {
-              const errorData = await response.json();
-              if (errorData.message) {
-                errorMessage = errorData.message;
-              } else if (errorData.status === 'fail' && errorData.message) {
-                errorMessage = errorData.message;
-              }
-            } catch (parseError) {
-              // Fallback to response status text if JSON parsing fails
-              errorMessage = response.statusText || "Failed to create task";
-            }
-            throw new Error(errorMessage);
-          }
+          await postMultipart("/task", formData);
         } else {
           const payload: any = { ...newTask, projectId };
           if (!newTask.assigneeId) {
