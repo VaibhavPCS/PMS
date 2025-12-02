@@ -67,6 +67,15 @@ interface Workspace {
   _id: string;
   name: string;
   description?: string;
+  members?: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    role: string;
+    joinedAt: string;
+  }>;
 }
 
 const WorkspacePage = () => {
@@ -91,6 +100,23 @@ const WorkspacePage = () => {
   }, [projects]);
 
   // Check if workspace exists and is accessible (not archived/deleted)
+  // Check if user can add projects (admin OR lead/owner in current workspace)
+  const canAddProject = () => {
+    // Global admin can always add projects
+    if (user?.role === 'admin') return true;
+
+    // Check if user is lead or owner in current workspace
+    if (currentWorkspace?.members) {
+      const currentUserId = (user as any)?._id || (user as any)?.id;
+      const userMember = currentWorkspace.members.find(
+        (m) => m.userId._id === currentUserId || m.userId === currentUserId
+      );
+      return userMember?.role === 'lead' || userMember?.role === 'owner';
+    }
+
+    return false;
+  };
+
   const checkWorkspaceExistence = async (workspaceId: string) => {
     try {
       // First check if workspace exists via exists endpoint
@@ -402,8 +428,8 @@ const switchWorkspace = async (workspaceId: string) => {
               </SelectContent>
             </Select>
 
-            {/* Add Project Button (visible only to admin) */}
-            {user?.role === 'admin' && (
+            {/* Add Project Button (visible to admin and workspace lead/owner) */}
+            {canAddProject() && (
               <Button
                 onClick={() => setShowAddProjectModal(true)}
                 className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center gap-[10px]"

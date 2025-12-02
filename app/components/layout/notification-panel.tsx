@@ -75,7 +75,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       onClose();
 
       const { data } = notification;
-      
+
+      // COMMENTED OUT: Notification validation checks
+      /*
       // Check resource existence before navigation
       try {
         if (data.taskId) {
@@ -84,12 +86,12 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
             toast.error("This task no longer exists.");
             return;
           }
-          // Check if task is archived or deleted
+          // Check if task is deleted or inactive
           const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
           if (taskResponse.ok) {
             const taskData = await taskResponse.json();
-            if (taskData.task?.isArchived) {
-              toast.error("This task has been archived");
+            if (taskData.task?.isActive === false) {
+              toast.error("This task has been deleted or archived");
               return;
             }
             if (taskData.task?.deletedAt) {
@@ -103,12 +105,12 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
             toast.error("This project no longer exists or you don't have access to it");
             return;
           }
-          // Check if project is archived or deleted
+          // Check if project is deleted or inactive
           const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include' });
           if (projectResponse.ok) {
             const projectData = await projectResponse.json();
-            if (projectData.project?.isArchived) {
-              toast.error("This project has been archived");
+            if (projectData.project?.isActive === false) {
+              toast.error("This project has been deleted or archived");
               return;
             }
             if (projectData.project?.deletedAt) {
@@ -117,7 +119,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
             }
           }
         }
-        
+
         // Check workspace existence if provided
         if (data.workspaceId) {
           const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
@@ -138,7 +140,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
               return;
             }
           }
-          
+
           // Persist and switch workspace on backend if provided
           try {
             localStorage.setItem('currentWorkspaceId', data.workspaceId);
@@ -153,6 +155,19 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         console.error('Error checking resource existence:', error);
         toast.error("Unable to verify resource access");
         return;
+      }
+      */
+
+      // Switch workspace if provided
+      if (data.workspaceId) {
+        try {
+          localStorage.setItem('currentWorkspaceId', data.workspaceId);
+        } catch {}
+        try {
+          await postData('/workspace/switch', { workspaceId: data.workspaceId });
+        } catch (err) {
+          console.error('Failed to switch workspace from notification:', err);
+        }
       }
 
       // Decide the most specific target route first

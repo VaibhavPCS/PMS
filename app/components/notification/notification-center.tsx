@@ -108,84 +108,76 @@ const NotificationCenter = () => {
 
     // Navigate based on notification data
     const { data } = notification;
-    
-    // Check resource existence before navigation
+
+    // Switch workspace first if provided, then check resource existence
+    // COMMENTED OUT: Notification validation checks
+    /*
     try {
+      let headers: Record<string, string> = {};
+      if (data.workspaceId) {
+        try { localStorage.setItem('currentWorkspaceId', data.workspaceId); } catch {}
+        try { await postData('/workspace/switch', { workspaceId: data.workspaceId }); } catch (err) {
+          console.error('Failed to switch workspace from notification:', err);
+        }
+        headers['workspace-id'] = data.workspaceId;
+      } else {
+        const wsId = localStorage.getItem('currentWorkspaceId') || '';
+        if (wsId) headers['workspace-id'] = wsId;
+      }
+
       if (data.taskId) {
-        const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include' });
+        const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {
           toast.error("This task no longer exists.");
           return;
         }
-        // Check if task is archived or deleted
-        const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
+        const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include', headers });
         if (taskResponse.ok) {
           const taskData = await taskResponse.json();
-          if (taskData.task?.isArchived) {
-            toast.error("This task has been archived");
-            return;
-          }
-          if (taskData.task?.deletedAt) {
-            toast.error("This task has been deleted");
-            return;
-          }
+          if (taskData.task?.isActive === false) { toast.error("This task has been deleted or archived"); return; }
+          if (taskData.task?.deletedAt) { toast.error("This task has been deleted"); return; }
         }
       } else if (data.projectId) {
-        const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include' });
+        const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {
           toast.error("This project no longer exists or you don't have access to it");
           return;
         }
-        // Check if project is archived or deleted
-        const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include' });
+        const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include', headers });
         if (projectResponse.ok) {
           const projectData = await projectResponse.json();
-          if (projectData.project?.isArchived) {
-            toast.error("This project has been archived");
-            return;
-          }
-          if (projectData.project?.deletedAt) {
-            toast.error("This project has been deleted");
-            return;
-          }
+          if (projectData.project?.isActive === false) { toast.error("This project has been deleted or archived"); return; }
+          if (projectData.project?.deletedAt) { toast.error("This project has been deleted"); return; }
         }
       }
-      
-      // Check workspace existence if provided
+
       if (data.workspaceId) {
-        const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
-        if (!existsResponse.ok) {
-          toast.error("This workspace no longer exists or you don't have access to it");
-          return;
-        }
-        // Check if workspace is archived or deleted
-        const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include' });
+        const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include', headers });
+        if (!existsResponse.ok) { toast.error("This workspace no longer exists or you don't have access to it"); return; }
+        const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include', headers });
         if (workspaceResponse.ok) {
           const workspaceData = await workspaceResponse.json();
-          if (workspaceData.workspace?.isArchived) {
-            toast.error("This workspace has been archived");
-            return;
-          }
-          if (workspaceData.workspace?.deletedAt) {
-            toast.error("This workspace has been deleted");
-            return;
-          }
-        }
-        
-        // Persist and switch workspace on backend if provided
-        try {
-          localStorage.setItem('currentWorkspaceId', data.workspaceId);
-        } catch {}
-        try {
-          await postData('/workspace/switch', { workspaceId: data.workspaceId });
-        } catch (err) {
-          console.error('Failed to switch workspace from notification:', err);
+          if (workspaceData.workspace?.isArchived) { toast.error("This workspace has been archived"); return; }
+          if (workspaceData.workspace?.deletedAt) { toast.error("This workspace has been deleted"); return; }
         }
       }
     } catch (error) {
       console.error('Error checking resource existence:', error);
       toast.error("Unable to verify resource access");
       return;
+    }
+    */
+
+    // Switch workspace if provided
+    if (data.workspaceId) {
+      try {
+        localStorage.setItem('currentWorkspaceId', data.workspaceId);
+      } catch {}
+      try {
+        await postData('/workspace/switch', { workspaceId: data.workspaceId });
+      } catch (err) {
+        console.error('Failed to switch workspace from notification:', err);
+      }
     }
 
     // Route selection: task > project > workspace > meetings > invite > dashboard

@@ -1238,14 +1238,14 @@ const Dashboard = () => {
                     <h3 className="font-['Inter'] font-medium text-[16px] text-[#2e2e30] leading-normal flex-1">
                       Task Overview
                     </h3>
-                    <Button
+                    {/* <Button
                       variant="ghost"
                       size="sm"
                       className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
                     >
                       See All
                       <ArrowRight className="w-4 h-4" />
-                    </Button>
+                    </Button> */}
                   </div>
 
                   {/* Search and Filter */}

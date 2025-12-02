@@ -819,10 +819,10 @@ const TaskCard = React.memo<{
     return isAssigneeOrCreator || isAdmin || isProjectLead;
   }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
-  // Delete allowed for assignee, creator, or admin (backend: deleteTask)
+  // Delete allowed for assignee, creator, admin, or project lead (backend: deleteTask)
   const canDeleteTask = useMemo(() => {
-    return isAssigneeOrCreator || isAdmin;
-  }, [isAssigneeOrCreator, isAdmin]);
+    return isAssigneeOrCreator || isAdmin || isProjectLead;
+  }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
