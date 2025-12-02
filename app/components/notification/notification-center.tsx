@@ -109,9 +109,7 @@ const NotificationCenter = () => {
     // Navigate based on notification data
     const { data } = notification;
 
-    // COMMENTED OUT: Notification validation checks
-    /*
-    // Switch workspace first if provided, then check resource existence
+    // Check resource existence and status before navigation
     try {
       let headers: Record<string, string> = {};
       if (data.workspaceId) {
@@ -135,7 +133,7 @@ const NotificationCenter = () => {
         const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include', headers });
         if (taskResponse.ok) {
           const taskData = await taskResponse.json();
-          // If isActive is false, task is deleted - don't redirect
+          // If isActive is false, task is deleted/archived - don't redirect
           if (taskData.task?.isActive === false) {
             toast.error("This task has been deleted or archived");
             return;
@@ -152,7 +150,7 @@ const NotificationCenter = () => {
         const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include', headers });
         if (projectResponse.ok) {
           const projectData = await projectResponse.json();
-          // If isActive is false, project is deleted - don't redirect
+          // If isActive is false, project is deleted/archived - don't redirect
           if (projectData.project?.isActive === false) {
             toast.error("This project has been deleted or archived");
             return;
@@ -182,7 +180,6 @@ const NotificationCenter = () => {
       toast.error("Unable to verify resource access");
       return;
     }
-    */
 
     // Switch workspace if provided
     if (data.workspaceId) {

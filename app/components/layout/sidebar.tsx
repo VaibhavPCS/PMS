@@ -196,16 +196,13 @@ const Sidebar = () => {
             toast.error("This task no longer exists.");
             return;
           }
-          // Check if task is archived or deleted
+          // Check if task is deleted/archived
           const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
           if (taskResponse.ok) {
             const taskData = await taskResponse.json();
-            if (taskData.task?.isArchived) {
-              toast.error("This task has been archived");
-              return;
-            }
-            if (taskData.task?.deletedAt) {
-              toast.error("This task has been deleted");
+            // If isActive is false, task is deleted/archived - don't redirect
+            if (taskData.task?.isActive === false) {
+              toast.error("This task has been deleted or archived");
               return;
             }
           }
@@ -215,16 +212,13 @@ const Sidebar = () => {
             toast.error("This project no longer exists or you don't have access to it");
             return;
           }
-          // Check if project is archived or deleted
+          // Check if project is deleted/archived
           const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include' });
           if (projectResponse.ok) {
             const projectData = await projectResponse.json();
-            if (projectData.project?.isArchived) {
-              toast.error("This project has been archived");
-              return;
-            }
-            if (projectData.project?.deletedAt) {
-              toast.error("This project has been deleted");
+            // If isActive is false, project is deleted/archived - don't redirect
+            if (projectData.project?.isActive === false) {
+              toast.error("This project has been deleted or archived");
               return;
             }
           }
@@ -237,16 +231,13 @@ const Sidebar = () => {
             toast.error("This workspace no longer exists or you don't have access to it");
             return;
           }
-          // Check if workspace is archived or deleted
+          // Check if workspace is archived
           const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include' });
           if (workspaceResponse.ok) {
             const workspaceData = await workspaceResponse.json();
-            if (workspaceData.workspace?.isArchived) {
+            // If isArchived is true, workspace is archived - don't redirect
+            if (workspaceData.workspace?.isArchived === true) {
               toast.error("This workspace has been archived");
-              return;
-            }
-            if (workspaceData.workspace?.deletedAt) {
-              toast.error("This workspace has been deleted");
               return;
             }
           }

@@ -152,16 +152,76 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
       }
       */
 
-      // Switch workspace if provided
-      if (data.workspaceId) {
-        try {
-          localStorage.setItem('currentWorkspaceId', data.workspaceId);
-        } catch {}
-        try {
-          await postData('/workspace/switch', { workspaceId: data.workspaceId });
-        } catch (err) {
-          console.error('Failed to switch workspace from notification:', err);
+      // Check resource existence and status before navigation
+      try {
+        let headers: Record<string, string> = {};
+        if (data.workspaceId) {
+          try { localStorage.setItem('currentWorkspaceId', data.workspaceId); } catch {}
+          try { await postData('/workspace/switch', { workspaceId: data.workspaceId }); } catch (err) {
+            console.error('Failed to switch workspace from notification:', err);
+          }
+          headers['workspace-id'] = data.workspaceId;
+        } else {
+          const wsId = localStorage.getItem('currentWorkspaceId') || '';
+          if (wsId) headers['workspace-id'] = wsId;
         }
+
+        // Check task existence and active status
+        if (data.taskId) {
+          const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include', headers });
+          if (!existsResponse.ok) {
+            toast.error("This task no longer exists.");
+            return;
+          }
+          const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include', headers });
+          if (taskResponse.ok) {
+            const taskData = await taskResponse.json();
+            // If isActive is false, task is deleted/archived - don't redirect
+            if (taskData.task?.isActive === false) {
+              toast.error("This task has been deleted or archived");
+              return;
+            }
+          }
+        }
+        // Check project existence and active status
+        else if (data.projectId) {
+          const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include', headers });
+          if (!existsResponse.ok) {
+            toast.error("This project no longer exists or you don't have access to it");
+            return;
+          }
+          const projectResponse = await fetch(buildApiUrl(`/project/${data.projectId}`), { credentials: 'include', headers });
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json();
+            // If isActive is false, project is deleted/archived - don't redirect
+            if (projectData.project?.isActive === false) {
+              toast.error("This project has been deleted or archived");
+              return;
+            }
+          }
+        }
+
+        // Check workspace existence and archived status
+        if (data.workspaceId) {
+          const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include', headers });
+          if (!existsResponse.ok) {
+            toast.error("This workspace no longer exists or you don't have access to it");
+            return;
+          }
+          const workspaceResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}`), { credentials: 'include', headers });
+          if (workspaceResponse.ok) {
+            const workspaceData = await workspaceResponse.json();
+            // If isArchived is true, workspace is archived - don't redirect
+            if (workspaceData.workspace?.isArchived === true) {
+              toast.error("This workspace has been archived");
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking resource existence:', error);
+        toast.error("Unable to verify resource access");
+        return;
       }
 
       // Decide the most specific target route first
