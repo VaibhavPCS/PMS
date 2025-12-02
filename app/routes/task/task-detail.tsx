@@ -697,6 +697,7 @@ const TaskDetail = () => {
   const [subtaskPriority, setSubtaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
   const [subtaskStartDate, setSubtaskStartDate] = useState<string>("");
   const [subtaskEndDate, setSubtaskEndDate] = useState<string>("");
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false); // ✅ NEW: Loading state for subtask creation
 
   // ✅ NEW: Fetch assignable members for reassignment
   const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
@@ -955,7 +956,7 @@ const TaskDetail = () => {
     if (subtaskStartDate && subtaskEndDate) {
       const startDate = new Date(subtaskStartDate);
       const endDate = new Date(subtaskEndDate);
-      
+
       if (startDate > endDate) {
         toast.error("End date must be after or equal to start date");
         return;
@@ -965,13 +966,17 @@ const TaskDetail = () => {
       if (task) {
         const taskStartDate = new Date(task.startDate);
         const taskDueDate = new Date(task.dueDate);
-        
+
         if (startDate < taskStartDate || endDate > taskDueDate) {
           toast.error("Subtask dates must be within the parent task date range");
           return;
         }
       }
     }
+
+    // ✅ NEW: Set loading state to prevent multiple submissions
+    setIsCreatingSubtask(true);
+
     try {
       const res = await fetch(buildApiUrl(`/task/${taskId}/subtasks`), {
         method: "POST",
@@ -1007,6 +1012,9 @@ const TaskDetail = () => {
       }
     } catch (e: any) {
       toast.error(e?.message || "Failed to create subtask");
+    } finally {
+      // ✅ NEW: Always reset loading state
+      setIsCreatingSubtask(false);
     }
   };
 
@@ -2654,8 +2662,10 @@ const TaskDetail = () => {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={()=>setShowCreateSubtask(false)}>Cancel</Button>
-              <Button onClick={handleCreateSubtask}>Create</Button>
+              <Button variant="outline" onClick={()=>setShowCreateSubtask(false)} disabled={isCreatingSubtask}>Cancel</Button>
+              <Button onClick={handleCreateSubtask} disabled={isCreatingSubtask}>
+                {isCreatingSubtask ? "Creating..." : "Create"}
+              </Button>
             </div>
           </div>
         </DialogContent>

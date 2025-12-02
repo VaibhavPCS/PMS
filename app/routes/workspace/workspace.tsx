@@ -207,6 +207,9 @@ const fetchWorkspaces = useCallback(async () => {
       const list: Project[] = response.projects || [];
       const currentUserId = (user as any)?.id || (user as any)?._id;
       const filtered = list.filter((p: any) => {
+        // Admin can see all projects
+        if (user?.role === 'admin') return true;
+        
         const isCreator = p?.creator?._id === currentUserId;
         const isHead = p?.projectHead?._id === currentUserId;
         const inMembers = Array.isArray(p?.members)
