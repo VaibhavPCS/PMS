@@ -698,6 +698,7 @@ const TaskDetail = () => {
   const [subtaskStartDate, setSubtaskStartDate] = useState<string>("");
   const [subtaskEndDate, setSubtaskEndDate] = useState<string>("");
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false); // ✅ NEW: Loading state for subtask creation
+  const [isChangingStatus, setIsChangingStatus] = useState(false); // ✅ NEW: Loading state for status changes
 
   // ✅ NEW: Fetch assignable members for reassignment
   const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
@@ -955,20 +956,24 @@ const TaskDetail = () => {
     // Date validation
     if (subtaskStartDate && subtaskEndDate) {
       const startDate = new Date(subtaskStartDate);
+      startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(subtaskEndDate);
+      endDate.setHours(0, 0, 0, 0);
 
       if (startDate > endDate) {
         toast.error("End date must be after or equal to start date");
         return;
       }
 
-      // Check if dates are within parent task date range
+      // Check if dates are within parent task date range (inclusive of task start and end dates)
       if (task) {
         const taskStartDate = new Date(task.startDate);
+        taskStartDate.setHours(0, 0, 0, 0);
         const taskDueDate = new Date(task.dueDate);
+        taskDueDate.setHours(0, 0, 0, 0);
 
         if (startDate < taskStartDate || endDate > taskDueDate) {
-          toast.error("Subtask dates must be within the parent task date range");
+          toast.error("Subtask dates must be within the parent task date range (including task start and end dates)");
           return;
         }
       }
@@ -1027,6 +1032,12 @@ const TaskDetail = () => {
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
 
+    // Prevent multiple concurrent status changes
+    if (isChangingStatus) {
+      toast.error("Status change already in progress");
+      return;
+    }
+
     if (task.approvalStatus === "approved") {
       toast.error("Approved tasks are locked and cannot change status");
       return;
@@ -1048,12 +1059,15 @@ const TaskDetail = () => {
     }
 
     try {
+      setIsChangingStatus(true);
       await postData(`/task/${taskId}/status`, { status: newStatus });
       setTask({ ...task, status: newStatus as any });
       toast.success("Task status updated");
     } catch (error) {
       console.error("Failed to update task status:", error);
       toast.error("Failed to update task status");
+    } finally {
+      setIsChangingStatus(false);
     }
   };
 
@@ -1202,30 +1216,31 @@ const TaskDetail = () => {
     }
   };
 
-  // ✅ ENHANCED: Reject task with new dates and optional reassignment
+  // ✅ ENHANCED: Reject task with new due date and optional reassignment (start date unchanged)
   const handleRejectTask = async () => {
     if (!task) return;
     if (!rejectionReason.trim()) {
       toast.error("Please provide a reason for rejection");
       return;
     }
-    if (!rejectStartDate || !rejectDueDate) {
-      toast.error("Please provide new start and due dates");
+    if (!rejectDueDate) {
+      toast.error("Please provide a new due date");
       return;
     }
 
-    const s = new Date(rejectStartDate);
     const d = new Date(rejectDueDate);
-    s.setHours(0,0,0,0);
     d.setHours(0,0,0,0);
-    if (s > d) {
-      toast.error("Start date cannot be after due date");
-      return;
+
+    // Validate due date is not before current start date (which remains unchanged)
+    if (rejectStartDate) {
+      const s = new Date(rejectStartDate);
+      s.setHours(0,0,0,0);
+      if (d < s) {
+        toast.error("Due date cannot be before the task start date");
+        return;
+      }
     }
-    if (rejectProjectStart && s < rejectProjectStart) {
-      toast.error("Start date cannot be before project start date");
-      return;
-    }
+
     if (rejectProjectEnd) {
       const pePlusOne = new Date(rejectProjectEnd);
       pePlusOne.setDate(pePlusOne.getDate() + 1);
@@ -1239,11 +1254,10 @@ const TaskDetail = () => {
       setIsRejecting(true);
       await postData(`/task/${task._id}/reject`, {
         reason: rejectionReason,
-        newStartDate: rejectStartDate,
         newDueDate: rejectDueDate,
         reassigneeId: rejectReassigneeId || undefined
       });
-      toast.success("Task rejected with new dates");
+      toast.success("Task rejected with new due date");
       setShowRejectDialog(false);
       setRejectionReason("");
       setRejectStartDate("");
@@ -1259,30 +1273,31 @@ const TaskDetail = () => {
     }
   };
 
-  // ✅ NEW: Reassign approved task
+  // ✅ NEW: Reassign approved task (start date unchanged)
   const handleReassignTask = async () => {
     if (!task) return;
     if (!reassignAssigneeId) {
       toast.error("Please select an assignee");
       return;
     }
-    if (!reassignStartDate || !reassignDueDate) {
-      toast.error("Please provide start and due dates");
+    if (!reassignDueDate) {
+      toast.error("Please provide a due date");
       return;
     }
 
-    const s = new Date(reassignStartDate);
     const d = new Date(reassignDueDate);
-    s.setHours(0,0,0,0);
     d.setHours(0,0,0,0);
-    if (s > d) {
-      toast.error("Start date cannot be after due date");
-      return;
+
+    // Validate due date is not before current start date (which remains unchanged)
+    if (reassignStartDate) {
+      const s = new Date(reassignStartDate);
+      s.setHours(0,0,0,0);
+      if (d < s) {
+        toast.error("Due date cannot be before the task start date");
+        return;
+      }
     }
-    if (reassignProjectStart && s < reassignProjectStart) {
-      toast.error("Start date cannot be before project start date");
-      return;
-    }
+
     if (reassignProjectEnd) {
       const pePlusOne = new Date(reassignProjectEnd);
       pePlusOne.setDate(pePlusOne.getDate() + 1);
@@ -1301,13 +1316,11 @@ const TaskDetail = () => {
       if (isAdminOrHead && isApproved) {
         await postData(`/task/${task._id}/reassign`, {
           assigneeId: reassignAssigneeId,
-          startDate: reassignStartDate,
           dueDate: reassignDueDate
         });
       } else {
         await putData(`/task/${task._id}`, {
           assigneeId: reassignAssigneeId,
-          startDate: reassignStartDate,
           dueDate: reassignDueDate
         });
       }
@@ -2095,7 +2108,7 @@ const TaskDetail = () => {
               )}
 
               <Select value={task.status} onValueChange={handleStatusChange}>
-                <SelectTrigger className={cn("w-40", task.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")} disabled={task.approvalStatus === "approved"}>
+                <SelectTrigger className={cn("w-40", (task.approvalStatus === "approved" || isChangingStatus) ? "opacity-50 cursor-not-allowed" : "")} disabled={task.approvalStatus === "approved" || isChangingStatus}>
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(task.status)}
                     <SelectValue />
@@ -2604,12 +2617,15 @@ const TaskDetail = () => {
                         }
                       }}
                       disabled={(date) => {
-                        const taskStart = task?.startDate ? new Date(task.startDate) : null;
-                        const taskDue = task?.dueDate ? new Date(task.dueDate) : null;
-                        return Boolean(
-                          (taskStart && date < taskStart) ||
-                          (taskDue && date > taskDue)
-                        );
+                        if (!task?.startDate || !task?.dueDate) return false;
+                        const d = new Date(date);
+                        d.setHours(0, 0, 0, 0);
+                        const taskStart = new Date(task.startDate);
+                        taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = new Date(task.dueDate);
+                        taskDue.setHours(0, 0, 0, 0);
+                        // Allow dates from task start to task end (inclusive)
+                        return d < taskStart || d > taskDue;
                       }}
                       initialFocus
                     />
@@ -2646,14 +2662,25 @@ const TaskDetail = () => {
                         }
                       }}
                       disabled={(date) => {
-                        const taskStart = task?.startDate ? new Date(task.startDate) : null;
-                        const taskDue = task?.dueDate ? new Date(task.dueDate) : null;
-                        const startDate = subtaskStartDate ? new Date(subtaskStartDate) : null;
-                        return Boolean(
-                          (taskStart && date < taskStart) ||
-                          (taskDue && date > taskDue) ||
-                          (startDate && date < startDate)
-                        );
+                        if (!task?.startDate || !task?.dueDate) return false;
+                        const d = new Date(date);
+                        d.setHours(0, 0, 0, 0);
+                        const taskStart = new Date(task.startDate);
+                        taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = new Date(task.dueDate);
+                        taskDue.setHours(0, 0, 0, 0);
+
+                        // Must be within task date range
+                        if (d < taskStart || d > taskDue) return true;
+
+                        // Must be >= subtask start date if selected
+                        if (subtaskStartDate) {
+                          const subStart = new Date(subtaskStartDate);
+                          subStart.setHours(0, 0, 0, 0);
+                          if (d < subStart) return true;
+                        }
+
+                        return false;
                       }}
                       initialFocus
                     />
@@ -2834,79 +2861,17 @@ const TaskDetail = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
-                  New Start Date <span className="text-red-500">*</span>
+                  Start Date (Unchanged)
                 </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      data-slot="popover-trigger"
-                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
-                      type="button"
-                      aria-haspopup="dialog"
-                      aria-expanded="false"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
-                        <path d="M8 2v4"></path>
-                        <path d="M16 2v4"></path>
-                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
-                        <path d="M3 10h18"></path>
-                      </svg>
-                      {rejectStartDate ? format(new Date(rejectStartDate), 'PPP') : 'Pick a date'}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
-                      mode="single"
-                      selected={rejectStartDate ? new Date(rejectStartDate) : undefined}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        const d = new Date(date);
-                        d.setHours(0,0,0,0);
-                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
-                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
-                        if (ps) ps.setHours(0,0,0,0);
-                        if (pe) pe.setHours(0,0,0,0);
-                        if (ps && d < ps) {
-                          const f = format(ps, 'yyyy-MM-dd');
-                          setRejectStartDate(f);
-                          if (rejectDueDate) {
-                            const due = new Date(rejectDueDate);
-                            due.setHours(0,0,0,0);
-                            if (due < ps) setRejectDueDate(f);
-                          }
-                          return;
-                        }
-                        if (pe && d > pe) {
-                          const f = format(pe, 'yyyy-MM-dd');
-                          setRejectStartDate(f);
-                          if (rejectDueDate) {
-                            const due = new Date(rejectDueDate);
-                            due.setHours(0,0,0,0);
-                            if (due < pe) setRejectDueDate(f);
-                          }
-                          return;
-                        }
-                        const f = format(d, 'yyyy-MM-dd');
-                        setRejectStartDate(f);
-                        if (rejectDueDate) {
-                          const due = new Date(rejectDueDate);
-                          due.setHours(0,0,0,0);
-                          if (due < d) setRejectDueDate(f);
-                        }
-                      }}
-                      disabled={(date) => {
-                        const d = new Date(date as Date);
-                        d.setHours(0,0,0,0);
-                        const ps = rejectProjectStart || (task ? new Date(task.startDate) : undefined);
-                        const pe = rejectProjectEnd || (task ? new Date(task.dueDate) : undefined);
-                        if (ps) ps.setHours(0,0,0,0);
-                        if (pe) pe.setHours(0,0,0,0);
-                        return Boolean((ps && d < ps) || (pe && d > pe));
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <div className="inline-flex items-center gap-2 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] bg-gray-50 text-gray-500 border cursor-not-allowed opacity-60">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                    <path d="M8 2v4"></path>
+                    <path d="M16 2v4"></path>
+                    <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                    <path d="M3 10h18"></path>
+                  </svg>
+                  {rejectStartDate ? format(new Date(rejectStartDate), 'PPP') : 'No date'}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
@@ -3029,7 +2994,7 @@ const TaskDetail = () => {
             </Button>
             <Button
               onClick={handleRejectTask}
-              disabled={isRejecting || !rejectionReason.trim() || !rejectStartDate || !rejectDueDate}
+              disabled={isRejecting || !rejectionReason.trim() || !rejectDueDate}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {isRejecting ? "Rejecting..." : "Reject Task"}
@@ -3072,80 +3037,17 @@ const TaskDetail = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
-                  Start Date <span className="text-red-500">*</span>
+                  Start Date (Unchanged)
                 </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      data-slot="popover-trigger"
-                      className="inline-flex items-center gap-2 whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 has-[&gt;svg]:px-3 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal text-[#717680]"
-                      type="button"
-                      aria-haspopup="dialog"
-                      aria-expanded="false"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
-                        <path d="M8 2v4"></path>
-                        <path d="M16 2v4"></path>
-                        <rect width="18" height="18" x="3" y="4" rx="2"></rect>
-                        <path d="M3 10h18"></path>
-                      </svg>
-                      {reassignStartDate ? format(new Date(reassignStartDate), 'PPP') : 'Pick a date'}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
-                      mode="single"
-                      selected={reassignStartDate ? new Date(reassignStartDate) : undefined}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        const d = new Date(date);
-                        d.setHours(0,0,0,0);
-                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
-                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
-                        if (ps) ps.setHours(0,0,0,0);
-                        if (pe) pe.setHours(0,0,0,0);
-                        if (ps && d < ps) {
-                          const f = format(ps, 'yyyy-MM-dd');
-                          setReassignStartDate(f);
-                          // Ensure due >= start
-                          if (reassignDueDate) {
-                            const due = new Date(reassignDueDate);
-                            due.setHours(0,0,0,0);
-                            if (due < ps) setReassignDueDate(f);
-                          }
-                          return;
-                        }
-                        if (pe && d > pe) {
-                          const f = format(pe, 'yyyy-MM-dd');
-                          setReassignStartDate(f);
-                          if (reassignDueDate) {
-                            const due = new Date(reassignDueDate);
-                            due.setHours(0,0,0,0);
-                            if (due < pe) setReassignDueDate(f);
-                          }
-                          return;
-                        }
-                        const f = format(d, 'yyyy-MM-dd');
-                        setReassignStartDate(f);
-                        if (reassignDueDate) {
-                          const due = new Date(reassignDueDate);
-                          due.setHours(0,0,0,0);
-                          if (due < d) setReassignDueDate(f);
-                        }
-                      }}
-                      disabled={(date) => {
-                        const d = new Date(date as Date);
-                        d.setHours(0,0,0,0);
-                        const ps = reassignProjectStart || (task ? new Date(task.startDate) : undefined);
-                        const pe = reassignProjectEnd || (task ? new Date(task.dueDate) : undefined);
-                        if (ps) ps.setHours(0,0,0,0);
-                        if (pe) pe.setHours(0,0,0,0);
-                        return Boolean((ps && d < ps) || (pe && d > pe));
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <div className="inline-flex items-center gap-2 w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] bg-gray-50 text-gray-500 border cursor-not-allowed opacity-60">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar mr-2 h-4 w-4" aria-hidden="true">
+                    <path d="M8 2v4"></path>
+                    <path d="M16 2v4"></path>
+                    <rect width="18" height="18" x="3" y="4" rx="2"></rect>
+                    <path d="M3 10h18"></path>
+                  </svg>
+                  {reassignStartDate ? format(new Date(reassignStartDate), 'PPP') : 'No date'}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-900 mb-2 block">
@@ -3243,7 +3145,7 @@ const TaskDetail = () => {
             </Button>
             <Button
               onClick={handleReassignTask}
-              disabled={isReassigning || !reassignAssigneeId || !reassignStartDate || !reassignDueDate}
+              disabled={isReassigning || !reassignAssigneeId || !reassignDueDate}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isReassigning ? "Reassigning..." : "Reassign Task"}

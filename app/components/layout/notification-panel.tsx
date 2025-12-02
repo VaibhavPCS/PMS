@@ -306,6 +306,10 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         return '✏️';
       case 'task_reassigned':
         return '🔄';
+      case 'task_overdue':
+        return '⚠️';
+      case 'task_overdue_reminder':
+        return '🔔';
       case 'task_comment':
         return '💬';
       default:
