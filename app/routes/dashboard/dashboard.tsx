@@ -82,7 +82,7 @@ interface ProjectStatistics {
   proposedProjects: number;
 }
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' ;
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 interface Project {
   _id: string;
@@ -994,21 +994,21 @@ const Dashboard = () => {
                               <ChevronDown className="w-3 h-3" />
                             </Button>
                           </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-[200px]">
-                              {workspaces.map((workspace) => (
-                                <DropdownMenuItem
-                                  key={workspace._id}
-                                  onClick={() => handleSwitchWorkspace(workspace._id)}
-                                  className={cn(
-                                    "cursor-pointer",
-                                    currentWorkspace?._id === workspace._id && "bg-blue-50"
-                                  )}
-                                >
-                                  {workspace.name}
-                                  {currentWorkspace?._id === workspace._id && (
-                                    <span className="ml-auto text-blue-600">✓</span>
-                                  )}
-                                </DropdownMenuItem>
+                          <DropdownMenuContent align="end" className="w-[200px]">
+                            {workspaces.map((workspace) => (
+                              <DropdownMenuItem
+                                key={workspace._id}
+                                onClick={() => handleSwitchWorkspace(workspace._id)}
+                                className={cn(
+                                  "cursor-pointer",
+                                  currentWorkspace?._id === workspace._id && "bg-blue-50"
+                                )}
+                              >
+                                {workspace.name}
+                                {currentWorkspace?._id === workspace._id && (
+                                  <span className="ml-auto text-blue-600">✓</span>
+                                )}
+                              </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1444,7 +1444,7 @@ const Dashboard = () => {
 
       {/* Update Task Modal */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="w-[95vw] sm:max-w-[600px] max-h-[450px] overflow-y-auto sm:max-h-[85vh]">
           <DialogHeader>
             <DialogTitle>Update Task</DialogTitle>
             <DialogDescription>
@@ -1453,7 +1453,7 @@ const Dashboard = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="grid gap-1">
                   <Label>Project</Label>
                   <div className="text-sm text-gray-700">{selectedTask?.project?.title || "—"}</div>
@@ -1476,7 +1476,7 @@ const Dashboard = () => {
                 onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
                 placeholder="Enter task title"
                 disabled={(selectedTask as any)?.approvalStatus === "approved"}
-                className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""}
+                className={cn("w-full", (selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")}
               />
             </div>
             <div className="grid gap-2">
@@ -1488,14 +1488,14 @@ const Dashboard = () => {
                 placeholder="Enter task description"
                 rows={3}
                 disabled={(selectedTask as any)?.approvalStatus === "approved"}
-                className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""}
+                className={cn("w-full", (selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="priority">Priority</Label>
                 <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
-                  <SelectTrigger className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
+                  <SelectTrigger className={cn("w-full", (selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1509,7 +1509,7 @@ const Dashboard = () => {
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
                 <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
-                  <SelectTrigger className={(selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : ""} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
+                  <SelectTrigger className={cn("w-full", (selectedTask as any)?.approvalStatus === "approved" ? "opacity-50 cursor-not-allowed" : "")} disabled={(selectedTask as any)?.approvalStatus === "approved"}>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1520,7 +1520,7 @@ const Dashboard = () => {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Date fields commented out
               <div className="grid gap-2">
                 <Label htmlFor="startDate">Start Date</Label>
@@ -1543,7 +1543,7 @@ const Dashboard = () => {
               */}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowUpdateModal(false)} disabled={isUpdating}>
               Cancel
             </Button>
