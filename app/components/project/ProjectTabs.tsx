@@ -17,36 +17,20 @@ const tabs = [
 export function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full overflow-hidden">
-      <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0 overflow-x-auto overflow-y-hidden scrollbar-hide flex-nowrap">
+      <div className="flex items-center gap-[10px] border-b-[0.5px] border-[#949291] overflow-x-auto scrollbar-visible">
         {tabs.map((tab) => (
-          <TabsTrigger
+          <button
             key={tab.value}
-            value={tab.value}
-            className="
-              px-[16px] md:px-[20px] py-[10px] rounded-tl-[10px] rounded-tr-[10px]
-              text-[14px] md:text-[16px] font-normal font-['Inter'] whitespace-nowrap flex-shrink-0
-              data-[state=active]:text-[#000D2A]
-              data-[state=active]:border-b-[1px]
-              data-[state=active]:border-[#F2761B]
-              data-[state=inactive]:text-[#000D2A]
-              data-[state=inactive]:opacity-60
-              data-[state=active]:bg-transparent
-              data-[state=inactive]:bg-transparent
-              hover:bg-transparent
-              hover:opacity-100
-              data-[state=active]:shadow-none
-              shadow-none
-              relative
-              mb-[-0.5px]
-              transition-opacity
-              border-b-[0.5px]
-              border-transparent
-            "
+            onClick={() => onTabChange(tab.value)}
+            className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === tab.value
+                ? "border-b-[1px] border-[#f2761b] opacity-100"
+                : "opacity-60 hover:opacity-100"
+              }`}
           >
             {tab.label}
-          </TabsTrigger>
+          </button>
         ))}
-      </TabsList>
+      </div>
     </Tabs>
   );
 }
