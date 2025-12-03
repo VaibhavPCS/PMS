@@ -130,7 +130,7 @@ const WorkspacePage = () => {
           },
         }
       );
-      
+
       if (!existsResponse.ok) {
         if (existsResponse.status === 404) {
           toast.error("This workspace has been deleted or no longer exists");
@@ -140,7 +140,7 @@ const WorkspacePage = () => {
           return false;
         }
       }
-      
+
       // If exists, check if it's archived by fetching full workspace details
       try {
         const workspaceResponse = await fetch(
@@ -153,7 +153,7 @@ const WorkspacePage = () => {
             },
           }
         );
-        
+
         if (workspaceResponse.ok) {
           const workspaceData = await workspaceResponse.json();
           if (workspaceData.workspace?.isArchived) {
@@ -169,7 +169,7 @@ const WorkspacePage = () => {
         console.error("Error fetching workspace details:", detailError);
         // Continue even if detail fetch fails, as existence check passed
       }
-      
+
       return true;
     } catch (error) {
       console.error("Error checking workspace existence:", error);
@@ -178,27 +178,27 @@ const WorkspacePage = () => {
     }
   };
 
-const fetchWorkspaces = useCallback(async () => {
-  try {
-    const response = await fetchData('/workspace'); // ✅ Keep singular (already correct)
-    const workspaceList = response.workspaces?.map((w: any) => w.workspaceId).filter(Boolean) || [];
-    
-    setWorkspaces(workspaceList);
-    setCurrentWorkspace(response.currentWorkspace);
-    // Persist current workspace id for request headers
-    if (response.currentWorkspace?._id) {
-      localStorage.setItem('workspace-id', response.currentWorkspace._id);
-      localStorage.setItem('currentWorkspaceId', response.currentWorkspace._id);
-      
-      // Check if current workspace exists (show notification but don't block)
-      checkWorkspaceExistence(response.currentWorkspace._id).catch(err => {
-        console.error("Workspace existence check failed:", err);
-      });
+  const fetchWorkspaces = useCallback(async () => {
+    try {
+      const response = await fetchData('/workspace'); // ✅ Keep singular (already correct)
+      const workspaceList = response.workspaces?.map((w: any) => w.workspaceId).filter(Boolean) || [];
+
+      setWorkspaces(workspaceList);
+      setCurrentWorkspace(response.currentWorkspace);
+      // Persist current workspace id for request headers
+      if (response.currentWorkspace?._id) {
+        localStorage.setItem('workspace-id', response.currentWorkspace._id);
+        localStorage.setItem('currentWorkspaceId', response.currentWorkspace._id);
+
+        // Check if current workspace exists (show notification but don't block)
+        checkWorkspaceExistence(response.currentWorkspace._id).catch(err => {
+          console.error("Workspace existence check failed:", err);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load workspaces', error);
     }
-  } catch (error) {
-    console.error('Failed to load workspaces', error);
-  }
-}, []);
+  }, []);
 
 
   const fetchProjects = useCallback(async () => {
@@ -209,16 +209,16 @@ const fetchWorkspaces = useCallback(async () => {
       const filtered = list.filter((p: any) => {
         // Admin can see all projects
         if (user?.role === 'admin') return true;
-        
+
         const isCreator = p?.creator?._id === currentUserId;
         const isHead = p?.projectHead?._id === currentUserId;
         const inMembers = Array.isArray(p?.members)
           ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
           : Array.isArray(p?.categories)
-          ? p.categories.some(
+            ? p.categories.some(
               (c: any) => Array.isArray(c.members) && c.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
             )
-          : false;
+            : false;
         return isCreator || isHead || inMembers;
       });
       setProjects(filtered);
@@ -239,18 +239,18 @@ const fetchWorkspaces = useCallback(async () => {
     }
   }, [isAuthenticated, fetchWorkspaces, fetchProjects]);
 
-const switchWorkspace = async (workspaceId: string) => {
-  try {
-    await postData('/workspace/switch', { workspaceId }); // ✅ Change from '/workspaces/switch' to '/workspace/switch'
-    // Persist new workspace id immediately so subsequent requests use correct header
-    localStorage.setItem('workspace-id', workspaceId);
-    localStorage.setItem('currentWorkspaceId', workspaceId);
-    await fetchWorkspaces();
-    await fetchProjects();
-  } catch (error) {
-    console.error('Failed to switch workspace', error);
-  }
-};
+  const switchWorkspace = async (workspaceId: string) => {
+    try {
+      await postData('/workspace/switch', { workspaceId }); // ✅ Change from '/workspaces/switch' to '/workspace/switch'
+      // Persist new workspace id immediately so subsequent requests use correct header
+      localStorage.setItem('workspace-id', workspaceId);
+      localStorage.setItem('currentWorkspaceId', workspaceId);
+      await fetchWorkspaces();
+      await fetchProjects();
+    } catch (error) {
+      console.error('Failed to switch workspace', error);
+    }
+  };
 
 
   const handleCreateWorkspace = () => {
@@ -350,22 +350,22 @@ const switchWorkspace = async (workspaceId: string) => {
   return (
     <>
       {/* Main Content Container - matches Figma white card */}
-      <div className="bg-white rounded-[8px] min-h-[940px] mx-[20px] mt-[30px] p-[10px]">
+      <div className="bg-white rounded-[8px] min-h-[940px] mx-[10px] md:mx-[20px] mt-[20px] md:mt-[30px] p-[15px] md:p-[10px]">
         {/* Breadcrumb */}
-        <div className="mb-[25px]">
+        <div className="mb-[15px] md:mb-[25px]">
           <Breadcrumb />
         </div>
 
         {/* Header Section */}
-        <div className="flex flex-col gap-[15px] mb-[25px]">
+        <div className="flex flex-col gap-[15px] mb-[20px] md:mb-[25px]">
           {/* Title and Project Selector Row */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-[15px] md:gap-0">
             {/* Left: Title */}
             <div className="flex flex-col gap-[5px]">
-              <h1 className="text-[24px] font-bold text-[#040110] font-['Inter']">
+              <h1 className="text-[20px] md:text-[24px] font-bold text-[#040110] font-['Inter']">
                 {projects.length} Projects
               </h1>
-              <p className="text-[14px] text-[#040110] opacity-60 font-normal">
+              <p className="text-[13px] md:text-[14px] text-[#040110] opacity-60 font-normal">
                 Ensure timely completion with organized task tracking.
               </p>
             </div>
@@ -386,11 +386,11 @@ const switchWorkspace = async (workspaceId: string) => {
                   aria-label="Workspace settings"
                   aria-haspopup="dialog"
                   onClick={() => setShowWorkspaceSettings(true)}
-                  className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3a5afe]"
+                  className="inline-flex items-center justify-center w-[40px] h-[40px] md:w-[44px] md:h-[44px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3a5afe]"
                   title="Workspace settings"
                 >
                   {/* svg: purely visual settings icon */}
-                  <SettingsIcon className="w-[20px] h-[20px] text-[#717182]" aria-hidden="true" />
+                  <SettingsIcon className="w-[18px] h-[18px] md:w-[20px] md:h-[20px] text-[#717182]" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -403,7 +403,7 @@ const switchWorkspace = async (workspaceId: string) => {
           />
 
           {/* Search and Action Buttons Row */}
-          <div className="flex items-center gap-[10px] mt-[10px]">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-[10px] mt-[10px]">
             {/* Search Input */}
             <div className="flex-1 flex items-center gap-[10px] px-[10px] py-[10px] bg-[rgba(4,1,16,0.05)] rounded-[8px]">
               <Search size={15} className="text-[#717182]" />
@@ -418,7 +418,7 @@ const switchWorkspace = async (workspaceId: string) => {
 
             {/* Sort by Select */}
             <Select value={sortOption} onValueChange={setSortOption}>
-              <SelectTrigger className="w-[180px] bg-[rgba(4,1,16,0.05)] border-none font-['Inter'] text-[14px]">
+              <SelectTrigger className="w-full md:w-[180px] bg-[rgba(4,1,16,0.05)] border-none font-['Inter'] text-[14px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent className="font-['Inter'] text-[14px]">
@@ -435,7 +435,7 @@ const switchWorkspace = async (workspaceId: string) => {
             {canAddProject() && (
               <Button
                 onClick={() => setShowAddProjectModal(true)}
-                className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center gap-[10px]"
+                className="w-full md:w-auto bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center justify-center gap-[10px]"
               >
                 <Plus size={15} />
                 Add Project
@@ -469,7 +469,7 @@ const switchWorkspace = async (workspaceId: string) => {
         </div>
 
         {/* Projects Grid */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(274px,1fr))] gap-[15px] mt-[25px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(274px,1fr))] gap-[15px] mt-[20px] md:mt-[25px]">
           {sortedProjects.map((project) => (
             <ProjectCard
               key={project._id}

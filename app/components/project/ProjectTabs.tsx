@@ -16,15 +16,15 @@ const tabs = [
 
 export function ProjectTabs({ activeTab, onTabChange }: ProjectTabsProps) {
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-      <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0">
+    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full overflow-hidden">
+      <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0 overflow-x-auto overflow-y-hidden scrollbar-hide flex-nowrap">
         {tabs.map((tab) => (
           <TabsTrigger
             key={tab.value}
             value={tab.value}
             className="
-              px-[20px] py-[10px] rounded-tl-[10px] rounded-tr-[10px]
-              text-[16px] font-normal font-['Inter']
+              px-[16px] md:px-[20px] py-[10px] rounded-tl-[10px] rounded-tr-[10px]
+              text-[14px] md:text-[16px] font-normal font-['Inter'] whitespace-nowrap flex-shrink-0
               data-[state=active]:text-[#000D2A]
               data-[state=active]:border-b-[1px]
               data-[state=active]:border-[#F2761B]
