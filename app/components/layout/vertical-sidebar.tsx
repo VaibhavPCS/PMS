@@ -31,7 +31,11 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: "/assets/analytics-icon.svg", // ✅ Icon path
   },
-  // Commented out items...
+  // {
+  //   name: "Chat",
+  //   href: "/chat",
+  //   icon: "/assets/chat.svg", // ✅ Icon path
+  // },
   {
     name: "Administration",
     href: "/administration",
@@ -135,7 +139,7 @@ const VerticalSidebar = () => {
       </div>
 
       {/* Navigation Items */}
-      <nav className="flex-1 px-[12px] space-y-[4px]">
+      <nav className="px-[12px] space-y-[4px] pb-[20px]">
         {visibleNavItems.map((item) => {
           const active = isActive(item.href, item.hasDropdown, item.subItems);
           const isExpanded = expandedItems.has(item.name);

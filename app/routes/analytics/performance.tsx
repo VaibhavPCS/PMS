@@ -137,7 +137,7 @@ const Performance = () => {
 
   // Handle date range change
   const handleDateRangeChange = (newStartDate: string, newEndDate: string) => {
-    console.log("Date range changed:", { newStartDate, newEndDate });
+    // console.log("Date range changed:", { newStartDate, newEndDate });
   };
 
   // ✅ ALWAYS SHOW HEADER WITH DATE FILTER (even during loading/error/no-data)

@@ -69,7 +69,7 @@ export function WorkspaceProjectSelector() {
         setLoadingWorkspaces(true);
         const data = await fetchData<WorkspaceResponse>('/workspace');
         
-        console.log('Fetched workspace response:', data);
+        // console.log('Fetched workspace response:', data);
         
         const workspaceList = data?.workspaces || [];
         setWorkspaces(workspaceList);
@@ -102,7 +102,7 @@ export function WorkspaceProjectSelector() {
         setLoadingProjects(true);
         const data = await fetchData<ProjectResponse>(`/project?workspace=${selectedWorkspaceId}`);
         
-        console.log('Fetched projects response:', data);
+        // console.log('Fetched projects response:', data);
         
         const projectList = data?.projects || [];
         const filtered = projectList.filter(p => `${p.workspace}` === selectedWorkspaceId);
@@ -153,6 +153,8 @@ export function WorkspaceProjectSelector() {
         } catch {}
         setSelectedWorkspace(workspaceId, workspace.workspaceId.name);
         try { localStorage.setItem('currentWorkspaceId', workspaceId); } catch {}
+        // Dispatch custom event for workspace change - COMMENTED OUT
+        // window.dispatchEvent(new CustomEvent('workspaceChanged'));
         setProjects([]);
       }
     }

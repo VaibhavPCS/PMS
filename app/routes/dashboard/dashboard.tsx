@@ -18,6 +18,7 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -212,6 +213,8 @@ const Dashboard = () => {
       // Update localStorage
       localStorage.setItem("currentWorkspaceId", workspaceId);
       localStorage.setItem("workspace-id", workspaceId);
+      // Dispatch custom event for workspace change - COMMENTED OUT
+      // window.dispatchEvent(new CustomEvent('workspaceChanged'));
       // Update current workspace state
       const selectedWorkspace = workspaces.find(w => w._id === workspaceId);
       setCurrentWorkspace(selectedWorkspace || null);
@@ -678,38 +681,38 @@ const Dashboard = () => {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#f1f2f7] p-6">
-        <div className="max-w-full mx-auto space-y-6">
+      <div className="min-h-screen bg-[#F9F9F9] p-3 sm:p-4 md:p-6">
+        <div className="max-w-full mx-auto space-y-4 md:space-y-6">
           {/* Page Title */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
           </div>
 
           {/* TOP ROW: Statistics Cards + Project Chart Side by Side */}
           {(isAdmin || (accessibleProjectIds && accessibleProjectIds.size > 0)) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left: Project Statistics Cards */}
-              <div className="grid grid-cols-2 gap-[15px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-[15px] order-1 md:order-none">
                 {/* Total Projects Card */}
-                <div className="bg-[#4a8cd7] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                <div className="bg-[#4a8cd7] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
                   {/* Decorative Circle - Creates light blue gradient effect on top */}
                   <div className="absolute left-[-85px] top-[-135px] w-[256px] h-[256px] rotate-[5.438deg]">
                     <div className="w-full h-full rounded-full bg-[#6ba9e3] opacity-40"></div>
                   </div>
 
                   {/* Content */}
-                  <div className="relative z-10 p-[15px]">
-                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       Total Projects
                     </p>
-                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       {projectStats.totalProjects}
                     </p>
                   </div>
                 </div>
 
                 {/* Ongoing Projects Card */}
-                <div className="bg-[#479c39] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                <div className="bg-[#479c39] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
                   {/* Decorative Pattern - White wavy lines */}
                   <div className="absolute left-[50px] top-[8px] w-[200.5px] h-[126.5px]">
                     <img
@@ -720,18 +723,18 @@ const Dashboard = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="relative z-10 p-[15px]">
-                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       Ongoing Projects
                     </p>
-                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       {projectStats.ongoingProjects}
                     </p>
                   </div>
                 </div>
 
                 {/* Completed Projects Card */}
-                <div className="bg-[#6647bf] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                <div className="bg-[#6647bf] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
                   {/* Decorative Circle - Purple circle at top right */}
                   <div className="absolute left-[111px] top-[-40px] w-[100px] h-[100px]">
                     <img
@@ -751,18 +754,18 @@ const Dashboard = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="relative z-10 p-[15px]">
-                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       Completed Projects
                     </p>
-                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       {projectStats.completedProjects}
                     </p>
                   </div>
                 </div>
 
                 {/* Proposed Projects Card */}
-                <div className="bg-[#f27944] h-[120px] rounded-[10px] flex-1 min-w-[200px] overflow-hidden relative">
+                <div className="bg-[#f27944] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
                   {/* Decorative Shape - Left side light shape */}
                   <div className="absolute left-[-80px] top-[-55px] w-[148.992px] h-[136px]">
                     <img
@@ -782,11 +785,11 @@ const Dashboard = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="relative z-10 p-[15px]">
-                    <p className="font-medium text-[18px] text-white leading-normal mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       Proposed Projects
                     </p>
-                    <p className="font-medium text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       {projectStats.proposedProjects}
                     </p>
                   </div>
@@ -794,7 +797,7 @@ const Dashboard = () => {
               </div>
 
               {/* Right: Project Statistics Pie Chart */}
-              <Card className="border border-[#e9ecf1]">
+              <Card className="border border-[#e9ecf1] order-2 md:order-none">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <CardTitle className="font-['Inter'] font-medium text-[16px] text-[#2e2e30]">
@@ -869,9 +872,9 @@ const Dashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
-                    {/* Pie Chart */}
-                    <div className="h-[200px] w-[200px] relative">
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Pie Chart - Always on top */}
+                    <div className="h-[200px] w-[200px] relative shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -925,29 +928,29 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    {/* Legend with animations */}
-                    <div className="flex flex-col gap-[15px]">
+                    {/* Legend with animations - 2x2 grid for all screen sizes */}
+                    <div className="grid grid-cols-2 gap-[15px] w-full max-w-[300px]">
                       {chartData.map((item, index) => (
                         <div
                           key={item.name}
-                          className="flex items-center justify-between gap-8 min-w-[120px] transition-all duration-300 hover:scale-105"
+                          className="flex items-center justify-between gap-2 transition-all duration-300 hover:scale-105 min-w-0"
                           style={{
                             animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
                           }}
                         >
-                          <div className="flex items-center gap-[5px]">
+                          <div className="flex items-center gap-[5px] min-w-0">
                             <div
-                              className="w-[10px] h-[10px] rounded-full transition-all duration-300 hover:scale-125"
+                              className="w-[10px] h-[10px] rounded-full transition-all duration-300 hover:scale-125 shrink-0"
                               style={{
                                 backgroundColor: item.fill,
                                 boxShadow: `0 2px 6px ${item.fill}40`
                               }}
                             />
-                            <span className="font-['Inter'] font-semibold text-[12px] text-[#767676]">
+                            <span className="font-['Inter'] font-semibold text-[12px] text-[#767676] truncate">
                               {item.name}
                             </span>
                           </div>
-                          <span className="font-['Inter'] font-bold text-[12px] text-neutral-700 transition-all duration-300">
+                          <span className="font-['Inter'] font-bold text-[12px] text-neutral-700 transition-all duration-300 shrink-0">
                             {item.value}
                           </span>
                         </div>
@@ -962,7 +965,7 @@ const Dashboard = () => {
           {/* BOTTOM ROW: Recent Projects Table + Task Overview Side by Side */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Left: Recent Ongoing Projects Table (2/3 width) */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 order-3 md:order-none">
               <Card className="shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
                 <CardHeader className="px-[20px] py-[15px]">
                   <div className="flex flex-col gap-[20px]">
@@ -1125,12 +1128,12 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </CardHeader>
-                <CardContent className="px-[20px] pb-[15px]">
-                  <div className="border border-[#cccccc] rounded-[10px] overflow-hidden">
-                    <table className="w-full">
+                <CardContent className="px-2 sm:px-[20px] pb-[15px]">
+                  <div className="border border-[#cccccc] rounded-[10px] overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
                       <thead>
                         <tr className="bg-[#d5e5ff]">
-                          <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px] w-[60px]">
+                          <th className="text-left px-[8px] sm:px-[16px] py-[12px] text-[11px] sm:text-[12px] font-['Inter'] font-normal text-[rgba(0,0,0,0.6)] min-h-[40px] w-[40px] sm:w-[60px]">
                             <div className="flex items-center gap-2">
                               S.No
                             </div>
@@ -1181,31 +1184,35 @@ const Dashboard = () => {
                           recentProjects.map((project, index) => (
                             <tr
                               key={project._id}
-                              className={index % 2 === 1 ? "bg-[#f2f7ff]" : ""}
+                              onClick={() => handleViewProject(project._id)}
+                              className={cn(
+                                "cursor-pointer transition-colors hover:bg-[#e6f2ff]",
+                                index % 2 === 1 ? "bg-[#f2f7ff]" : ""
+                              )}
                             >
-                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px] text-[11px] sm:text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px]">
                                 {index + 1}
                               </td>
-                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.title}>
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px] text-[11px] sm:text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[150px] sm:max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.title}>
                                 {limitWords(project.title, 2)}
                               </td>
-                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.description || "No description"}>
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px] text-[11px] sm:text-[12px] font-['Inter'] font-normal text-black tracking-[0.5px] max-w-[180px] sm:max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap" title={project.description || "No description"}>
                                 {limitWords(project.description || "No description", 3)}
                               </td>
-                              <td className="px-[16px] py-[14px]">
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px]">
                                 <StatusBadge status={project.status} />
                               </td>
-                              <td className="px-[16px] py-[14px]">
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px]">
                                 <div className="flex flex-col gap-1">
-                                  <div className="text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
+                                  <div className="text-[11px] sm:text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
                                     {formatDate(project.startDate)}
                                   </div>
-                                  <div className="text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
+                                  <div className="text-[11px] sm:text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
                                     {formatDate(project.endDate)}
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
+                              <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px] text-[11px] sm:text-[12px] font-['Inter'] font-semibold text-black tracking-[0.5px] whitespace-nowrap">
                                 {calculateDaysBetween(project.startDate, project.endDate)} days
                               </td>
                               {/* <td className="px-[16px] py-[14px]">
@@ -1229,9 +1236,9 @@ const Dashboard = () => {
               </Card>
             </div>
 
-            {/* Right: Task Overview Panel (1/3 width) */}
-            <div className="lg:col-span-1">
-              <Card className="overflow-hidden px-[10px] py-[15px]">
+            {/* Right: Task Overview Panel (1/3 width) - Shows last on mobile */}
+            <div className="lg:col-span-1 order-4 md:order-none">
+              <Card className="overflow-hidden px-2 sm:px-[10px] py-[15px]">
                 <div className="px-[10px]">
                   {/* Header */}
                   <div className="flex items-center justify-between gap-[10px] mb-[15px]">
@@ -1264,11 +1271,11 @@ const Dashboard = () => {
                       {/* <Filter className="w-4 h-4 text-[#040110]" /> */}
                     </div>
 
-                    <div className="flex items-center gap-[10px]">
+                    <div className="flex items-center gap-[10px] overflow-x-auto scrollbar-visible">
                       <button
                         onClick={() => setTaskStatusFilter("all")}
                         className={cn(
-                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
                           taskStatusFilter === "all"
                             ? "border-b-[1px] border-[#f2761b] opacity-100"
                             : "opacity-60"
@@ -1279,7 +1286,7 @@ const Dashboard = () => {
                       <button
                         onClick={() => setTaskStatusFilter("to-do")}
                         className={cn(
-                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
                           taskStatusFilter === "to-do"
                             ? "border-b-[1px] border-[#f2761b] opacity-100"
                             : "opacity-60"
@@ -1290,7 +1297,7 @@ const Dashboard = () => {
                       <button
                         onClick={() => setTaskStatusFilter("in-progress")}
                         className={cn(
-                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
                           taskStatusFilter === "in-progress"
                             ? "border-b-[1px] border-[#f2761b] opacity-100"
                             : "opacity-60"
@@ -1301,7 +1308,7 @@ const Dashboard = () => {
                       <button
                         onClick={() => setTaskStatusFilter("done")}
                         className={cn(
-                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all",
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
                           taskStatusFilter === "done"
                             ? "border-b-[1px] border-[#f2761b] opacity-100"
                             : "opacity-60"
@@ -1309,11 +1316,14 @@ const Dashboard = () => {
                       >
                         Done
                       </button>
+                      {/* <button className="p-[10px] text-[#000d2a] opacity-60 hover:opacity-100 transition-all shrink-0">
+                        <ArrowUpDown className="w-4 h-4" />
+                      </button> */}
                     </div>
                   </div>
 
                   {/* Task List */}
-                  <ScrollArea className="h-[600px]">
+                  <ScrollArea className="h-[600px] scrollbar-visible">
                     <div className="space-y-[10px]">
                       {filteredTasks.length === 0 ? (
                         <div className="text-center py-8 text-[#717182] text-[14px] font-['Inter']">
@@ -1326,14 +1336,14 @@ const Dashboard = () => {
                               key={task._id}
                               onClick={() => navigate(`/task/${task._id}`)}
                               className={cn(
-                                "rounded-lg border border-gray-200 bg-white p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer",
-                                "flex gap-3 items-start"
+                                "rounded-lg border border-gray-200 bg-white px-[10px] py-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer w-full",
+                                "flex gap-3 items-start min-h-fit"
                               )}
                             >
                               {/* Status indicator */}
                               <div
                                 className={cn(
-                                  "w-1 h-16 rounded-full shrink-0 mt-1",
+                                  "w-1 min-h-[40px] rounded-full shrink-0 mt-1 self-stretch",
                                   task.status === "to-do" && "bg-blue-500",
                                   task.status === "in-progress" && "bg-amber-500",
                                   task.status === "done" && "bg-green-500"
@@ -1343,32 +1353,32 @@ const Dashboard = () => {
                               {/* Task content */}
                               <div className="flex-1 min-w-0">
                                 {/* Task title */}
-                                <h4 className="font-medium text-gray-900 text-sm leading-5 mb-2 truncate">
-                                  {task.title}
+                                <h4 className="font-medium text-gray-900 text-sm leading-5 mb-2 break-words">
+                                  {task.title.length > 50 ? `${task.title.substring(0, 50)}...` : task.title}
                                 </h4>
 
                                 {/* Task description */}
                                 {task.description && (
-                                  <p className="text-gray-600 text-xs leading-4 mb-3 line-clamp-2">
+                                  <p className="text-gray-600 text-xs leading-4 mb-3 break-words whitespace-pre-wrap">
                                     {task.description}
                                   </p>
                                 )}
 
                                 {/* Task metadata */}
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                   {/* Assignee */}
                                   {task.assignedTo && (
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium shrink-0">
                                         {task.assignedTo.name.charAt(0).toUpperCase()}
                                       </div>
-                                      <span className="text-gray-700 text-xs font-medium truncate max-w-24">
-                                        {task.assignedTo.name}
+                                      <span className="text-gray-700 text-xs font-medium truncate">
+                                        {task.assignedTo.name.split(' ')[0].charAt(0).toUpperCase() + task.assignedTo.name.split(' ')[0].slice(1).toLowerCase()}
                                       </span>
                                     </div>
                                   )}
 
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 shrink-0">
                                     {/* Status badge */}
                                     <div className={cn(
                                       "px-2 py-1 rounded-full text-xs font-medium",

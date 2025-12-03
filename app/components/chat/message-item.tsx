@@ -79,7 +79,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
 
-  const isOwnMessage = message.sender._id === currentUser._id;
+  const senderId = typeof (message as any).sender === 'string' 
+    ? (message as any).sender 
+    : (message as any).sender?._id;
+  const isOwnMessage = String(senderId || '') === String(currentUser?._id || '');
 
   const handleReaction = (emoji: string) => {
     if (socket) {
@@ -135,6 +138,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
   };
 
   const reactionCounts = getReactionCounts();
+  const shouldHideMessageBubble = (message.attachments && message.attachments.length > 0) && (
+    (message.content || '').trim().toLowerCase() === 'file attachment' || (message.content || '').trim() === ''
+  );
 
   return (
     <div
@@ -188,8 +194,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {/* Reply To */}
           {message.replyTo && (
             <div
-              className={`mb-2 p-2 bg-gray-100 rounded border-l-4 border-gray-300 text-sm ${
-                isOwnMessage ? "bg-blue-100 border-blue-300" : ""
+              className={`mb-2 p-2 rounded-2xl border-l-4 text-sm ${
+                isOwnMessage 
+                  ? "bg-[#e6f7d9] border-[#b8e7a4]" 
+                  : "bg-[#f7f7f7] border-[#e0e0e0]"
               }`}
             >
               <p className="text-xs text-gray-600 font-medium">
@@ -202,11 +210,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {/* Message Bubble */}
           <div className="relative">
             <div
-              className={`px-3 py-2 rounded-lg ${
+              className={`px-3 py-2 rounded-2xl ${
                 isOwnMessage
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 text-gray-900"
-              }`}
+                  ? "bg-[#dcf8c6] text-gray-900"
+                  : "bg-[#f5f5f5] text-gray-900"
+              } ${shouldHideMessageBubble ? 'hidden' : ''}`}
             >
               {isEditing ? (
                 <div className="space-y-2">

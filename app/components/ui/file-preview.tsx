@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { File, Download, Eye, X, ExternalLink } from 'lucide-react';
+import { File, Download, Eye, X, ExternalLink, Trash2 } from 'lucide-react';
 import { Button } from './button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { buildBackendUrl } from '@/lib/config';
@@ -110,9 +110,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                 className="rounded-lg max-h-48 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => setPreviewImage(buildBackendUrl(attachment.fileUrl))}
               />
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+              {/* <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                 {attachment.fileName}
-              </div>
+              </div> */}
               {canDelete && onDelete && (
                 <Button
                   size="sm"
@@ -125,42 +125,39 @@ const FilePreview: React.FC<FilePreviewProps> = ({
               )}
             </div>
           ) : (
-            // Document Preview
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">{getFileIcon(attachment.mimeType)}</span>
-                <div>
-                  <div className="font-medium text-sm">{attachment.fileName}</div>
-                  <div className="text-xs text-gray-500">
+            <div className="flex items-center justify-between h-11 hover:bg-white/50 transition-colors rounded-md px-2.5 py-1.5 group overflow-x-auto border bg-white">
+              <div
+                className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
+                onClick={() => openFile(attachment)}
+                title="Open in new tab"
+              >
+                <File className="w-6 h-6 text-gray-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-normal text-gray-900 truncate">
+                    {attachment.fileName}
+                  </div>
+                  <div className="text-xs font-normal text-gray-500">
                     {formatFileSize(attachment.fileSize)}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  variant="outline"
+
+              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
                   onClick={() => openFile(attachment)}
+                  className="p-1 hover:bg-blue-100 rounded transition-colors h-auto"
                   title="Open in new tab"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => downloadFile(attachment)}
-                  title="Download file"
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
+                  <Download className="w-4 h-4 text-blue-600" />
+                </button>
                 {canDelete && onDelete && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
+                  <button
                     onClick={() => onDelete(index)}
+                    className="p-1 hover:bg-red-100 rounded transition-colors h-auto"
+                    title="Delete (Admin only)"
                   >
-                    <X className="w-4 h-4" />
-                  </Button>
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </button>
                 )}
               </div>
             </div>

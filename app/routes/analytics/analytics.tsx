@@ -91,7 +91,7 @@ function AnalyticsContent() {
   const showPersonalTab = true; // All roles can see personal
 
   return (
-    <div className="min-h-screen bg-[#f1f2f7] p-6">
+    <div className="min-h-screen bg-[#F9F9F9] p-6">
       <div className="max-w-full mx-auto space-y-6">
         {/* Page Header with Manual Refresh Button and Role Switcher */}
         <div className="flex justify-between items-start">

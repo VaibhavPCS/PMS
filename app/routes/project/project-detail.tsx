@@ -260,7 +260,11 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
           ? { year: "numeric", month: "short", day: "numeric" }
           : { year: "numeric", month: "long", day: "numeric" };
 
-    return currentDate.toLocaleDateString("en-US", options);
+    const date = new Date(currentDate);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   }, [currentDate, calendarView]);
 
   // ✅ UPDATED: Get tasks that span across or fall on a specific date
@@ -375,7 +379,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       days.push({
         date,
         day: date.getDate(),
-        dayName: date.toLocaleDateString("en-US", { weekday: "short" }),
+        dayName: date.toLocaleDateString("en-GB", { weekday: "short" }),
         isToday,
         tasks: getTasksForDate(date),
       });
@@ -695,12 +699,13 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                   )}
                 >
                   <h3 className="text-xl font-bold text-gray-900">
-                    {currentDate.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {(() => {
+                      const date = new Date(currentDate);
+                      const day = String(date.getDate()).padStart(2, '0');
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const year = date.getFullYear();
+                      return `${day}/${month}/${year}`;
+                    })()}
                   </h3>
                 </Card>
 
@@ -1007,11 +1012,13 @@ const TaskCard = React.memo<{
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <Clock className="w-4 h-4" />
             <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-              {new Date(task.dueDate).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {(() => {
+                const date = new Date(task.dueDate);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+              })()}
             </span>
           </div>
 
@@ -2083,10 +2090,13 @@ const ProjectDetail = () => {
             </div>
             <span className="text-xs text-gray-600">
               Due:{" "}
-              {new Date(project.endDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
+              {(() => {
+                const date = new Date(project.endDate);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+              })()}
             </span>
           </div>
         </div>

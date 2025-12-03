@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../provider/auth-context';
-import { fetchData } from '@/lib/fetch-util';
+import { fetchData, postData, postMultipart } from '@/lib/fetch-util';
 import ChatSidebar from '../../components/chat/chat-sidebar';
 import ChatWindow from '../../components/chat/chat-window';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 
 interface Chat {
   _id: string;
@@ -85,6 +86,7 @@ const Chat: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
+    console.log('Current user:', user);
     if (user) {
       initializeSocket();
       fetchChats();
@@ -96,6 +98,27 @@ const Chat: React.FC = () => {
       }
     };
   }, [user]);
+
+  // Auto-refresh when workspace changes
+  useEffect(() => {
+    const handleWorkspaceChange = () => {
+      fetchChats();
+      // Clear active chat when workspace changes
+      setActiveChat(null);
+      setMessages([]);
+    };
+
+    // Listen for storage events (when workspace changes in other tabs/components)
+    window.addEventListener('storage', handleWorkspaceChange);
+    
+    // Also listen for custom workspace change events
+    window.addEventListener('workspaceChanged', handleWorkspaceChange);
+
+    return () => {
+      window.removeEventListener('storage', handleWorkspaceChange);
+      window.removeEventListener('workspaceChanged', handleWorkspaceChange);
+    };
+  }, []);
 
   const initializeSocket = () => {
     // const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
@@ -114,7 +137,8 @@ const Chat: React.FC = () => {
       console.log('Connected to Socket.IO server');
     });
 
-    newSocket.on('message', (message: Message) => {
+    newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
+      const { message } = data;
       if (activeChat && message.chat === activeChat._id) {
         setMessages(prev => [...prev, message]);
       }
@@ -131,7 +155,7 @@ const Chat: React.FC = () => {
       ));
     });
 
-    newSocket.on('messageUpdate', (updatedMessage: Message) => {
+    newSocket.on('message-updated', (updatedMessage: Message) => {
       if (activeChat && updatedMessage.chat === activeChat._id) {
         setMessages(prev => prev.map(msg => 
           msg._id === updatedMessage._id ? updatedMessage : msg
@@ -139,12 +163,12 @@ const Chat: React.FC = () => {
       }
     });
 
-    newSocket.on('chatUpdate', (data: any) => {
-      if (data.type === 'created') {
-        setChats(prev => [data.chat, ...prev]);
-      } else if (data.type === 'participant-added') {
+    newSocket.on('chat-updated', (payload: any) => {
+      if (payload.updateType === 'created') {
+        setChats(prev => [payload.data, ...prev]);
+      } else if (payload.updateType === 'participant-added') {
         setChats(prev => prev.map(chat => 
-          chat._id === data.chatId ? data.chat : chat
+          chat._id === payload.chatId ? payload.data : chat
         ));
       }
     });
@@ -155,8 +179,16 @@ const Chat: React.FC = () => {
   const fetchChats = async () => {
     try {
       setLoading(true);
-      const response = await fetchData('/chats');
-      setChats(response.data || []);
+      const currentWorkspaceId = localStorage.getItem('currentWorkspaceId');
+      console.log('Current workspace ID from localStorage:', currentWorkspaceId);
+      if (!currentWorkspaceId) {
+        console.error('No workspace ID found');
+        return;
+      }
+      const response = await fetchData(`/chats/workspace/${currentWorkspaceId}`);
+      console.log('Chat API response:', response);
+      console.log('Chats data:', response.chats || response.data || []);
+      setChats(response.chats || response.data || []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
     } finally {
@@ -167,7 +199,7 @@ const Chat: React.FC = () => {
   const fetchMessages = async (chatId: string) => {
     try {
       const response = await fetchData(`/messages/chat/${chatId}`);
-      setMessages(response.data || []);
+      setMessages(response.messages || response.data || []);
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
@@ -183,14 +215,41 @@ const Chat: React.FC = () => {
     }
   };
 
-  const handleSendMessage = (content: string, attachments?: File[], replyTo?: string) => {
-    if (socket && activeChat) {
-      socket.emit('sendMessage', {
-        chatId: activeChat._id,
-        content,
-        attachments,
-        replyTo
-      });
+  const handleSendMessage = async (content: string, attachments?: File[], replyTo?: string) => {
+    if (activeChat) {
+      try {
+        let messageData: any = {
+          content: content || '',
+          replyTo: replyTo || undefined
+        };
+
+        // If there are attachments, create FormData
+        if (attachments && attachments.length > 0) {
+          const formData = new FormData();
+          formData.append('content', content || '');
+          if (replyTo) {
+            formData.append('replyTo', replyTo);
+          }
+          attachments.forEach(file => {
+            formData.append('attachments', file);
+          });
+          
+          // Send message with attachments via REST API
+          const response = await postMultipart(`/messages/chat/${activeChat._id}`, formData);
+          messageData = response.data;
+        } else {
+          // Send text-only message via REST API
+          const response = await postData(`/messages/chat/${activeChat._id}`, messageData);
+          messageData = response.data;
+        }
+
+        // The message will be received via socket broadcast
+        // No need to manually update the messages state here
+        
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        toast.error('Failed to send message. Please try again.');
+      }
     }
   };
 

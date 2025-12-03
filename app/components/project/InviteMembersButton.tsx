@@ -105,21 +105,21 @@ export function InviteMembersButton({
         return;
       }
       
-      console.log(`Fetching workspace members for workspace ID: ${workspaceId}`);
+      // console.log(`Fetching workspace members for workspace ID: ${workspaceId}`);
       const response = await fetchData(`/workspace/${workspaceId}`);
-      console.log("Workspace API response:", response);
+      // console.log("Workspace API response:", response);
       
       const workspace = response?.workspace || response;
       const members = workspace?.members || [];
       
-      console.log(`Found ${members.length} workspace members`);
+      // console.log(`Found ${members.length} workspace members`);
       const mappedMembers = members.map((member: any) => ({
         _id: member.userId?._id || member.userId,
         name: member.userId?.name || 'Unknown',
         email: member.userId?.email || ''
       })).filter((member: any) => member.email);
       
-      console.log(`Filtered to ${mappedMembers.length} members with email addresses`);
+      // console.log(`Filtered to ${mappedMembers.length} members with email addresses`);
       setWorkspaceMembers(mappedMembers);
     } catch (error) {
       console.error("Error fetching workspace members:", error);

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, MoreVertical, Users, Phone, Video } from 'lucide-react';
+import { Send, Paperclip, Smile, Users, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { formatDistanceToNow } from 'date-fns';
-import { Socket, io } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import MessageItem from './message-item';
 
 interface Chat {
@@ -95,6 +95,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
   useEffect(() => {
     scrollToBottom();
@@ -161,16 +163,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     );
   };
 
+  const formatUnread = (count?: number) => {
+    if (!count || count <= 0) return '';
+    return count > 4 ? '4+' : String(count);
+  };
+
   const handleSendMessage = () => {
-    if (messageText.trim()) {
-      onSendMessage(messageText.trim(), undefined, replyTo?._id);
-      setMessageText('');
-      setReplyTo(null);
-      
-      // Stop typing indicator
-      if (socket) {
-        socket.emit('stopTyping', { chatId: chat._id });
-      }
+    if (!messageText.trim() && selectedFiles.length === 0) {
+      return;
+    }
+    const content = messageText.trim() || 'File attachment';
+    onSendMessage(content, selectedFiles.length ? selectedFiles : undefined, replyTo?._id);
+    setMessageText('');
+    setSelectedFiles([]);
+    setReplyTo(null);
+
+    if (socket) {
+      socket.emit('stopTyping', { chatId: chat._id });
     }
   };
 
@@ -207,11 +216,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      onSendMessage(messageText.trim() || 'File attachment', files, replyTo?._id);
-      setMessageText('');
-      setReplyTo(null);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    const rejectedNames: string[] = [];
+    files.forEach((file) => {
+      if (file.size <= MAX_FILE_SIZE) {
+        validFiles.push(file);
+      } else {
+        rejectedNames.push(file.name);
+      }
+    });
+
+    if (rejectedNames.length) {
+      toast.error(`File size exceeds 10 MB`, { description: rejectedNames.join(', ') });
     }
+
+    if (validFiles.length) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+    }
+    e.target.value = '';
+  };
+
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearSelectedFiles = () => {
+    setSelectedFiles([]);
   };
 
   const handleReply = (message: Message) => {
@@ -229,33 +261,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {getChatAvatar()}
-            <div>
-              <h3 className="font-medium text-gray-900">{getChatName()}</h3>
-              <p className="text-sm text-gray-500">
-                {chat.type === 'group' 
-                  ? `${chat.participants.length} employees`
-                  : 'Direct message'
-                }
-              </p>
-            </div>
+            <h3 className="font-medium text-gray-900">{getChatName()}</h3>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <Phone className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <Video className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </div>
+          {typeof (chat as any).unreadCount === 'number' && (chat as any).unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white">
+              {formatUnread((chat as any).unreadCount)}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="p-4 h-[600px] w-[800px] mx-auto">
         <div className="space-y-4">
           {messages.map((message, index) => {
             const showAvatar = index === 0 || 
@@ -306,7 +323,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       )}
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-200 bg-white">
+      <div className="p-4 border-t border-gray-200 bg-white sticky bottom-0 z-10">
         <div className="flex items-end space-x-2">
           <Button
             variant="ghost"
@@ -325,6 +342,24 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               onKeyPress={handleKeyPress}
               className="resize-none"
             />
+            {selectedFiles.length > 0 && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-gray-500">Attachments selected (max 10 MB each)</div>
+                  <button onClick={clearSelectedFiles} className="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-2 px-2 py-1 rounded-md border bg-gray-50">
+                      <span className="text-xs text-gray-800 truncate max-w-[200px]">{file.name}</span>
+                      <button onClick={() => removeSelectedFile(idx)} className="p-1 hover:bg-gray-200 rounded">
+                        <X className="w-3 h-3 text-gray-600" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
           <Button
@@ -337,7 +372,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           
           <Button
             onClick={handleSendMessage}
-            disabled={!messageText.trim()}
+            disabled={!messageText.trim() && selectedFiles.length === 0}
             size="sm"
             className="flex-shrink-0"
           >

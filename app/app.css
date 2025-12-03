@@ -204,5 +204,49 @@ body {
   background: #717182;
 }
 
+/* Visible Scrollbar Styling - Hidden but functional */
+.scrollbar-visible::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+/* Task Card Scrollbar Styling */
+.task-card-scrollbar::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.task-card-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Date Picker Size Reduction and Scrollbar Overrides */
 @import "./styles/date-picker-overrides.css";

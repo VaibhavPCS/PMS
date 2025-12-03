@@ -70,7 +70,7 @@ const HorizontalNavbar: React.FC<HorizontalNavbarProps> = ({
 
   return (
     <div
-      className="bg-[#f1f2f7] flex flex-col gap-[20px] items-start justify-end"
+      className="bg-[#F9F9F9] flex flex-col gap-[20px] items-start justify-end"
       style={{ height: '80px', width: '100%' }}
     >
       {/* Main Content */}

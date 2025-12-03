@@ -58,15 +58,40 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const { user } = useAuth();
 
   const filteredChats = chats.filter(chat => {
-    const chatName = chat.name || chat.participants
-      .map(p => p.user.name)
-      .join(', ');
+    let chatName = chat.name || '';
+    if (!chatName) {
+      if (chat.type === 'direct') {
+        const other = Array.isArray(chat.participants)
+          ? chat.participants.find(p => p.user && String(p.user._id) !== String(user?._id))
+          : undefined;
+        chatName = other?.user?.name || '';
+      } else {
+        const names = Array.isArray(chat.participants)
+          ? chat.participants.map(p => (p.user && p.user.name) ? p.user.name : '').filter(Boolean)
+          : [];
+        chatName = names.join(', ');
+      }
+    }
     return chatName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const getChatName = (chat: Chat) => {
     if (chat.name) return chat.name;
-    return chat.participants.map(p => p.user.name).join(', ');
+    if (chat.type === 'direct') {
+      const other = Array.isArray(chat.participants)
+        ? chat.participants.find(p => p.user && String(p.user._id) !== String(user?._id))
+        : undefined;
+      return other?.user?.name || 'Direct message';
+    }
+    const participantNames = Array.isArray(chat.participants)
+      ? chat.participants.map(p => (p.user && p.user.name) ? p.user.name : '').filter(Boolean)
+      : [];
+    return participantNames.join(', ');
+  };
+
+  const formatUnread = (count?: number) => {
+    if (!count || count <= 0) return '';
+    return count > 4 ? '4+' : String(count);
   };
 
   const getChatAvatar = (chat: Chat) => {
@@ -78,7 +103,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       );
     }
     
-    const otherParticipant = chat.participants.find(p => p.user._id !== user?._id);
+    const otherParticipant = Array.isArray(chat.participants)
+      ? chat.participants.find(p => p.user && p.user._id !== user?._id)
+      : undefined;
     if (otherParticipant?.user.profilePicture) {
       return (
         <Avatar className="w-10 h-10">
@@ -169,41 +196,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         {getChatName(chat)}
                       </h3>
                       {chat.unreadCount && chat.unreadCount > 0 && (
-                        <Badge variant="destructive" className="ml-2 text-xs">
-                          {chat.unreadCount}
+                        <Badge className="ml-2 text-[10px] px-2 py-0.5">
+                          {formatUnread(chat.unreadCount)}
                         </Badge>
-                      )}
-                    </div>
-
-                    {/* Last Message */}
-                    {chat.lastMessage ? (
-                      <div className="mt-1">
-                        <p className="text-xs text-gray-600 truncate">
-                          <span className="font-medium">
-                            {chat.lastMessage.sender.name}:
-                          </span>{' '}
-                          {truncateMessage(chat.lastMessage.content)}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {formatDistanceToNow(new Date(chat.lastMessage.createdAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 mt-1">No messages yet</p>
-                    )}
-
-                    {/* Chat Type Indicator */}
-                    <div className="flex items-center mt-2">
-                      {chat.type === 'group' ? (
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Users className="w-3 h-3 mr-1" />
-                          {chat.participants.length} employees
-                        </div>
-                      ) : (
-                        <div className="flex items-center text-xs text-gray-500">
-                          <MessageCircle className="w-3 h-3 mr-1" />
-                          Direct message
-                        </div>
                       )}
                     </div>
                   </div>
@@ -215,12 +210,11 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       </div>
 
       {/* Create Chat Modal */}
-      {showCreateModal && (
-        <CreateChatModal
-          onClose={() => setShowCreateModal(false)}
-          onChatCreated={onRefresh}
-        />
-      )}
+      <CreateChatModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onChatCreated={onRefresh}
+      />
     </div>
   );
 };

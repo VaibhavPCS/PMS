@@ -25,7 +25,7 @@ const DashboardLayout = () => {
 
   return (
     <BadgeProvider>
-      <div className="h-screen flex bg-[#f1f2f7]">
+      <div className="h-screen flex bg-[#F9F9F9]">
         {/* Vertical Sidebar */}
         <VerticalSidebar />
 

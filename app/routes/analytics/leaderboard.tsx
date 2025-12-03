@@ -299,7 +299,10 @@ const Leaderboard = () => {
                           const month = date.getUTCMonth();
                           const day = date.getUTCDate();
                           const localDate = new Date(year, month, day);
-                          return format(localDate, "MMM dd, yyyy");
+                          const formattedDay = String(localDate.getDate()).padStart(2, '0');
+                          const formattedMonth = String(localDate.getMonth() + 1).padStart(2, '0');
+                          const formattedYear = localDate.getFullYear();
+                          return `${formattedDay}/${formattedMonth}/${formattedYear}`;
                         })()}
                       </TableCell>
                     </TableRow>
