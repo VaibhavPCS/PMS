@@ -265,9 +265,8 @@ const Chat: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex bg-white">
-      {/* Chat Sidebar */}
-      <div className="w-80 border-r border-gray-200 flex flex-col">
+    <div className="w-full h-full flex bg-white flex-col md:flex-row overflow-hidden">
+      <div className={`w-full md:w-[300px] md:border-r border-gray-200 flex flex-col h-full ${activeChat ? 'hidden md:flex' : ''}`}>
         <ChatSidebar
           chats={chats}
           activeChat={activeChat}
@@ -276,8 +275,10 @@ const Chat: React.FC = () => {
         />
       </div>
 
-      {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+      <div className={`
+        ${activeChat ? 'fixed top-0 left-0 z-50 w-full h-[100dvh] flex flex-col bg-white' : 'hidden'} 
+        md:static md:z-auto md:flex md:flex-1 md:flex-col md:h-full
+      `}>
         {activeChat ? (
           <ChatWindow
             chat={activeChat}
@@ -285,6 +286,7 @@ const Chat: React.FC = () => {
             currentUser={user!}
             onSendMessage={handleSendMessage}
             socket={socket}
+            onBack={() => setActiveChat(null)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">

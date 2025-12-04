@@ -149,11 +149,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
       onMouseLeave={() => setShowActions(false)}
     >
       <div
-        className={`flex max-w-[70%] ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
+        className={`flex max-w-[92%] sm:max-w-[85%] md:max-w-[75%] xl:max-w-[65%] ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
       >
         {/* Avatar */}
         {showAvatar && !isOwnMessage && (
-          <Avatar className="w-8 h-8 mr-2 flex-shrink-0">
+          <Avatar className="w-7 h-7 sm:w-8 sm:h-8 mr-2 flex-shrink-0">
             {message.sender.profilePicture ? (
               <img
                 src={message.sender.profilePicture}
@@ -165,7 +165,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         )}
 
         {!showAvatar && !isOwnMessage && (
-          <div className="w-8 mr-2 flex-shrink-0" />
+          <div className="w-7 sm:w-8 mr-2 flex-shrink-0" />
         )}
 
         {/* Message Content */}
@@ -210,7 +210,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {/* Message Bubble */}
           <div className="relative">
             <div
-              className={`px-3 py-2 rounded-2xl ${
+              className={`px-3 md:px-4 py-2 rounded-2xl ${
                 isOwnMessage
                   ? "bg-[#dcf8c6] text-gray-900"
                   : "bg-[#f5f5f5] text-gray-900"

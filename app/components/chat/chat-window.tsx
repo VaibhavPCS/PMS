@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, Users, X } from 'lucide-react';
+import { Send, Paperclip, Smile, Users, X, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,7 @@ interface ChatWindowProps {
   currentUser: User;
   onSendMessage: (content: string, attachments?: File[], replyTo?: string) => void;
   socket: Socket | null;
+  onBack?: () => void;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -87,7 +88,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   currentUser,
   onSendMessage,
-  socket
+  socket,
+  onBack
 }) => {
   const [messageText, setMessageText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -255,11 +257,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Chat Header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
+    <div className="flex-1 min-h-0 flex flex-col h-full">
+      <div className="p-3 md:p-4 border-b border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            {onBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onBack?.()}
+                className="h-8 w-8 p-0 md:hidden"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+            )}
             {getChatAvatar()}
             <h3 className="font-medium text-gray-900">{getChatName()}</h3>
           </div>
@@ -272,8 +283,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className="p-4 h-[600px] w-[800px] mx-auto">
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 min-h-0 p-2 sm:p-3 md:p-4">
+        <div className="space-y-4 w-full max-w-[900px] lg:max-w-[1000px] xl:max-w-[1200px] 2xl:max-w-[1400px] mx-0 md:mx-auto">
           {messages.map((message, index) => {
             const showAvatar = index === 0 || 
               messages[index - 1].sender._id !== message.sender._id ||
@@ -323,7 +334,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       )}
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-200 bg-white sticky bottom-0 z-10">
+      <div 
+        className="p-3 md:p-4 border-t border-gray-200 bg-white flex-shrink-0 pb-[env(safe-area-inset-bottom)]"
+        style={{ paddingBottom: '14px' }}
+      >
         <div className="flex items-end space-x-2">
           <Button
             variant="ghost"
@@ -351,7 +365,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedFiles.map((file, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-2 py-1 rounded-md border bg-gray-50">
-                      <span className="text-xs text-gray-800 truncate max-w-[200px]">{file.name}</span>
+                      <span className="text-xs text-gray-800 truncate max-w-[140px] sm:max-w-[200px]">{file.name}</span>
                       <button onClick={() => removeSelectedFile(idx)} className="p-1 hover:bg-gray-200 rounded">
                         <X className="w-3 h-3 text-gray-600" />
                       </button>
