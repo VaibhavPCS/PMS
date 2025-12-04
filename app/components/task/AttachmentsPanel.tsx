@@ -95,11 +95,11 @@ export function AttachmentsPanel({
 
   return (
     <ScrollArea className={cn('h-[250px]', className)}>
-      <div className="space-y-2 p-2">
+      <div className="space-y-2 p-1 sm:p-2">
         {attachments.map((attachment, index) => (
           <div
             key={index}
-            className="flex items-center gap-3 p-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+            className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group overflow-hidden"
           >
             {/* File Icon */}
             <div className="flex-shrink-0">
@@ -107,16 +107,16 @@ export function AttachmentsPanel({
             </div>
 
             {/* File Info */}
-            <div 
-              className="flex-1 min-w-0 cursor-pointer"
+            <div
+              className="flex-1 min-w-0 cursor-pointer overflow-hidden max-w-full"
               onClick={() => {
                 window.open(buildBackendUrl(attachment.fileUrl), '_blank');
               }}
             >
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-xs sm:text-sm font-medium text-gray-900 truncate overflow-hidden text-ellipsis whitespace-nowrap">
                 {attachment.fileName}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-[10px] sm:text-xs text-gray-500">
                 {formatFileSize(attachment.fileSize)}
               </p>
             </div>

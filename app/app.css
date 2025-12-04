@@ -3,6 +3,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Custom xs breakpoint for very small screens (375px+) */
+@custom-variant xs (@media (min-width: 375px));
+
 @theme {
   --font-sans: "Inter", "Work Sans", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -204,7 +207,7 @@ body {
   background: #717182;
 }
 
-/* Visible Scrollbar Styling - Hidden but functional */
+/* Visible Scrollbar Styling */
 .scrollbar-visible::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -216,12 +219,18 @@ body {
 }
 
 .scrollbar-visible::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: var(--text-tertiary);
   border-radius: 3px;
 }
 
 .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: transparent;
+  background: #717182;
+}
+
+@media (min-width: 350px) {
+  [data-slot="scroll-area-viewport"].scrollbar-visible::-webkit-scrollbar {
+    display: initial !important;
+  }
 }
 
 /* Task Card Scrollbar Styling */

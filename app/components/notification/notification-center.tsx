@@ -24,6 +24,8 @@ interface Notification {
     meetingId?: string;
     inviteId?: string;
   };
+  relatedTask?: string;
+  relatedComment?: string;
   createdAt: string;
   readAt?: string;
 }
@@ -96,6 +98,36 @@ const NotificationCenter = () => {
     }
   };
 
+  // Generate href for notification navigation
+   const getNotificationHref = (notification: Notification): string => {
+     const { data, relatedTask, type } = notification;
+     
+     // Handle comment notifications that use relatedTask field
+     if (type === 'task_comment' && relatedTask) {
+       return `/task/${relatedTask}`;
+     }
+     
+     // Handle cases where data might be undefined or null
+     if (!data) {
+       return '/dashboard';
+     }
+     
+     // Decide the most specific target route first
+     if (data?.taskId) {
+       return `/task/${data.taskId}`;
+     } else if (data?.projectId) {
+       return `/project/${data.projectId}`;
+     } else if (data?.workspaceId) {
+       return `/workspace`;
+     } else if (data?.meetingId) {
+       return `/meetings`;
+     } else if (data?.inviteId) {
+       return `/workspace`;
+     }
+     
+     return '/dashboard';
+   };
+
   // Enhanced navigation function for notifications with existence checks
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read if unread
@@ -109,10 +141,19 @@ const NotificationCenter = () => {
     // Navigate based on notification data
     const { data } = notification;
 
+    // Handle comment notifications that don't have data field but have relatedTask
+    if (notification.type === 'task_comment' && notification.relatedTask) {
+      // Don't navigate to dashboard yet, let the navigation logic handle it
+    } else if (!data) {
+      // If no data and not a comment notification, navigate to dashboard
+      navigate('/dashboard');
+      return;
+    }
+
     // Check resource existence and status before navigation
     try {
       let headers: Record<string, string> = {};
-      if (data.workspaceId) {
+      if (data?.workspaceId) {
         try { localStorage.setItem('currentWorkspaceId', data.workspaceId); } catch {}
         try { await postData('/workspace/switch', { workspaceId: data.workspaceId }); } catch (err) {
           console.error('Failed to switch workspace from notification:', err);
@@ -124,13 +165,14 @@ const NotificationCenter = () => {
       }
 
       // Check task existence and active status
-      if (data.taskId) {
-        const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include', headers });
+      const taskId = data.taskId || (notification.type === 'task_comment' && notification.relatedTask);
+      if (taskId) {
+        const existsResponse = await fetch(buildApiUrl(`/task/${taskId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {
           toast.error("This task no longer exists.");
           return;
         }
-        const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include', headers });
+        const taskResponse = await fetch(buildApiUrl(`/task/${taskId}`), { credentials: 'include', headers });
         if (taskResponse.ok) {
           const taskData = await taskResponse.json();
           // If isActive is false, task is deleted/archived - don't redirect
@@ -141,7 +183,7 @@ const NotificationCenter = () => {
         }
       }
       // Check project existence and active status
-      else if (data.projectId) {
+      else if (data?.projectId) {
         const existsResponse = await fetch(buildApiUrl(`/project/${data.projectId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {
           toast.error("This project no longer exists or you don't have access to it");
@@ -159,7 +201,7 @@ const NotificationCenter = () => {
       }
 
       // Check workspace existence and archived status
-      if (data.workspaceId) {
+      if (data?.workspaceId) {
         const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {
           toast.error("This workspace no longer exists or you don't have access to it");
@@ -182,7 +224,7 @@ const NotificationCenter = () => {
     }
 
     // Switch workspace if provided
-    if (data.workspaceId) {
+    if (data?.workspaceId) {
       try {
         localStorage.setItem('currentWorkspaceId', data.workspaceId);
       } catch {}
@@ -195,15 +237,19 @@ const NotificationCenter = () => {
 
     // Route selection: task > project > workspace > meetings > invite > dashboard
     let targetPath = '/dashboard';
-    if (data.taskId) {
+    
+    // Handle comment notifications that use relatedTask field
+    if (notification.type === 'task_comment' && notification.relatedTask) {
+      targetPath = `/task/${notification.relatedTask}`;
+    } else if (data?.taskId) {
       targetPath = `/task/${data.taskId}`;
-    } else if (data.projectId) {
+    } else if (data?.projectId) {
       targetPath = `/project/${data.projectId}`;
-    } else if (data.workspaceId) {
+    } else if (data?.workspaceId) {
       targetPath = `/workspace`;
-    } else if (data.meetingId) {
+    } else if (data?.meetingId) {
       targetPath = `/meetings`;
-    } else if (data.inviteId) {
+    } else if (data?.inviteId) {
       targetPath = `/workspace`;
     }
 
@@ -309,14 +355,18 @@ const NotificationCenter = () => {
               </div>
             ) : (
               notifications.slice(0, 10).map((notification) => (
-                <div
+                <a
                   key={notification._id}
-                  className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
+                  href={getNotificationHref(notification)}
+                  className={`block px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 no-underline ${
                     !notification.isRead 
                       ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100 shadow-sm' 
                       : 'bg-gray-50 border-l-4 border-l-gray-300 hover:bg-gray-100 opacity-75'
                   }`}
-                  onClick={() => handleNotificationClick(notification)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNotificationClick(notification);
+                  }}
                 >
                   <div className="flex items-start space-x-3">
                     {/* Icon */}
@@ -355,7 +405,7 @@ const NotificationCenter = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </a>
               ))
             )}
           </div>

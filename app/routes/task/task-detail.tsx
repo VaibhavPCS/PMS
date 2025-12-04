@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { fetchData, postData, putData } from "@/lib/fetch-util";
@@ -88,6 +88,11 @@ interface Task {
   project: {
     _id: string;
     title: string;
+    projectHead?: {
+      _id: string;
+      name?: string;
+      email?: string;
+    };
   };
   category: string;
   startDate: string;
@@ -480,208 +485,215 @@ const ChatMessage: React.FC<{
   onToggleExpand,
   onLoadReplies,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(comment.content);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(comment.content);
 
-  const isOwnMessage = comment.author._id === (currentUser?._id || currentUser?.id);
-  const hasReplies = (comment.replyCount ?? 0) > 0;
+    const isOwnMessage = comment.author._id === (currentUser?._id || currentUser?.id);
+    const hasReplies = (comment.replyCount ?? 0) > 0;
 
-  const handleEdit = () => {
-    if (editContent.trim() && editContent !== comment.content) {
-      onEdit(comment._id, editContent.trim());
-    }
-    setIsEditing(false);
-  };
+    const handleEdit = () => {
+      if (editContent.trim() && editContent !== comment.content) {
+        onEdit(comment._id, editContent.trim());
+      }
+      setIsEditing(false);
+    };
 
-  const handleCancelEdit = () => {
-    setEditContent(comment.content);
-    setIsEditing(false);
-  };
+    const handleCancelEdit = () => {
+      setEditContent(comment.content);
+      setIsEditing(false);
+    };
 
-  const handleToggleExpand = () => {
-    if (hasReplies && !isExpanded && replies.length === 0 && onLoadReplies) {
-      onLoadReplies(comment._id);
-    }
-    onToggleExpand(comment._id);
-  };
+    const handleToggleExpand = () => {
+      if (hasReplies && !isExpanded && replies.length === 0 && onLoadReplies) {
+        onLoadReplies(comment._id);
+      }
+      onToggleExpand(comment._id);
+    };
 
-  return (
-    <div className="group mb-3">
-      <div
-        className={`flex gap-2 ${
-          isOwnMessage ? "flex-row-reverse" : "flex-row"
-        }`}
-      >
-        {!isOwnMessage && (
-          <Avatar className="w-8 h-8 flex-shrink-0">
-            <AvatarFallback className="text-xs bg-blue-500 text-white">
-              {comment.author.name.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        )}
-
+    return (
+      <div className="group mb-3">
         <div
-          className={`flex-1 max-w-[95%] sm:max-w-[85%] md:max-w-[75%] ${
-            isOwnMessage ? "flex flex-col items-end" : ""
-          }`}
+          className={`flex gap-2 ${isOwnMessage ? "flex-row-reverse" : "flex-row"
+            }`}
         >
+          {!isOwnMessage && (
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              <AvatarFallback className="text-xs bg-blue-500 text-white">
+                {comment.author.name.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
+
           <div
-            className={`p-2 sm:p-3 rounded-lg ${
-              isOwnMessage
+            className={`flex-1 max-w-[95%] sm:max-w-[85%] md:max-w-[75%] ${isOwnMessage ? "flex flex-col items-end" : ""
+              }`}
+          >
+            <div
+              className={`p-2 sm:p-3 rounded-lg ${isOwnMessage
                 ? "bg-[#DCF8C6] text-black rounded-tr-none"
                 : "bg-white border border-gray-200 text-black rounded-tl-none"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-sm">
-                {isOwnMessage ? "You" : comment.author.name}
-              </span>
-              <span className="text-xs text-gray-500">
-                {new Date(comment.createdAt).toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                })}
-              </span>
-              {comment.isEdited && (
-                <span className="text-xs text-gray-400">(edited)</span>
+                }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-sm">
+                  {isOwnMessage ? "You" : comment.author.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {new Date(comment.createdAt).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
+                </span>
+                {comment.isEdited && (
+                  <span className="text-xs text-gray-400">(edited)</span>
+                )}
+              </div>
+
+              {comment.parentComment && (
+                <div className="mb-2 p-2 bg-gray-100 rounded border-l-2 border-gray-300">
+                  <div className="text-xs text-gray-600">
+                    Replying to{" "}
+                    <span className="font-medium">
+                      {comment.parentComment.author.name}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-700 truncate">
+                    {comment.parentComment.content.length > 30
+                      ? `${comment.parentComment.content.substring(0, 30)}...`
+                      : comment.parentComment.content}
+                  </div>
+                </div>
+              )}
+
+              {isEditing ? (
+                <div className="mb-2">
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="text-sm p-2 border rounded resize-none"
+                    rows={2}
+                  />
+                  <div className="flex space-x-2 mt-2">
+                    <Button
+                      size="sm"
+                      onClick={handleEdit}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-900 whitespace-pre-wrap">
+                  {comment.content}
+                </div>
+              )}
+
+              {comment.attachments && comment.attachments.length > 0 && (
+                <FilePreview
+                  attachments={comment.attachments}
+                  isOwnAttachment={isOwnMessage}
+                  canDelete={isOwnMessage}
+                />
               )}
             </div>
 
-            {comment.parentComment && (
-              <div className="mb-2 p-2 bg-gray-100 rounded border-l-2 border-gray-300">
-                <div className="text-xs text-gray-600">
-                  Replying to{" "}
-                  <span className="font-medium">
-                    {comment.parentComment.author.name}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-700 truncate">
-                  {comment.parentComment.content.length > 30
-                    ? `${comment.parentComment.content.substring(0, 30)}...`
-                    : comment.parentComment.content}
-                </div>
-              </div>
-            )}
-
-            {isEditing ? (
-              <div className="mb-2">
-                <Textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="text-sm p-2 border rounded resize-none"
-                  rows={2}
-                />
-                <div className="flex space-x-2 mt-2">
-                  <Button
-                    size="sm"
-                    onClick={handleEdit}
-                    className="h-7 px-3 text-xs"
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    className="h-7 px-3 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-900 whitespace-pre-wrap">
-                {comment.content}
-              </div>
-            )}
-
-            {comment.attachments && comment.attachments.length > 0 && (
-              <FilePreview
-                attachments={comment.attachments}
-                isOwnAttachment={isOwnMessage}
-                canDelete={isOwnMessage}
-              />
-            )}
-          </div>
-
-          <div
-            className={`flex items-center gap-2 mt-1 text-xs ${
-              isOwnMessage ? "justify-end" : "justify-start"
-            }`}
-          >
-            {canReply && (
-              <button
-                onClick={() => onReply(comment)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                <Reply className="w-3 h-3" />
-                Reply
-              </button>
-            )}
-            {canEdit && isOwnMessage && !isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                <Edit3 className="w-3 h-3" />
-                Edit
-              </button>
-            )}
-            {canDelete && isOwnMessage && (
-              <button
-                onClick={() => onDelete(comment._id)}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
-              >
-                <Trash2 className="w-3 h-3" />
-                Delete
-              </button>
-            )}
-          </div>
-
-          {hasReplies && (
-            <div className="mt-2">
-              <button
-                onClick={handleToggleExpand}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors text-xs"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronRight className="w-3 h-3" />
-                )}
-                <span>
-                  {comment.replyCount || 0} {comment.replyCount === 1 ? "reply" : "replies"}
-                </span>
-              </button>
+            <div
+              className={`flex items-center gap-2 mt-1 text-xs ${isOwnMessage ? "justify-end" : "justify-start"
+                }`}
+            >
+              {canReply && (
+                <button
+                  onClick={() => onReply(comment)}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  <Reply className="w-3 h-3" />
+                  Reply
+                </button>
+              )}
+              {canEdit && isOwnMessage && !isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  Edit
+                </button>
+              )}
+              {canDelete && isOwnMessage && (
+                <button
+                  onClick={() => onDelete(comment._id)}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {hasReplies && isExpanded && (
-        <div className={`mt-2 space-y-2 pl-10 ${isOwnMessage ? "pr-0" : "pr-10"}`}>
-          {replies.map((reply) => (
-            <ChatMessage
-              key={reply._id}
-              comment={reply}
-              currentUser={currentUser}
-              canReply={canReply}
-              canEdit={canEdit}
-              canDelete={canDelete}
-              onReply={onReply}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onToggleExpand={() => {}}
-            />
-          ))}
+            {hasReplies && (
+              <div className="mt-2">
+                <button
+                  onClick={handleToggleExpand}
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors text-xs"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                  <span>
+                    {comment.replyCount || 0} {comment.replyCount === 1 ? "reply" : "replies"}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
-  );
-};
+
+        {hasReplies && isExpanded && (
+          <div className={`mt-2 space-y-2 pl-10 ${isOwnMessage ? "pr-0" : "pr-10"}`}>
+            {replies.map((reply) => (
+              <ChatMessage
+                key={reply._id}
+                comment={reply}
+                currentUser={currentUser}
+                canReply={canReply}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                onReply={onReply}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onToggleExpand={() => { }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
 const TaskDetail = () => {
+  // Helper to format date in error messages from (mm/dd/yyyy) to (dd/mm/yyyy)
+  const formatErrorMessageDate = (message: string) => {
+    const dateRegex = /\((\d{1,2})\/(\d{1,2})\/(\d{4})\)/;
+    const match = message.match(dateRegex);
+    if (match) {
+      const [_, month, day, year] = match;
+      const formattedDate = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      return message.replace(dateRegex, `(${formattedDate})`);
+    }
+    return message;
+  };
   const { id: taskId } = useParams();
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
@@ -736,6 +748,8 @@ const TaskDetail = () => {
   const [subtaskPriority, setSubtaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
   const [subtaskStartDate, setSubtaskStartDate] = useState<string>("");
   const [subtaskEndDate, setSubtaskEndDate] = useState<string>("");
+  const [subtaskProjectStart, setSubtaskProjectStart] = useState<Date | null>(null);
+  const [subtaskProjectEnd, setSubtaskProjectEnd] = useState<Date | null>(null);
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false); // ✅ NEW: Loading state for subtask creation
   const [isChangingStatus, setIsChangingStatus] = useState(false); // ✅ NEW: Loading state for status changes
 
@@ -780,7 +794,7 @@ const TaskDetail = () => {
             },
           }
         );
-        
+
         if (taskDetailsResponse.ok) {
           const taskData = await taskDetailsResponse.json();
           if (taskData.task?.isArchived) {
@@ -880,6 +894,66 @@ const TaskDetail = () => {
     return () => clearInterval(interval);
   }, [task?._id]);
 
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const handoverTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Text formatting function for handover notes
+  const applyTextFormatting = (format: 'bold' | 'italic' | 'underline') => {
+    const textarea = handoverTextareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = newHandoverContent.substring(start, end);
+
+    if (!selectedText) {
+      toast.error("Please select some text to format");
+      return;
+    }
+
+    let formattedText: string;
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText}**`;
+        break;
+      case 'italic':
+        formattedText = `*${selectedText}*`;
+        break;
+      case 'underline':
+        formattedText = `__${selectedText}__`;
+        break;
+      default:
+        formattedText = selectedText;
+    }
+
+    const newContent =
+      newHandoverContent.substring(0, start) +
+      formattedText +
+      newHandoverContent.substring(end);
+
+    setNewHandoverContent(newContent);
+
+    // Restore cursor position after formatting
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        const newCursorPos = start + formattedText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  };
+
+  useEffect(() => {
+    const root = chatScrollRef.current;
+    if (!root) return;
+    const viewport = root.querySelector(
+      '[data-slot="scroll-area-viewport"]'
+    ) as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+  }, [comments.length]);
+
   const fetchTaskDetails = async () => {
     if (!taskId) {
       setLoading(false);
@@ -970,7 +1044,7 @@ const TaskDetail = () => {
         const data = await res.json();
         setSubtasks(data.subtasks || []);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleCreateSubtask = async () => {
@@ -1124,8 +1198,10 @@ const TaskDetail = () => {
   // ✅ NEW: Submit handover entry
   const handleSubmitHandoverEntry = async () => {
     if (!task) return;
-    if (!newHandoverContent.trim() && handoverSelectedFiles.length === 0) {
-      toast.error("Please add content or attach files");
+
+    // Backend requires content to be non-empty
+    if (!newHandoverContent.trim()) {
+      toast.error("Please add a message");
       return;
     }
 
@@ -1152,7 +1228,8 @@ const TaskDetail = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to add handover entry");
+        const errorData = await response.json().catch(() => ({ message: 'Failed to add handover entry' }));
+        throw new Error(errorData.message || 'Failed to add handover entry');
       }
 
       toast.success("Handover entry added successfully");
@@ -1163,9 +1240,9 @@ const TaskDetail = () => {
 
       // Refresh handover entries
       await fetchHandoverEntries();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add handover entry:", error);
-      toast.error("Failed to add handover entry");
+      toast.error(error?.message || "Failed to add handover entry");
     } finally {
       setSubmittingHandover(false);
     }
@@ -1351,28 +1428,30 @@ const TaskDetail = () => {
             "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
           },
           body: JSON.stringify({
-            rejectionReason: rejectionReason.trim(),
+            reason: rejectionReason.trim(),
             reassigneeId: rejectReassigneeId || undefined,
-            startDate: rejectStartDate || undefined,
-            dueDate: rejectDueDate || undefined,
+            newDueDate: rejectDueDate || undefined,
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to reject task");
+        const errorData = await response.json().catch(() => ({ message: 'Failed to reject task' }));
+        throw new Error(errorData.message || 'Failed to reject task');
       }
 
-      toast.success("Task rejected and reassigned");
+      toast.success("Task rejected successfully");
       setShowRejectDialog(false);
       setRejectionReason("");
       setRejectReassigneeId("");
       setRejectStartDate("");
       setRejectDueDate("");
+      setRejectProjectEnd(null);
       await fetchTaskDetails();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to reject task:", error);
-      toast.error("Failed to reject task");
+      const errorMessage = error?.message || "Failed to reject task";
+      toast.error(formatErrorMessageDate(errorMessage));
     } finally {
       setIsRejecting(false);
     }
@@ -1398,7 +1477,6 @@ const TaskDetail = () => {
           },
           body: JSON.stringify({
             assigneeId: reassignAssigneeId,
-            startDate: reassignStartDate || undefined,
             dueDate: reassignDueDate,
           }),
         }
@@ -1412,12 +1490,12 @@ const TaskDetail = () => {
       toast.success("Task reassigned successfully");
       setShowReassignDialog(false);
       setReassignAssigneeId("");
-      setReassignStartDate("");
       setReassignDueDate("");
       await fetchTaskDetails();
     } catch (error: any) {
       console.error("Failed to reassign task:", error);
-      toast.error(error?.message || "Failed to reassign task");
+      const errorMessage = error?.message || "Failed to reassign task";
+      toast.error(formatErrorMessageDate(errorMessage));
     } finally {
       setIsReassigning(false);
     }
@@ -1479,18 +1557,21 @@ const TaskDetail = () => {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const topLevelComments = comments.filter((c) => !c.parentComment);
 
   const isCreator = activeUser?._id === task?.creator?._id || activeUser?.id === task?.creator?._id;
   const isAssignee = activeUser?._id === task?.assignee?._id || activeUser?.id === task?.assignee?._id;
-  const canApprove = task?.approvalStatus === "pending-approval" && isCreator;
+  const isAdmin = ['admin', 'super_admin'].includes(activeUser?.role || '');
+  const isProjectHead = task?.project?.projectHead?._id === activeUser?._id || task?.project?.projectHead === activeUser?._id;
+  const canCreateSubtask = isCreator || isAdmin || isProjectHead;
+  const canApprove = task?.status === "done" && task?.approvalStatus === "pending-approval" && isCreator;
 
   if (loading) {
     return (
@@ -1532,14 +1613,14 @@ const TaskDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         {/* Breadcrumb Navigation */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Breadcrumb
             items={[
-              { 
-                label: "Dashboard", 
+              {
+                label: "Dashboard",
                 href: "/dashboard",
                 icon: (
                   <img
@@ -1549,8 +1630,8 @@ const TaskDetail = () => {
                   />
                 )
               },
-              { 
-                label: "Workspace", 
+              {
+                label: "Workspace",
                 href: "/workspace",
                 icon: (
                   <img
@@ -1560,8 +1641,8 @@ const TaskDetail = () => {
                   />
                 )
               },
-              { 
-                label: task.project?.title || "Project", 
+              {
+                label: task.project?.title || "Project",
                 href: `/project/${task.project?._id}`,
                 icon: (
                   <img
@@ -1571,8 +1652,8 @@ const TaskDetail = () => {
                   />
                 )
               },
-              { 
-                label: task.title, 
+              {
+                label: task.title,
                 href: "#",
                 icon: (
                   <svg
@@ -1606,345 +1687,265 @@ const TaskDetail = () => {
         </div>
 
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
-          {/* Main Content - Left side on desktop */}
-          <div className="space-y-6 order-2 lg:order-1">
+        {/* Modern Responsive Layout */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+          {/* Left Column - Task Details and Handover Progress */}
+          <div className="space-y-4 md:space-y-6">
             {/* Task Details Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-2xl mb-2">{task.title}</CardTitle>
-                    <div className="flex flex-col gap-2">
-                      {/* Status and Priority on same line */}
-                      <div className="flex flex-wrap gap-2">
-                        <Badge
-                          variant="outline"
-                          className={`${getStatusColor(task.status)} border`}
-                        >
-                          {getStatusIcon(task.status)}
-                          <span className="ml-1 capitalize">
-                            {task.status.replace("-", " ")}
-                          </span>
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`${getPriorityColor(task.priority)} border`}
-                        >
-                          <span className="capitalize">{task.priority}</span>
-                        </Badge>
-                      </div>
-                      {/* Approval status on next line */}
-                      {task.approvalStatus && task.approvalStatus !== "not-required" && (
-                        <div className="flex flex-wrap gap-2">
-                          <Badge
-                            variant="outline"
-                            className={`${getApprovalStatusColor(task.approvalStatus)} border`}
+            <Card className="shadow-sm border-gray-200">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-4">
+                  {/* Title and Actions Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <CardTitle className="text-xl sm:text-2xl font-bold leading-tight">Task Overview</CardTitle>
+
+                    {/* Approval Buttons - Responsive: stack on mobile */}
+                    <div className="flex flex-col xs:flex-row flex-wrap gap-2 xs:gap-3 items-stretch xs:items-center w-full xs:w-auto">
+                      {/* Approval Actions - Only for creator */}
+                      {canApprove && (
+                        <>
+                          <Button
+                            onClick={handleApprove}
+                            disabled={isApproving}
+                            size="sm"
+                            className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-full xs:w-auto justify-center"
                           >
-                            <span className="capitalize">
-                              {task.approvalStatus.replace("-", " ")}
-                            </span>
-                          </Badge>
-                        </div>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            {isApproving ? "Approving..." : "Approve"}
+                          </Button>
+                          <Button
+                            onClick={() => setShowRejectDialog(true)}
+                            disabled={isRejecting}
+                            size="sm"
+                            className="bg-white border border-[#ef4444] text-[#ef4444] hover:bg-red-50 font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-full xs:w-auto justify-center"
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Reassign Button */}
+                      {isCreator && task.assignee && (
+                        <Button
+                          size="sm"
+                          onClick={() => setShowReassignDialog(true)}
+                          className="bg-white border border-[#d5d7da] text-[#414651] hover:bg-gray-50 font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-full xs:w-auto justify-center"
+                        >
+                          <svg className="w-4 h-4 mr-2" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M13.3333 15.8333H16.6667M16.6667 15.8333V12.5M16.6667 15.8333L12.5 11.6667M6.66667 4.16667H3.33333M3.33333 4.16667V7.5M3.33333 4.16667L7.5 8.33333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Reassign Task
+                        </Button>
                       )}
                     </div>
-                    
-                    {/* Task Details - 2x2 Grid Layout */}
-                    <div className="mt-6 grid grid-cols-2 gap-4 h-64 w-full">
-                      {/* Top Row - Assignee and Creator */}
-                      <div className="bg-gray-50 rounded-lg p-4 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                          <User className="w-4 h-4" />
-                          <span className="font-medium">Assignee</span>
+                  </div>
+
+                  {/* Project Details Card - Figma Design */}
+                  <div className="mt-4 bg-[#e5efff] rounded-lg px-5 py-[18px] flex flex-col gap-5">
+                    {/* Task Title - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Task Title</p>
+                      <p className="text-sm text-neutral-700 font-normal break-words">{task.title}</p>
+                    </div>
+
+                    {/* Assigned to - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Assigned to</p>
+                      <p className="text-sm text-neutral-700 font-normal">{task.assignee?.name || "Unassigned"}</p>
+                    </div>
+
+                    {/* Priority - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Priority</p>
+                      <p className={`text-sm font-normal capitalize ${task.priority === 'urgent' ? 'text-[#cd2812]' :
+                        task.priority === 'high' ? 'text-[#cd2812]' :
+                          task.priority === 'medium' ? 'text-[#f2761b]' :
+                            'text-neutral-700'
+                        }`}>
+                        {task.priority}
+                      </p>
+                    </div>
+
+                    {/* Description - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Description</p>
+                      <p className="text-sm text-neutral-700 font-normal whitespace-pre-wrap">{task.description || '-'}</p>
+                    </div>
+
+                    {/* Start Date & Due Date - Side by side */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-[5px]">
+                        <p className="text-sm text-[#040110] opacity-60 font-normal">Start Date</p>
+                        <p className="text-sm text-neutral-700 font-normal">{formatDate(task.startDate || "")}</p>
+                      </div>
+                      <div className="flex flex-col gap-[5px]">
+                        <p className="text-sm text-[#040110] opacity-60 font-normal">Due Date</p>
+                        <p className="text-sm text-neutral-700 font-normal">{formatDate(task.dueDate || "")}</p>
+                      </div>
+                    </div>
+
+                    {/* Duration - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Duration</p>
+                      <p className="text-sm text-neutral-700 font-normal">{task.durationDays ? `${task.durationDays} Day${task.durationDays > 1 ? 's' : ''}` : 'N/A'}</p>
+                    </div>
+
+                    {/* Status - Full width */}
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-sm text-[#040110] opacity-60 font-normal">Status</p>
+                      {isAssignee && task.approvalStatus !== "approved" ? (
+                        <div className="flex items-center gap-[6px] sm:gap-[10px] border-b-[1px] border-[#e0e0e0] overflow-x-auto">
+                          {[
+                            { value: "to-do", label: "To Do" },
+                            { value: "in-progress", label: "In Progress" },
+                            { value: "done", label: "Done" }
+                          ].map((status) => (
+                            <button
+                              key={status.value}
+                              onClick={() => !isChangingStatus && handleStatusChange(status.value)}
+                              disabled={isChangingStatus}
+                              className={`px-[6px] sm:px-[10px] py-[8px] text-[12px] sm:text-[13px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap
+                                ${task.status === status.value
+                                  ? 'border-b-[2px] border-[#f2761b] opacity-100 -mb-[1px]'
+                                  : 'opacity-60 hover:opacity-100'}
+                                ${isChangingStatus ? 'cursor-wait' : 'cursor-pointer'}
+                              `}
+                            >
+                              {status.label}
+                            </button>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-sm bg-blue-500 text-white">
-                              {task.assignee?.name?.charAt(0).toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">
-                            {task.assignee?.name || "Unassigned"}
+                      ) : (
+                        <p className={`text-sm font-medium capitalize ${task.status === 'done' ? 'text-[#22c55e]' :
+                          task.status === 'in-progress' ? 'text-[#f2761b]' :
+                            'text-neutral-700'
+                          }`}>
+                          {task.status.replace("-", " ")}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Approval Status - Inline Display with Rejection Reason */}
+                    {task.approvalStatus && task.approvalStatus !== "not-required" && (
+                      <div className="pt-2 border-t border-[#e0e0e0]/50">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-[#040110] opacity-60">Approval:</span>
+                          <span className={`text-sm font-medium capitalize ${task.approvalStatus === 'approved' ? 'text-[#22c55e]' :
+                            task.approvalStatus === 'rejected' ? 'text-[#ef4444]' :
+                              task.approvalStatus === 'pending-approval' ? 'text-[#f59e0b]' :
+                                'text-neutral-700'
+                            }`}>
+                            {task.approvalStatus.replace("-", " ")}
                           </span>
                         </div>
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                          <User className="w-4 h-4" />
-                          <span className="font-medium">Creator</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-sm bg-green-500 text-white">
-                              {task.creator?.name?.charAt(0).toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{task.creator?.name}</span>
-                        </div>
-                      </div>
-
-                      {/* Bottom Row - Dates */}
-                      <div className="bg-gray-50 rounded-lg p-4 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                          <Calendar className="w-4 h-4" />
-                          <span className="font-medium">Timeline</span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-gray-500">
-                            <span className="font-medium">Start:</span> {formatDate(task.startDate)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            <span className="font-medium">Due:</span> {formatDate(task.dueDate)}
-                          </div>
-                          {task.durationDays && (
-                            <div className="text-xs text-gray-500">
-                              <span className="font-medium">Duration:</span> {task.durationDays} days
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-gray-50 rounded-lg p-4 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                          <Calendar className="w-4 h-4" />
-                          <span className="font-medium">Created</span>
-                        </div>
-                        <div className="text-sm font-medium">{formatDate(task.createdAt)}</div>
-                        {task.completedAt && (
-                          <div className="mt-1">
-                            <div className="flex items-center gap-2 text-xs text-green-600">
-                              <CheckCircle className="w-3 h-3" />
-                              <span>Completed {formatDate(task.completedAt)}</span>
-                            </div>
+                        {/* Show rejection reason inline */}
+                        {task.approvalStatus === "rejected" && task.rejectionReason && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-[#040110] opacity-60">Reason: </span>
+                            <span className="text-[#ef4444]">{task.rejectionReason}</span>
                           </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  {/* Status Change Dropdown - Only for assignee */}
-                  {isAssignee && task.approvalStatus !== "approved" && (
-                    <Select
-                      value={task.status}
-                      onValueChange={handleStatusChange}
-                      disabled={isChangingStatus}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="to-do">To Do</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                  
-                  {/* Reassign Button - Only for creator */}
-                  {isCreator && task.assignee && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowReassignDialog(true)}
-                      className="text-xs"
-                    >
-                      Reassign Task
-                    </Button>
-                  )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {task.description}
-                  </p>
-                </div>
-
-                {task.category && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-2">Category</h3>
-                    <Badge variant="outline">{task.category}</Badge>
-                  </div>
-                )}
-
+              <CardContent className="space-y-4 sm:space-y-6 pt-4">
                 {task.attachments && task.attachments.length > 0 && (
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">Attachments</h3>
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 mb-3">Attachments</h3>
                     <AttachmentsPanel attachments={task.attachments} />
-                  </div>
-                )}
-
-                {/* Approval Actions - Only for creator */}
-                {canApprove && (
-                  <div className="flex gap-3 pt-4 border-t">
-                    <Button
-                      onClick={handleApprove}
-                      disabled={isApproving}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      {isApproving ? "Approving..." : "Approve Task"}
-                    </Button>
-                    <Button
-                      onClick={() => setShowRejectDialog(true)}
-                      disabled={isRejecting}
-                      variant="outline"
-                      className="border-red-300 text-red-600 hover:bg-red-50"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Reject & Reassign
-                    </Button>
-                  </div>
-                )}
-
-                {/* Rejection Info - Show if task was rejected */}
-                {task.approvalStatus === "rejected" && task.rejectionReason && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <h4 className="font-semibold text-red-900 mb-2">Rejection Reason</h4>
-                    <p className="text-red-700">{task.rejectionReason}</p>
-                  </div>
-                )}
-
-                {/* Approval Info - Show if task was approved */}
-                {task.approvalStatus === "approved" && task.approvedBy && (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h4 className="font-semibold text-green-900 mb-2">Approved By</h4>
-                    <p className="text-green-700">
-                      {task.approvedBy.name} on {formatDate(task.approvedAt || "")}
-                    </p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Handover Progress - WhatsApp Style */}
-            <Card className="w-full bg-[#E5EFFF]">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="w-5 h-5" />
-                  <span>Handover Progress</span>
-                  {handoverEntries && handoverEntries.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
-                      {handoverEntries.length}
-                    </Badge>
-                  )}
-                </CardTitle>
-              </CardHeader>
+            {/* Handover Progress - Figma Design */}
+            <div className="bg-[#e5efff] border border-[#cccccc] rounded-lg px-5 py-[18px] flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex flex-col gap-[5px]">
+                <h3 className="text-lg font-medium text-neutral-700">Handover Notes</h3>
+                <p className="text-sm text-[#040110] opacity-60 font-normal">
+                  Add your progress updates and handover information here
+                </p>
+              </div>
 
-              <CardContent className="p-0">
-                <ScrollArea className="h-64 sm:h-72 md:h-80 px-2 sm:px-3 md:px-4 bg-[#E5DDD5]">
-                  {handoverEntries && handoverEntries.length > 0 ? (
-                    <div className="space-y-3 py-3">
-                      {(() => {
-                        const groupedEntries: Record<string, typeof handoverEntries> = {};
-                        handoverEntries.forEach((entry) => {
-                          const date = new Date(entry.createdAt).toLocaleDateString("en-US", {
-                            day: "numeric",
-                            month: "long",
-                          });
-                          if (!groupedEntries[date]) {
-                            groupedEntries[date] = [];
-                          }
-                          groupedEntries[date].push(entry);
-                        });
-
-                        return Object.entries(groupedEntries).map(([date, entries]) => (
-                          <div key={date} className="space-y-3">
-                            <div className="flex justify-center">
-                              <span className="bg-white px-3 py-1 rounded-full text-xs text-gray-600 shadow-sm">
-                                {date}
-                              </span>
-                            </div>
-                            {entries.map((entry) => {
-                              const isOwnEntry = entry.author._id === (activeUser?._id || activeUser?.id);
-                              return (
-                                <div
-                                  key={entry._id}
-                                  className={`flex gap-2 ${isOwnEntry ? "flex-row-reverse" : "flex-row"}`}
-                                >
-                                  {!isOwnEntry && (
-                                    <Avatar className="w-8 h-8 flex-shrink-0">
-                                      <AvatarFallback className="text-xs bg-blue-500 text-white">
-                                        {entry.author.name.charAt(0).toUpperCase()}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  )}
-                                  <div
-                                    className={`flex-1 max-w-[95%] sm:max-w-[85%] md:max-w-[75%] ${
-                                      isOwnEntry ? "flex flex-col items-end" : ""
-                                    }`}
-                                  >
-                                    <div
-                                      className={`p-2 sm:p-3 rounded-lg ${
-                                        isOwnEntry
-                                          ? "bg-[#DCF8C6] text-black rounded-tr-none"
-                                          : "bg-white border border-gray-200 text-black rounded-tl-none"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-semibold text-sm">
-                                          {isOwnEntry ? "You" : entry.author.name}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                          {new Date(entry.createdAt).toLocaleTimeString("en-US", {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                            hour12: true,
-                                          })}
-                                        </span>
-                                      </div>
-                                      <div className="text-sm text-gray-900 whitespace-pre-wrap">
-                                        {entry.content}
-                                      </div>
-                                      {entry.attachments && entry.attachments.length > 0 && (
-                                        <FilePreview
-                                          attachments={entry.attachments}
-                                          isOwnAttachment={isOwnEntry}
-                                          canDelete={isOwnEntry}
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ));
-                      })()}
+              {/* Handover Entries Display */}
+              {handoverEntries && handoverEntries.length > 0 && (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {handoverEntries.map((entry) => (
+                    <div key={entry._id} className="bg-white rounded-lg p-3 border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-sm text-gray-900">{entry.author.name}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(entry.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{entry.content}</p>
+                      {entry.attachments && entry.attachments.length > 0 && (
+                        <div className="mt-2">
+                          <FilePreview attachments={entry.attachments} isOwnAttachment={false} canDelete={false} />
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                      No handover entries yet
+                  ))}
+                </div>
+              )}
+
+              {/* Message Composer - Figma Design */}
+              {isAssignee && (
+                <div className="bg-white rounded-lg border border-[#cccccc]">
+                  {/* Textarea for input */}
+                  <Textarea
+                    ref={handoverTextareaRef}
+                    value={newHandoverContent}
+                    onChange={(e) => setNewHandoverContent(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="border-0 resize-none text-sm focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[100px]"
+                    rows={4}
+                  />
+
+                  {/* Selected Files Display */}
+                  {handoverSelectedFiles.length > 0 && (
+                    <div className="px-4 pb-2 space-y-2">
+                      {handoverSelectedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
+                          <span className="text-sm truncate flex-1">{file.name}</span>
+                          <button
+                            onClick={() => setHandoverSelectedFiles(handoverSelectedFiles.filter((_, i) => i !== index))}
+                            className="text-red-500 hover:text-red-700 ml-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </ScrollArea>
 
-                {isAssignee && (
-                  <div className="p-3 bg-gray-50">
-                    <Textarea
-                      value={newHandoverContent}
-                      onChange={(e) => setNewHandoverContent(e.target.value)}
-                      placeholder="Share your progress, blockers, or handover notes..."
-                      className="mb-3 resize-none"
-                      rows={3}
-                    />
-                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 border-t">
+                  {/* Separator */}
+                  <div className="w-full h-px bg-[#cccccc]" />
+
+                  {/* Bottom Row - Attach Icon, Formatting Icons, Share Button */}
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      {/* Attach Icon */}
                       <label htmlFor="handover-attach" className="cursor-pointer">
                         <svg
-                          xmlns="http://www.w3.org/2000/svg"
                           width="20"
                           height="20"
-                          viewBox="0 0 24 24"
+                          viewBox="0 0 20 20"
                           fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          xmlns="http://www.w3.org/2000/svg"
                           className="text-gray-600 hover:text-gray-800"
                         >
-                          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                          <path
+                            d="M17.8668 9.29175L10.2001 16.9584C8.78346 18.3751 6.46679 18.3751 5.05012 16.9584C3.63346 15.5417 3.63346 13.2251 5.05012 11.8084L12.7168 4.14175C13.6418 3.21675 15.1418 3.21675 16.0668 4.14175C16.9918 5.06675 16.9918 6.56675 16.0668 7.49175L8.40846 15.1501C7.94596 15.6126 7.19596 15.6126 6.73346 15.1501C6.27096 14.6876 6.27096 13.9376 6.73346 13.4751L13.5585 6.66675"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                         <input
                           id="handover-attach"
@@ -1955,75 +1956,95 @@ const TaskDetail = () => {
                           onChange={(e) => {
                             const files = e.target.files;
                             if (files) {
-                              setHandoverSelectedFiles(Array.from(files));
+                              const fileArray = Array.from(files);
+                              // Validate file sizes
+                              const oversizedFiles = fileArray.filter(file => file.size > 5 * 1024 * 1024);
+                              if (oversizedFiles.length > 0) {
+                                toast.error("File too large", {
+                                  description: `${oversizedFiles.map(f => f.name).join(', ')} exceeds 5MB limit`,
+                                });
+                                return;
+                              }
+                              setHandoverSelectedFiles([...handoverSelectedFiles, ...fileArray]);
                             }
                           }}
                         />
                       </label>
-                      <Button
-                        onClick={handleSubmitHandoverEntry}
-                        disabled={submittingHandover || (!newHandoverContent.trim() && handoverSelectedFiles.length === 0)}
-                        className="bg-[#FF6B2C] hover:bg-[#FF5A1A] text-white flex items-center gap-2"
-                        size="sm"
+
+                      {/* Formatting Icons */}
+                      <button
+                        type="button"
+                        className="text-gray-600 hover:text-gray-800"
+                        title="Bold"
+                        onClick={() => applyTextFormatting('bold')}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="m22 2-7 20-4-9-9-4Z" />
-                          <path d="M22 2 11 13" />
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5.83325 3.33325H11.6666C13.5076 3.33325 14.9999 4.82564 14.9999 6.66659C14.9999 8.50754 13.5076 9.99992 11.6666 9.99992H5.83325V3.33325Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M5.83325 10H12.4999C14.3409 10 15.8333 11.4924 15.8333 13.3333C15.8333 15.1743 14.3409 16.6666 12.4999 16.6666H5.83325V10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        Share
-                      </Button>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="text-gray-600 hover:text-gray-800"
+                        title="Italic"
+                        onClick={() => applyTextFormatting('italic')}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8.33325 3.33325H15.8333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4.16675 16.6667H11.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M12.5 3.33325L7.5 16.6666" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="text-gray-600 hover:text-gray-800"
+                        title="Underline"
+                        onClick={() => applyTextFormatting('underline')}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 2.5V8.33333C5 11.0948 7.23858 13.3333 10 13.3333C12.7614 13.3333 15 11.0948 15 8.33333V2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4.16675 17.5H15.8334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
                     </div>
-                    {handoverSelectedFiles.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {handoverSelectedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
-                            <span className="text-sm truncate">{file.name}</span>
-                            <button
-                              onClick={() => setHandoverSelectedFiles(handoverSelectedFiles.filter((_, i) => i !== index))}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+
+                    {/* Share Button */}
+                    <Button
+                      onClick={handleSubmitHandoverEntry}
+                      disabled={submittingHandover || !newHandoverContent.trim()}
+                      className="bg-[#FF6B2C] hover:bg-[#FF5A1A] text-white h-9 px-6 text-sm font-medium"
+                    >
+                      {submittingHandover ? "Sharing..." : "Share"}
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* Right Sidebar - Comments and Subtasks on desktop */}
-          <div className="space-y-6 order-1 lg:order-2">
-            {/* Comments Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  Discussion ({comments.length})
+          {/* Right Column - Discussion and Subtasks */}
+          <div className="space-y-4 md:space-y-6">
+            {/* Discussion Section - First on right */}
+            <Card className="min-h-[300px] shadow-sm border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Discussion
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Communicate with your team about this task
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ScrollArea className="h-[500px] pr-4">
-                  <div className="space-y-4">
+                <ScrollArea ref={chatScrollRef} className="h-[350px] sm:h-[450px] md:h-[500px] pr-2 sm:pr-4" viewportClassName="scrollbar-visible">
+                  <div className="space-y-3 sm:space-y-4">
                     {topLevelComments.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p>No comments yet. Start the discussion!</p>
+                        <MessageSquare className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-50" />
+                        <p className="text-xs sm:text-sm">No comments yet. Start the discussion!</p>
                       </div>
                     ) : (
                       topLevelComments.map((comment) => (
@@ -2048,14 +2069,14 @@ const TaskDetail = () => {
                 </ScrollArea>
 
                 {/* Comment Input */}
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
                   {replyingTo && (
-                    <div className="mb-3 p-2 bg-blue-50 rounded-lg flex items-start justify-between">
+                    <div className="mb-2 sm:mb-3 p-2 bg-blue-50 rounded-lg flex items-start justify-between">
                       <div className="flex-1">
-                        <span className="text-xs text-blue-600 font-medium">
+                        <span className="text-[10px] sm:text-xs text-blue-600 font-medium">
                           Replying to {replyingTo.author.name}
                         </span>
-                        <p className="text-xs text-gray-600 truncate">
+                        <p className="text-[10px] sm:text-xs text-gray-600 truncate">
                           {replyingTo.content.substring(0, 50)}...
                         </p>
                       </div>
@@ -2063,13 +2084,13 @@ const TaskDetail = () => {
                         onClick={() => setReplyingTo(null)}
                         className="text-blue-600 hover:text-blue-800"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   )}
 
-                  <div className="flex gap-3">
-                    <Avatar className="w-8 h-8 flex-shrink-0">
+                  <div className="flex gap-2 sm:gap-3">
+                    <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
                       <AvatarFallback className="text-xs bg-blue-500 text-white">
                         {activeUser?.name?.charAt(0).toUpperCase() || "U"}
                       </AvatarFallback>
@@ -2083,7 +2104,7 @@ const TaskDetail = () => {
                             ? `Reply to ${replyingTo.author.name}...`
                             : "Write a comment..."
                         }
-                        className="min-h-[80px] resize-none"
+                        className="min-h-[70px] sm:min-h-[80px] resize-none text-sm"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -2097,17 +2118,18 @@ const TaskDetail = () => {
                         maxFiles={3}
                         maxFileSize={5}
                       />
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">
-                          Press Enter to send, Shift + Enter for new line
+                      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2">
+                        <span className="text-[10px] sm:text-xs text-gray-500">
+                          <span className="hidden sm:inline">Press Enter to send, Shift + Enter for new line</span>
+                          <span className="sm:hidden">Enter to send</span>
                         </span>
                         <Button
                           onClick={handleAddComment}
                           disabled={isSubmitting || (!newComment.trim() && selectedFiles.length === 0)}
                           size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          className="w-full xs:w-auto bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
                         >
-                          <Send className="w-4 h-4 mr-2" />
+                          <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
                           {isSubmitting ? "Sending..." : "Send"}
                         </Button>
                       </div>
@@ -2116,187 +2138,132 @@ const TaskDetail = () => {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Subtasks Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Subtasks ({subtasks.length})</CardTitle>
-                  {isCreator && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowCreateSubtask(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      Create Subtask
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {subtasks.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No subtasks created yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {subtasks.map((subtask) => (
-                      <div
-                        key={subtask._id}
-                        className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate(`/tasks/${subtask._id}`)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{subtask.title}</h4>
-                            <div className="flex gap-2 mt-1">
-                              <Badge
-                                variant="outline"
-                                className={`text-xs ${getStatusColor(subtask.status)}`}
-                              >
-                                {subtask.status}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={`text-xs ${getPriorityColor(subtask.priority)}`}
-                              >
-                                {subtask.priority}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-
-
           </div>
         </div>
       </div>
 
-      {/* Reject Dialog */}
+      {/* Reject Dialog - Redesigned to match AddProjectModal */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Reject Task</DialogTitle>
-            <DialogDescription>
-              Provide a reason for rejection and optionally reassign the task
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Rejection Reason
-              </label>
-              <Textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Explain why this task is being rejected..."
-                className="min-h-[100px]"
-              />
+        <DialogContent className="sm:max-w-[500px] p-0 gap-0 rounded-[16px] max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="bg-white px-[24px] pt-[24px] pb-0 shrink-0">
+            <div className="flex items-start gap-[10px] mb-[10px]">
+              <div className="w-[48px] h-[48px] rounded-[10px] bg-[rgba(239,68,68,0.1)] flex items-center justify-center shrink-0">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#EF4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Reassign To (Optional)
-              </label>
-              <Select
-                value={rejectReassigneeId}
-                onValueChange={setRejectReassigneeId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableMembers.map((member) => (
-                    <SelectItem key={member._id} value={member._id}>
-                      {member.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {rejectReassigneeId && (
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    New Start Date (Optional)
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {rejectProjectStart
-                          ? format(rejectProjectStart, "PPP")
-                          : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <CalendarComponent
-                        mode="single"
-                        selected={rejectProjectStart || undefined}
-                        onSelect={(date) => {
-                          setRejectProjectStart(date || null);
-                          if (date) {
-                            setRejectStartDate(date.toISOString());
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    New Due Date (Required)
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {rejectProjectEnd
-                          ? format(rejectProjectEnd, "PPP")
-                          : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <CalendarComponent
-                        mode="single"
-                        selected={rejectProjectEnd || undefined}
-                        onSelect={(date) => {
-                          setRejectProjectEnd(date || null);
-                          if (date) {
-                            setRejectDueDate(date.toISOString());
-                          }
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </>
-            )}
+            <DialogHeader className="p-0 space-y-[4px]">
+              <DialogTitle className="text-[16px] font-semibold font-['Inter'] text-[#181d27] leading-[24px]">
+                Reject Task
+              </DialogTitle>
+              <DialogDescription className="text-[14px] font-normal font-['Inter'] text-[#535862] leading-[20px]">
+                Provide a reason and set a new due date for this task
+              </DialogDescription>
+            </DialogHeader>
+            <div className="h-[20px]" />
           </div>
-          <div className="flex gap-3 justify-end">
+
+          {/* Form Content - Scrollable */}
+          <div className="px-[24px] pr-[14px] overflow-y-auto flex-1">
+            <div className="pr-[10px] space-y-[16px] pb-[16px]">
+              {/* Rejection Reason */}
+              <div className="space-y-[6px]">
+                <label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  Rejection Reason <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+                </label>
+                <Textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Explain why this task is being rejected..."
+                  rows={4}
+                  className="border-[#d5d7da] rounded-[8px] px-[14px] py-[10px] text-[14px] font-['Inter'] placeholder:text-[#717680] resize-none"
+                />
+              </div>
+
+              {/* New Due Date - Required */}
+              <div className="space-y-[6px]">
+                <label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  New Due Date <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal ${!rejectProjectEnd && "text-[#717680]"
+                        }`}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {rejectProjectEnd ? formatDate(rejectProjectEnd.toISOString()) : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={rejectProjectEnd || undefined}
+                      onSelect={(date) => {
+                        setRejectProjectEnd(date || null);
+                        if (date) {
+                          setRejectDueDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return date < today;
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Reassign To (Optional) */}
+              <div className="space-y-[6px]">
+                <label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+                  Reassign To (Optional)
+                </label>
+                <Select value={rejectReassigneeId} onValueChange={setRejectReassigneeId}>
+                  <SelectTrigger className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] font-['Inter'] text-[14px]">
+                    <SelectValue placeholder="Keep current assignee" />
+                  </SelectTrigger>
+                  <SelectContent className="font-['Inter']">
+                    {assignableMembers.map((member) => (
+                      <SelectItem key={member._id} value={member._id} className="text-[14px]">
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
+                  Leave empty to keep the task with the current assignee
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Buttons */}
+          <div className="flex gap-[12px] px-[24px] py-[20px] border-t border-gray-100 shrink-0">
             <Button
-              variant="outline"
+              type="button"
               onClick={() => {
                 setShowRejectDialog(false);
                 setRejectionReason("");
                 setRejectReassigneeId("");
                 setRejectStartDate("");
                 setRejectDueDate("");
+                setRejectProjectEnd(null);
               }}
               disabled={isRejecting}
+              className="flex-1 bg-[rgba(4,1,16,0.05)] hover:bg-[rgba(4,1,16,0.1)] text-[#040110] font-medium font-['Inter'] text-[14px] h-auto px-[15px] py-[10px] rounded-[8px]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleReject}
-              disabled={isRejecting || !rejectionReason.trim()}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isRejecting || !rejectionReason.trim() || !rejectDueDate}
+              className="flex-1 bg-[#ef4444] hover:bg-[#dc2626] text-white font-medium font-['Inter'] text-[14px] h-auto px-[15px] py-[10px] rounded-[8px]"
             >
               {isRejecting ? "Rejecting..." : "Reject Task"}
             </Button>
@@ -2306,87 +2273,194 @@ const TaskDetail = () => {
 
       {/* Create Subtask Dialog */}
       <Dialog open={showCreateSubtask} onOpenChange={setShowCreateSubtask}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Subtask</DialogTitle>
-            <DialogDescription>
-              Create a subtask under "{task.title}"
+            <DialogTitle className="text-lg sm:text-xl font-bold">Create Subtask</DialogTitle>
+            <DialogDescription className="text-sm text-gray-600">
+              Create a subtask under "<span className="font-medium">{task.title}</span>"
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Title */}
             <div>
-              <label className="text-sm font-medium mb-2 block">Title</label>
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Title <span className="text-red-500">*</span>
+              </label>
               <Input
                 value={subtaskTitle}
                 onChange={(e) => setSubtaskTitle(e.target.value)}
-                placeholder="Subtask title"
+                placeholder="Enter subtask title"
+                className="h-10"
               />
             </div>
+
+            {/* Description */}
             <div>
-              <label className="text-sm font-medium mb-2 block">Description</label>
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">Description</label>
               <Textarea
                 value={subtaskDescription}
                 onChange={(e) => setSubtaskDescription(e.target.value)}
-                placeholder="Subtask description"
-                className="min-h-[80px]"
+                placeholder="Enter subtask description"
+                className="min-h-[100px] resize-none"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Assignee</label>
-              <Select value={subtaskAssigneeId} onValueChange={setSubtaskAssigneeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignableMembers.map((m) => (
-                    <SelectItem key={m._id} value={m._id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            {/* Two Column Layout for Assignee and Priority */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Assignee */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Assignee <span className="text-red-500">*</span>
+                </label>
+                <Select value={subtaskAssigneeId} onValueChange={setSubtaskAssigneeId}>
+                  <SelectTrigger className="h-10 bg-white">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableMembers.map((m) => (
+                      <SelectItem key={m._id} value={m._id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Priority <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={subtaskPriority}
+                  onValueChange={(val) =>
+                    setSubtaskPriority(val as "low" | "medium" | "high" | "urgent")
+                  }
+                >
+                  <SelectTrigger className="h-10 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Priority</label>
-              <Select
-                value={subtaskPriority}
-                onValueChange={(val) =>
-                  setSubtaskPriority(val as "low" | "medium" | "high" | "urgent")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Start Date</label>
-              <Input
-                type="date"
-                value={subtaskStartDate}
-                onChange={(e) => setSubtaskStartDate(e.target.value)}
-                min={task.startDate?.split('T')[0]}
-                max={task.dueDate?.split('T')[0]}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Due Date</label>
-              <Input
-                type="date"
-                value={subtaskEndDate}
-                onChange={(e) => setSubtaskEndDate(e.target.value)}
-                min={subtaskStartDate || task.startDate?.split('T')[0]}
-                max={task.dueDate?.split('T')[0]}
-              />
+
+            {/* Date Pickers Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Start Date */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 justify-start text-left font-normal bg-white hover:bg-gray-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                      {subtaskProjectStart
+                        ? format(subtaskProjectStart, "PPP")
+                        : "Pick start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={subtaskProjectStart || undefined}
+                      onSelect={(date) => {
+                        setSubtaskProjectStart(date || null);
+                        if (date) {
+                          setSubtaskStartDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateToCheck = new Date(date);
+                        dateToCheck.setHours(0, 0, 0, 0);
+                        const taskStart = task.startDate ? new Date(task.startDate) : null;
+                        if (taskStart) taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = task.dueDate ? new Date(task.dueDate) : null;
+                        if (taskDue) taskDue.setHours(0, 0, 0, 0);
+
+                        // Disable past dates (but allow today)
+                        if (dateToCheck < today) return true;
+
+                        // Disable dates outside parent task range
+                        if (taskStart && dateToCheck < taskStart) return true;
+                        if (taskDue && dateToCheck > taskDue) return true;
+
+                        return false;
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Due Date <span className="text-red-500">*</span>
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 justify-start text-left font-normal bg-white hover:bg-gray-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                      {subtaskProjectEnd
+                        ? format(subtaskProjectEnd, "PPP")
+                        : "Pick due date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={subtaskProjectEnd || undefined}
+                      onSelect={(date) => {
+                        setSubtaskProjectEnd(date || null);
+                        if (date) {
+                          setSubtaskEndDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateToCheck = new Date(date);
+                        dateToCheck.setHours(0, 0, 0, 0);
+                        const taskStart = task.startDate ? new Date(task.startDate) : null;
+                        if (taskStart) taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = task.dueDate ? new Date(task.dueDate) : null;
+                        if (taskDue) taskDue.setHours(0, 0, 0, 0);
+                        const selectedStart = subtaskProjectStart ? new Date(subtaskProjectStart) : null;
+                        if (selectedStart) selectedStart.setHours(0, 0, 0, 0);
+
+                        // Disable past dates (but allow today)
+                        if (dateToCheck < today) return true;
+
+                        // Disable dates before selected start date
+                        if (selectedStart && dateToCheck < selectedStart) return true;
+
+                        // Disable dates outside parent task range
+                        if (taskStart && dateToCheck < taskStart) return true;
+                        if (taskDue && dateToCheck > taskDue) return true;
+
+                        return false;
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
-          <div className="flex gap-3 justify-end">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => {
@@ -2396,16 +2470,19 @@ const TaskDetail = () => {
                 setSubtaskAssigneeId("");
                 setSubtaskStartDate("");
                 setSubtaskEndDate("");
+                setSubtaskProjectStart(null);
+                setSubtaskProjectEnd(null);
                 setSubtaskPriority("medium");
               }}
               disabled={isCreatingSubtask}
+              className="w-full sm:w-auto h-10 font-medium"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateSubtask}
-              disabled={isCreatingSubtask || !subtaskTitle}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isCreatingSubtask || !subtaskTitle || !subtaskAssigneeId || !subtaskStartDate || !subtaskEndDate}
+              className="w-full sm:w-auto bg-[#007aff] hover:bg-[#0066cc] text-white h-10 font-semibold"
             >
               {isCreatingSubtask ? "Creating..." : "Create Subtask"}
             </Button>
@@ -2415,14 +2492,14 @@ const TaskDetail = () => {
 
       {/* Reassign Task Dialog */}
       <Dialog open={showReassignDialog} onOpenChange={setShowReassignDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Reassign Task</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Reassign Task</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Assign this task to a different team member
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div>
               <label className="text-sm font-medium mb-2 block">
                 New Assignee
@@ -2448,35 +2525,7 @@ const TaskDetail = () => {
 
             <div>
               <label className="text-sm font-medium mb-2 block">
-                New Start Date (Optional)
-              </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {reassignProjectStart
-                      ? format(reassignProjectStart, "PPP")
-                      : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <CalendarComponent
-                    mode="single"
-                    selected={reassignProjectStart || undefined}
-                    onSelect={(date) => {
-                      setReassignProjectStart(date || null);
-                      if (date) {
-                        setReassignStartDate(date.toISOString());
-                      }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                New Due Date (Required)
+                Due Date (Required)
               </label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -2502,23 +2551,23 @@ const TaskDetail = () => {
               </Popover>
             </div>
           </div>
-          <div className="flex gap-3 justify-end">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end">
             <Button
               variant="outline"
               onClick={() => {
                 setShowReassignDialog(false);
                 setReassignAssigneeId("");
-                setReassignStartDate("");
                 setReassignDueDate("");
               }}
               disabled={isReassigning}
+              className="w-full sm:w-auto h-9 text-sm"
             >
               Cancel
             </Button>
             <Button
               onClick={handleReassignTask}
               disabled={isReassigning || !reassignAssigneeId || !reassignDueDate}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm"
             >
               {isReassigning ? "Reassigning..." : "Reassign Task"}
             </Button>

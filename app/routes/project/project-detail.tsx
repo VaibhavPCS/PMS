@@ -528,9 +528,9 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
 
-                {/* Dynamic Date Display - Always Visible */}
+                {/* Dynamic Date Display - Mobile Only */}
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                  <h2 className="sm:hidden text-base font-bold text-gray-900">
                     {getCalendarTitle}
                   </h2>
                   {/* Today button - Hidden on mobile */}
@@ -1010,10 +1010,10 @@ const TaskCard = React.memo<{
                 <DropdownMenuTrigger asChild>
                   <button
                     data-slot="dropdown-menu-trigger"
-                    className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 has-[>svg]:px-2.5 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-gray-100 rounded-md gap-1.5 has-[>svg]:px-2.5 h-6 w-6 p-0 transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                    <MoreVertical className="w-4 h-4 text-black" aria-hidden="true" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -2801,30 +2801,6 @@ const ProjectDetail = () => {
                           </DroppableColumn>
                         )}
                       </div>
-
-                      {/* Mobile Progress Bar - Shows after status selection */}
-                      {isMobile && (
-                        <div className="mb-3">
-                          <div className="flex items-center justify-end text-xs text-gray-600 mb-1">
-                            <span>
-                              {kanbanFilteredTasks.filter((t) => t.status === mobileKanbanStatus).length}/{kanbanFilteredTasks.length}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={cn(
-                                "h-1.5 rounded-full",
-                                mobileKanbanStatus === "to-do" && "bg-blue-500",
-                                mobileKanbanStatus === "in-progress" && "bg-orange-400",
-                                mobileKanbanStatus === "done" && "bg-green-500"
-                              )}
-                              style={{
-                                width: `${kanbanFilteredTasks.length > 0 ? Math.round((kanbanFilteredTasks.filter((t) => t.status === mobileKanbanStatus).length / kanbanFilteredTasks.length) * 100) : 0}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
 
                     <DragOverlay>
                       {activeTask && (
