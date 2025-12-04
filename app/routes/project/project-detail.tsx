@@ -908,6 +908,19 @@ const TaskCard = React.memo<{
     return isAssigneeOrCreator || isAdmin || isProjectLead;
   }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
+  const [hasBlockingSubtasks, setHasBlockingSubtasks] = useState(false);
+  const handleMenuOpenChange = async (open: boolean) => {
+    if (!open) return;
+    try {
+      const resp = await fetchData(`/task/${task._id}/subtasks`);
+      const list = Array.isArray((resp as any)?.subtasks) ? (resp as any).subtasks : (Array.isArray(resp) ? resp as any : []);
+      const hasBlocking = list.some((s: any) => (s.status !== 'done') || (s.approvalStatus !== 'approved'));
+      setHasBlockingSubtasks(hasBlocking);
+    } catch {
+      setHasBlockingSubtasks(false);
+    }
+  };
+
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
     try {
@@ -926,6 +939,15 @@ const TaskCard = React.memo<{
   // ✅ NEW: Handle status change directly from menu
   const handleStatusChange = async (newStatus: string) => {
     try {
+      if (newStatus === 'done') {
+        const resp = await fetchData(`/task/${task._id}/subtasks`);
+        const list = Array.isArray((resp as any)?.subtasks) ? (resp as any).subtasks : (Array.isArray(resp) ? resp as any : []);
+        const hasBlocking = list.some((s: any) => (s.status !== 'done') || (s.approvalStatus !== 'approved'));
+        if (hasBlocking) {
+          toast.error('Complete and approve all subtasks before marking Done');
+          return;
+        }
+      }
       await postData(`/task/${task._id}/status`, { status: newStatus });
       toast.success("Task status updated");
       onTaskUpdate?.();
@@ -1006,7 +1028,7 @@ const TaskCard = React.memo<{
             </span>
 
             {canManageTask && (
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={handleMenuOpenChange}>
                 <DropdownMenuTrigger asChild>
                   <button
                     data-slot="dropdown-menu-trigger"
@@ -1031,7 +1053,7 @@ const TaskCard = React.memo<{
                     </DropdownMenuItem>
                   )}
                   {(!isApproved && task.status !== "done") && (
-                    <DropdownMenuItem onSelect={() => handleStatusChange("done")}>
+                    <DropdownMenuItem disabled={hasBlockingSubtasks} onSelect={() => handleStatusChange("done")}>
                       <CheckCircle2 className="w-3 h-3 mr-2" /> Mark as Done
                     </DropdownMenuItem>
                   )}
@@ -1740,6 +1762,28 @@ const ProjectDetail = () => {
       }
 
       try {
+        if (newStatus === 'done') {
+          const resp = await fetch(
+            buildApiUrl(`/task/${taskId}/subtasks`),
+            {
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                'workspace-id': localStorage.getItem('currentWorkspaceId') || ''
+              }
+            }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            const list = Array.isArray(data?.subtasks) ? data.subtasks : [];
+            const hasBlocking = list.some((s: any) => (s.status !== 'done') || (s.approvalStatus !== 'approved'));
+            if (hasBlocking) {
+              toast.error('Complete and approve all subtasks before marking Done');
+              setActiveTask(null);
+              return;
+            }
+          }
+        }
         setAllTasks((tasks) =>
           tasks.map((t) => (t._id === taskId ? { ...t, status: newStatus as any } : t))
         );
@@ -1751,8 +1795,7 @@ const ProjectDetail = () => {
         fetchAllTasks();
       }
       setActiveTask(null);
-    },
-    [allTasks]
+    }, [allTasks]
   );
 
   // All existing API functions (unchanged)  
@@ -2333,6 +2376,8 @@ const ProjectDetail = () => {
           projectId={project._id}
           projectHead={project.projectHead || null}
           members={project.members || []}
+          userRole={userRole}
+          currentUserId={(currentUser?.id || currentUser?._id || '').toString()}
           onRemoveSuccess={async () => {
             await Promise.all([fetchProjectDetails(), fetchAssignableMembers()]);
           }}

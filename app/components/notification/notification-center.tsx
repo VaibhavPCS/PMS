@@ -303,6 +303,10 @@ const NotificationCenter = () => {
       case 'task_overdue': return '⚠️';
       case 'task_overdue_reminder': return '🔔';
       case 'task_comment': return '💬';
+      case 'subtask_assigned': return '🧩';
+      case 'subtask_approval_pending': return '⏳';
+      case 'subtask_approved': return '✅';
+      case 'subtask_rejected': return '❌';
       default: return '📢';
     }
   };

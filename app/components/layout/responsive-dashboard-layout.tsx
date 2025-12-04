@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { buildApiUrl } from '@/lib/config';
 import { postData } from '@/lib/fetch-util';
+import { io, Socket } from 'socket.io-client';
 
 interface UserInfo {
   _id: string;
@@ -52,11 +53,35 @@ const ResponsiveDashboardContent = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const { badgeCounts, refreshBadgeCounts } = useBadges();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchUserInfo();
       fetchNotifications();
+      const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+        auth: {
+          token: localStorage.getItem('token')
+        }
+      });
+
+      newSocket.on('connect', () => {
+        // Connected
+      });
+
+      newSocket.on('notification', (notification: Notification) => {
+        setNotifications(prev => [notification, ...prev]);
+        refreshBadgeCounts();
+        try {
+          toast.success(notification.title || 'New notification');
+        } catch {}
+      });
+
+      setSocket(newSocket);
+      return () => {
+        newSocket.disconnect();
+        setSocket(null);
+      };
     }
   }, [isAuthenticated]);
 
@@ -136,6 +161,10 @@ const ResponsiveDashboardContent = () => {
       case 'task_overdue': return '⚠️';
       case 'task_overdue_reminder': return '🔔';
       case 'task_comment': return '💬';
+      case 'subtask_assigned': return '🧩';
+      case 'subtask_approval_pending': return '⏳';
+      case 'subtask_approved': return '✅';
+      case 'subtask_rejected': return '❌';
       default: return '📢';
     }
   };

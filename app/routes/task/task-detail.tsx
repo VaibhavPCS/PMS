@@ -10,6 +10,9 @@ import {
   User,
   MessageSquare,
   Send,
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
   Edit3,
   Trash2,
   AlertCircle,
@@ -25,6 +28,7 @@ import {
   Image,
   Download,
 } from "lucide-react";
+import RichTextEditor from "@/components/ui/rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -682,6 +686,43 @@ const ChatMessage: React.FC<{
     );
   };
 
+const RichTextDisplay = ({ content }: { content: string }) => {
+  const escapeHtml = (text: string) => {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  const renderContent = (text: string) => {
+    // If text seems to be HTML (starts with <p, <div, etc or contains tags), render as is
+    // Otherwise, try to render basic markdown for backward compatibility
+    if (/<[a-z][\s\S]*>/i.test(text)) {
+      return text;
+    }
+
+    let html = escapeHtml(text);
+    // Underline (__)
+    html = html.replace(/__([\s\S]+?)__/g, '<u>$1</u>');
+    // Bold (**)
+    html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    // Italic (*)
+    html = html.replace(/\*([\s\S]+?)\*/g, '<em>$1</em>');
+    // Newlines
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  };
+
+  return (
+    <div
+      className="text-sm text-gray-700 prose prose-sm max-w-none [&_p]:m-0"
+      dangerouslySetInnerHTML={{ __html: renderContent(content) }}
+    />
+  );
+};
+
 const TaskDetail = () => {
   // Helper to format date in error messages from (mm/dd/yyyy) to (dd/mm/yyyy)
   const formatErrorMessageDate = (message: string) => {
@@ -709,6 +750,9 @@ const TaskDetail = () => {
   const [newHandoverContent, setNewHandoverContent] = useState("");
   const [handoverSelectedFiles, setHandoverSelectedFiles] = useState<File[]>([]);
   const [submittingHandover, setSubmittingHandover] = useState(false);
+
+  const [isUploadingTaskAttachments, setIsUploadingTaskAttachments] = useState(false);
+  const taskAttachmentsInputRef = useRef<HTMLInputElement>(null);
 
   // New chat-related states
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
@@ -752,6 +796,10 @@ const TaskDetail = () => {
   const [subtaskProjectEnd, setSubtaskProjectEnd] = useState<Date | null>(null);
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false); // ✅ NEW: Loading state for subtask creation
   const [isChangingStatus, setIsChangingStatus] = useState(false); // ✅ NEW: Loading state for status changes
+  const [handoverEditor, setHandoverEditor] = useState<any | null>(null);
+  const [isBoldActive, setIsBoldActive] = useState(false);
+  const [isItalicActive, setIsItalicActive] = useState(false);
+  const [isUnderlineActive, setIsUnderlineActive] = useState(false);
 
   // ✅ NEW: Fetch assignable members for reassignment
   const [assignableMembers, setAssignableMembers] = useState<any[]>([]);
@@ -895,53 +943,7 @@ const TaskDetail = () => {
   }, [task?._id]);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
-  const handoverTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Text formatting function for handover notes
-  const applyTextFormatting = (format: 'bold' | 'italic' | 'underline') => {
-    const textarea = handoverTextareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = newHandoverContent.substring(start, end);
-
-    if (!selectedText) {
-      toast.error("Please select some text to format");
-      return;
-    }
-
-    let formattedText: string;
-    switch (format) {
-      case 'bold':
-        formattedText = `**${selectedText}**`;
-        break;
-      case 'italic':
-        formattedText = `*${selectedText}*`;
-        break;
-      case 'underline':
-        formattedText = `__${selectedText}__`;
-        break;
-      default:
-        formattedText = selectedText;
-    }
-
-    const newContent =
-      newHandoverContent.substring(0, start) +
-      formattedText +
-      newHandoverContent.substring(end);
-
-    setNewHandoverContent(newContent);
-
-    // Restore cursor position after formatting
-    setTimeout(() => {
-      if (textarea) {
-        textarea.focus();
-        const newCursorPos = start + formattedText.length;
-        textarea.setSelectionRange(newCursorPos, newCursorPos);
-      }
-    }, 0);
-  };
 
   useEffect(() => {
     const root = chatScrollRef.current;
@@ -953,6 +955,24 @@ const TaskDetail = () => {
       viewport.scrollTop = viewport.scrollHeight;
     }
   }, [comments.length]);
+
+  useEffect(() => {
+    if (!handoverEditor) return;
+    const updateActive = () => {
+      setIsBoldActive(handoverEditor.isActive('bold'));
+      setIsItalicActive(handoverEditor.isActive('italic'));
+      setIsUnderlineActive(handoverEditor.isActive('underline'));
+    };
+    updateActive();
+    handoverEditor.on('transaction', updateActive);
+    handoverEditor.on('selectionUpdate', updateActive);
+    handoverEditor.on('update', updateActive);
+    return () => {
+      try { handoverEditor.off('transaction', updateActive); } catch {}
+      try { handoverEditor.off('selectionUpdate', updateActive); } catch {}
+      try { handoverEditor.off('update', updateActive); } catch {}
+    };
+  }, [handoverEditor]);
 
   const fetchTaskDetails = async () => {
     if (!taskId) {
@@ -1295,6 +1315,55 @@ const TaskDetail = () => {
     }
   };
 
+  const handleTaskAttachmentsSelect = async (filesList: FileList | null) => {
+    if (!filesList || !task?._id) return;
+    const remainingSlots = Math.max(0, 10 - (task.attachments?.length || 0));
+    if (remainingSlots <= 0) {
+      toast.error("Maximum attachments reached", { description: "You can attach up to 10 files" });
+      return;
+    }
+    if (filesList.length > remainingSlots) {
+      toast.error("Too many files", { description: `You can add ${remainingSlots} more attachment(s)` });
+    }
+    const files = Array.from(filesList).slice(0, Math.min(3, remainingSlots));
+    const oversized = files.filter((f) => f.size > 5 * 1024 * 1024);
+    if (oversized.length > 0) {
+      toast.error("File too large", {
+        description: `${oversized.map(f => f.name).join(', ')} exceeds 5MB limit`,
+      });
+      return;
+    }
+    setIsUploadingTaskAttachments(true);
+    try {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('attachments', f));
+      const response = await fetch(
+        buildApiUrl(`/task/${task._id}/attachments`),
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'workspace-id': localStorage.getItem('currentWorkspaceId') || '',
+          },
+          body: formData,
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to upload attachments' }));
+        throw new Error(errorData.message || 'Failed to upload attachments');
+      }
+      toast.success('Attachments uploaded successfully');
+      if (taskAttachmentsInputRef.current) {
+        taskAttachmentsInputRef.current.value = '';
+      }
+      await fetchTaskDetails();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to upload attachments');
+    } finally {
+      setIsUploadingTaskAttachments(false);
+    }
+  };
+
   const handleEditComment = async (commentId: string, content: string) => {
     try {
       const response = await fetch(buildApiUrl(`/comments/${commentId}`), {
@@ -1569,8 +1638,10 @@ const TaskDetail = () => {
   const isCreator = activeUser?._id === task?.creator?._id || activeUser?.id === task?.creator?._id;
   const isAssignee = activeUser?._id === task?.assignee?._id || activeUser?.id === task?.assignee?._id;
   const isAdmin = ['admin', 'super_admin'].includes(activeUser?.role || '');
-  const isProjectHead = task?.project?.projectHead?._id === activeUser?._id || task?.project?.projectHead === activeUser?._id;
-  const canCreateSubtask = isCreator || isAdmin || isProjectHead;
+  const isProjectHead = String(task?.project?.projectHead?._id || task?.project?.projectHead || '') === String(activeUser?._id || activeUser?.id || '');
+  const meMemberEntry = assignableMembers.find((m) => String(m._id) === String(activeUser?._id || activeUser?.id || ''));
+  const isTLAssignedToParent = Boolean(meMemberEntry && (meMemberEntry.role === 'tl') && isAssignee);
+  const canCreateSubtask = isTLAssignedToParent && task?.status !== 'done';
   const canApprove = task?.status === "done" && task?.approvalStatus === "pending-approval" && isCreator;
 
   if (loading) {
@@ -1692,7 +1763,7 @@ const TaskDetail = () => {
           {/* Left Column - Task Details and Handover Progress */}
           <div className="space-y-4 md:space-y-6">
             {/* Task Details Card */}
-            <Card className="shadow-sm border-gray-200">
+            <Card className="shadow-sm border-gray-200 overflow-hidden">
               <CardHeader className="pb-4">
                 <div className="flex flex-col gap-4">
                   {/* Title and Actions Row */}
@@ -1742,7 +1813,7 @@ const TaskDetail = () => {
                   </div>
 
                   {/* Project Details Card - Figma Design */}
-                  <div className="mt-4 bg-[#e5efff] rounded-lg px-5 py-[18px] flex flex-col gap-5">
+                  <div className="mt-4 bg-[#e5efff] rounded-lg px-5 py-[18px] flex flex-col gap-5 w-full overflow-x-hidden break-words">
                     {/* Task Title - Full width */}
                     <div className="flex flex-col gap-[5px]">
                       <p className="text-sm text-[#040110] opacity-60 font-normal">Task Title</p>
@@ -1770,11 +1841,11 @@ const TaskDetail = () => {
                     {/* Description - Full width */}
                     <div className="flex flex-col gap-[5px]">
                       <p className="text-sm text-[#040110] opacity-60 font-normal">Description</p>
-                      <p className="text-sm text-neutral-700 font-normal whitespace-pre-wrap">{task.description || '-'}</p>
+                      <p className="text-sm text-neutral-700 font-normal whitespace-pre-wrap break-all">{task.description || '-'}</p>
                     </div>
 
                     {/* Start Date & Due Date - Side by side */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-[5px]">
                         <p className="text-sm text-[#040110] opacity-60 font-normal">Start Date</p>
                         <p className="text-sm text-neutral-700 font-normal">{formatDate(task.startDate || "")}</p>
@@ -1852,12 +1923,30 @@ const TaskDetail = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 pt-4">
-                {task.attachments && task.attachments.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 mb-3">Attachments</h3>
-                    <AttachmentsPanel attachments={task.attachments} />
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900">Attachments</h3>
+                    {(isAdmin || isProjectHead) && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">{(task.attachments?.length || 0)}/10</span>
+                        <label htmlFor="task-attach" className={`cursor-pointer ${((task.attachments?.length || 0) >= 10) ? 'opacity-50 cursor-not-allowed' : ''}`} title={isUploadingTaskAttachments ? 'Uploading...' : 'Upload files'}>
+                          <Upload className="w-5 h-5 text-gray-600 hover:text-gray-800" />
+                        </label>
+                      </div>
+                    )}
+                    <input
+                      id="task-attach"
+                      ref={taskAttachmentsInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                      className="hidden"
+                      disabled={(task.attachments?.length || 0) >= 10}
+                      onChange={(e) => handleTaskAttachmentsSelect(e.target.files)}
+                    />
                   </div>
-                )}
+                  <AttachmentsPanel attachments={task.attachments || []} />
+                </div>
               </CardContent>
             </Card>
 
@@ -1882,7 +1971,7 @@ const TaskDetail = () => {
                           {new Date(entry.createdAt).toLocaleString()}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{entry.content}</p>
+                      <RichTextDisplay content={entry.content} />
                       {entry.attachments && entry.attachments.length > 0 && (
                         <div className="mt-2">
                           <FilePreview attachments={entry.attachments} isOwnAttachment={false} canDelete={false} />
@@ -1896,15 +1985,17 @@ const TaskDetail = () => {
               {/* Message Composer - Figma Design */}
               {isAssignee && (
                 <div className="bg-white rounded-lg border border-[#cccccc]">
-                  {/* Textarea for input */}
-                  <Textarea
-                    ref={handoverTextareaRef}
-                    value={newHandoverContent}
-                    onChange={(e) => setNewHandoverContent(e.target.value)}
-                    placeholder="Type your message here..."
-                    className="border-0 resize-none text-sm focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[100px]"
-                    rows={4}
-                  />
+                  {/* Rich Text Editor */}
+                  <div className="p-2 pb-0">
+                    <RichTextEditor
+                      content={newHandoverContent}
+                      onChange={setNewHandoverContent}
+                      placeholder="Type your message here..."
+                      className="min-h-[80px] w-full border-none shadow-none rounded-none"
+                      toolbarPosition="none"
+                      onEditorReady={setHandoverEditor}
+                    />
+                  </div>
 
                   {/* Selected Files Display */}
                   {handoverSelectedFiles.length > 0 && (
@@ -1926,9 +2017,41 @@ const TaskDetail = () => {
                   {/* Separator */}
                   <div className="w-full h-px bg-[#cccccc]" />
 
-                  {/* Bottom Row - Attach Icon, Formatting Icons, Share Button */}
-                  <div className="flex items-center justify-between px-4 py-3">
+                  {/* Bottom Row - Attach Icon and Share Button */}
+                  <div className="flex items-center gap-3 px-4 py-2">
                     <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handoverEditor && handoverEditor.chain().focus().toggleBold().run()}
+                          disabled={!handoverEditor}
+                          aria-pressed={isBoldActive}
+                          className={`p-1.5 rounded-md hover:bg-gray-100 ${isBoldActive ? 'bg-gray-200 text-gray-900' : 'text-gray-600'}`}
+                          title="Bold"
+                        >
+                          <Bold className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handoverEditor && handoverEditor.chain().focus().toggleItalic().run()}
+                          disabled={!handoverEditor}
+                          aria-pressed={isItalicActive}
+                          className={`p-1.5 rounded-md hover:bg-gray-100 ${isItalicActive ? 'bg-gray-200 text-gray-900' : 'text-gray-600'}`}
+                          title="Italic"
+                        >
+                          <Italic className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handoverEditor && handoverEditor.chain().focus().toggleUnderline().run()}
+                          disabled={!handoverEditor}
+                          aria-pressed={isUnderlineActive}
+                          className={`p-1.5 rounded-md hover:bg-gray-100 ${isUnderlineActive ? 'bg-gray-200 text-gray-900' : 'text-gray-600'}`}
+                          title="Underline"
+                        >
+                          <UnderlineIcon className="w-4 h-4" />
+                        </button>
+                      </div>
                       {/* Attach Icon */}
                       <label htmlFor="handover-attach" className="cursor-pointer">
                         <svg
@@ -1971,51 +2094,17 @@ const TaskDetail = () => {
                         />
                       </label>
 
-                      {/* Formatting Icons */}
-                      <button
-                        type="button"
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Bold"
-                        onClick={() => applyTextFormatting('bold')}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M5.83325 3.33325H11.6666C13.5076 3.33325 14.9999 4.82564 14.9999 6.66659C14.9999 8.50754 13.5076 9.99992 11.6666 9.99992H5.83325V3.33325Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M5.83325 10H12.4999C14.3409 10 15.8333 11.4924 15.8333 13.3333C15.8333 15.1743 14.3409 16.6666 12.4999 16.6666H5.83325V10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
 
-                      <button
-                        type="button"
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Italic"
-                        onClick={() => applyTextFormatting('italic')}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8.33325 3.33325H15.8333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M4.16675 16.6667H11.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M12.5 3.33325L7.5 16.6666" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
 
-                      <button
-                        type="button"
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Underline"
-                        onClick={() => applyTextFormatting('underline')}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M5 2.5V8.33333C5 11.0948 7.23858 13.3333 10 13.3333C12.7614 13.3333 15 11.0948 15 8.33333V2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M4.16675 17.5H15.8334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
                     </div>
 
                     {/* Share Button */}
                     <Button
                       onClick={handleSubmitHandoverEntry}
                       disabled={submittingHandover || !newHandoverContent.trim()}
-                      className="bg-[#FF6B2C] hover:bg-[#FF5A1A] text-white h-9 px-6 text-sm font-medium"
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive py-2 has-[>svg]:px-3 flex-1 bg-[#FF6B2C] hover:bg-[#FF5A1A] text-white h-9 px-6 text-sm font-medium"
                     >
+                      <Send className="w-4 h-4" />
                       {submittingHandover ? "Sharing..." : "Share"}
                     </Button>
                   </div>
@@ -2112,32 +2201,70 @@ const TaskDetail = () => {
                           }
                         }}
                       />
-                      <FileUpload
-                        onFilesSelect={setSelectedFiles}
-                        selectedFiles={selectedFiles}
-                        maxFiles={3}
-                        maxFileSize={5}
-                      />
-                      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2">
-                        <span className="text-[10px] sm:text-xs text-gray-500">
-                          <span className="hidden sm:inline">Press Enter to send, Shift + Enter for new line</span>
-                          <span className="sm:hidden">Enter to send</span>
-                        </span>
+                      <div className="mt-2 flex items-center gap-2">
+                        <FileUpload
+                          onFilesSelect={setSelectedFiles}
+                          selectedFiles={selectedFiles}
+                          maxFiles={3}
+                          maxFileSize={5}
+                        />
                         <Button
                           onClick={handleAddComment}
                           disabled={isSubmitting || (!newComment.trim() && selectedFiles.length === 0)}
                           size="sm"
-                          className="w-full xs:w-auto bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
                         >
                           <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
                           {isSubmitting ? "Sending..." : "Send"}
                         </Button>
+                      </div>
+                      <div className="mt-1 text-[10px] sm:text-xs text-gray-500">
+                        <span className="hidden sm:inline">Press Enter to send, Shift + Enter for new line</span>
+                        <span className="sm:hidden">Enter to send</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
+            {isTLAssignedToParent && (
+            <Card className="shadow-sm border-gray-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Subtasks</CardTitle>
+                  {canCreateSubtask && (
+                    <Button
+                      size="sm"
+                      onClick={() => setShowCreateSubtask(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
+                    >
+                      Create Subtask
+                    </Button>
+                  )}
+                </div>
+                <CardDescription className="text-xs sm:text-sm">Manage subtasks for this task</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {subtasks.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-xs sm:text-sm">No subtasks yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {subtasks.map((st) => (
+                      <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
+                          <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
+                        </div>
+                        <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            )}
           </div>
         </div>
       </div>
@@ -2317,11 +2444,13 @@ const TaskDetail = () => {
                     <SelectValue placeholder="Select assignee" />
                   </SelectTrigger>
                   <SelectContent>
-                    {assignableMembers.map((m) => (
-                      <SelectItem key={m._id} value={m._id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
+                    {assignableMembers
+                      .filter((m) => m.role === 'member' || m.role === 'trainee')
+                      .map((m) => (
+                        <SelectItem key={m._id} value={m._id}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
