@@ -31,12 +31,19 @@ interface InviteMembersButtonProps {
     }>;
   }>;
   onInviteSuccess?: () => void | Promise<void>;
+  // Optional customization props for different contexts (e.g., mobile)
+  buttonClassName?: string;
+  buttonText?: string;
+  iconSize?: string;
 }
 
 export function InviteMembersButton({
   projectId,
   workspaceId: propWorkspaceId,
-  onInviteSuccess
+  onInviteSuccess,
+  buttonClassName,
+  buttonText = "Add employee",
+  iconSize = "w-[15px] h-[15px]"
 }: InviteMembersButtonProps) {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [email, setEmail] = useState("");
@@ -104,21 +111,21 @@ export function InviteMembersButton({
         setWorkspaceMembers([]);
         return;
       }
-      
+
       // console.log(`Fetching workspace members for workspace ID: ${workspaceId}`);
       const response = await fetchData(`/workspace/${workspaceId}`);
       // console.log("Workspace API response:", response);
-      
+
       const workspace = response?.workspace || response;
       const members = workspace?.members || [];
-      
+
       // console.log(`Found ${members.length} workspace members`);
       const mappedMembers = members.map((member: any) => ({
         _id: member.userId?._id || member.userId,
         name: member.userId?.name || 'Unknown',
         email: member.userId?.email || ''
       })).filter((member: any) => member.email);
-      
+
       // console.log(`Filtered to ${mappedMembers.length} members with email addresses`);
       setWorkspaceMembers(mappedMembers);
     } catch (error) {
@@ -180,15 +187,18 @@ export function InviteMembersButton({
     }
   };
 
+  // Use custom button if className is provided (e.g., for mobile)
+  const defaultButtonClass = "bg-[rgba(4,1,16,0.05)] box-border flex items-center gap-[10px] px-[15px] py-[10px] rounded-[8px] cursor-pointer border-none hover:bg-[rgba(4,1,16,0.08)] transition-colors";
+
   return (
     <>
       <button
         onClick={handleInviteClick}
-        className="bg-[rgba(4,1,16,0.05)] box-border flex items-center gap-[10px] px-[15px] py-[10px] rounded-[8px] cursor-pointer border-none hover:bg-[rgba(4,1,16,0.08)] transition-colors"
+        className={buttonClassName || defaultButtonClass}
       >
-        <UserPlus className="w-[15px] h-[15px] text-[#040110]" strokeWidth={2} />
-        <span className="font-['Inter'] font-medium text-[14px] text-[#040110] whitespace-nowrap">
-          Add employee
+        <UserPlus className={`${iconSize} ${buttonClassName ? '' : 'text-[#040110]'}`} strokeWidth={2} />
+        <span className={buttonClassName ? '' : "font-['Inter'] font-medium text-[14px] text-[#040110] whitespace-nowrap"}>
+          {buttonText}
         </span>
       </button>
 

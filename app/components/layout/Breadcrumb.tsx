@@ -159,7 +159,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         className="flex items-center gap-[6px] md:gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[12px] md:text-[14px] font-['Inter'] hover:text-[#040110] transition-colors p-0"
       >
         <ArrowLeft size={14} strokeWidth={2} className="md:w-4 md:h-4" />
-        <span className="font-medium">Back</span>
+        <span className="hidden md:inline font-medium">Back</span>
       </button>
 
       {/* Separator */}
@@ -178,12 +178,12 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
               className="flex items-center gap-[6px] md:gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
             >
               <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
-              <span className="font-medium hidden sm:inline">{item.label}</span>
+              <span className="hidden md:inline">{item.label}</span>
             </a>
           ) : (
             <div className={`flex items-center gap-[6px] md:gap-[8px] ${item.isActive ? 'text-[#040110]' : 'text-[#717182]'}`}>
               <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
-              <span className="font-medium hidden sm:inline">{item.label}</span>
+              <span className="hidden md:inline">{item.label}</span>
             </div>
           )}
 

@@ -350,17 +350,29 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
 
         {showMigration ? renderMigrationContent() : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-hidden">
-            <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0 mb-2 overflow-x-auto overflow-y-hidden scrollbar-hide flex-nowrap">
-              <TabsTrigger value="general" className="px-[10px] md:px-[12px] py-[8px] text-[12px] md:text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B] whitespace-nowrap flex-shrink-0">
+            <TabsList className="flex items-center gap-[10px] overflow-x-auto scrollbar-visible">
+              <TabsTrigger
+                value="general"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
                 General
               </TabsTrigger>
-              <TabsTrigger value="add" className="px-[10px] md:px-[12px] py-[8px] text-[12px] md:text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B] whitespace-nowrap flex-shrink-0">
+              <TabsTrigger
+                value="add"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
                 <UserPlus className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Add Employee
               </TabsTrigger>
-              <TabsTrigger value="roles" className="px-[10px] md:px-[12px] py-[8px] text-[12px] md:text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B] whitespace-nowrap flex-shrink-0">
+              <TabsTrigger
+                value="roles"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
                 <Users className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Change Roles
               </TabsTrigger>
-              <TabsTrigger value="delete" className="px-[10px] md:px-[12px] py-[8px] text-[12px] md:text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B] whitespace-nowrap flex-shrink-0">
+              <TabsTrigger
+                value="delete"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
                 <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Delete Workspace
               </TabsTrigger>
             </TabsList>

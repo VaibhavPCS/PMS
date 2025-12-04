@@ -96,7 +96,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
   const [editing, setEditing] = useState<{ _id: string; name: string; email: string; role?: string; reportsTo?: string; reportsToName?: string } | null>(null);
   const [editRole, setEditRole] = useState<string>('member');
   const [editReportsTo, setEditReportsTo] = useState<string>('');
-  
+
 
   const reportingOptions = useMemo(() => {
     const opts: Array<{ id: string; label: string }> = [];
@@ -159,13 +159,13 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
       const tasksRes = await fetchData(`/task/project/${projectId}`);
       const tasks = tasksRes.tasks || [];
       // Only block if tasks are 'todo', 'in_progress', or pending approval
-      const userTasks = tasks.filter((t: any) => 
-        (t.assignedTo?._id === memberId || t.assignedTo === memberId) && 
+      const userTasks = tasks.filter((t: any) =>
+        (t.assignedTo?._id === memberId || t.assignedTo === memberId) &&
         (['todo', 'to-do', 'in_progress', 'in-progress'].includes(t.status) || t.approvalStatus === 'pending-approval')
       );
-      
+
       const subordinates = members.filter(m => m.reportsTo === memberId);
-      
+
       if (userTasks.length > 0 || subordinates.length > 0) {
         const member = allMembers.find(m => m._id === memberId);
         setMigrationData({
@@ -253,8 +253,8 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               setShowMigration(false);
               setPendingRemovalId(null);
@@ -276,8 +276,8 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
       }
       onOpenChange(o);
     }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] w-full">
+        <DialogHeader className="text-left">
           <DialogTitle>
             {showMigration ? "Migration Required" : "Manage Project Members"}
           </DialogTitle>
@@ -294,7 +294,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
               placeholder="Search by name or email"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-9 text-sm"
+              className="h-9 text-sm w-full"
             />
 
             <ScrollArea className="h-48">
@@ -303,27 +303,27 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
                   <div className="text-xs text-gray-500 text-center py-4">No matching employees</div>
                 ) : (
                   filteredMembers.map((m) => (
-                    <div key={m._id} className="flex items-center justify-between p-2 border rounded-md">
+                    <div key={m._id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 border rounded-md gap-2">
                       <div
-                        className={`flex items-center gap-3 ${!m.isHead && canEditMembers() ? 'cursor-pointer hover:bg-accent/30 rounded-md p-1 -m-1' : ''}`}
+                        className={`flex items-center gap-3 flex-1 min-w-0 ${!m.isHead && canEditMembers() ? 'cursor-pointer hover:bg-accent/30 rounded-md p-1 -m-1' : ''}`}
                         onClick={() => !m.isHead && canEditMembers() && openEdit(m)}
                       >
-                        <Avatar className="w-8 h-8">
+                        <Avatar className="w-8 h-8 flex-shrink-0">
                           <AvatarFallback className="text-xs">
                             {(m.name?.charAt(0) || m.email?.charAt(0) || '?').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-gray-900 truncate">
                             {m.name} {m.isHead && <span className="ml-1 text-[10px] text-blue-600">(Project Head)</span>}
                           </div>
-                          <div className="text-xs text-gray-600">{m.email}</div>
-                          <div className="flex items-center gap-3 mt-0.5">
+                          <div className="text-xs text-gray-600 truncate">{m.email}</div>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                             {m.role && (
                               <div className="text-[10px] text-gray-500">Role: {m.role}</div>
                             )}
                             {m.reportsTo && (
-                              <div className="text-[10px] text-blue-600">
+                              <div className="text-[10px] text-blue-600 truncate">
                                 Reports to: {m.reportsToName || allMembers.find(mem => mem._id === m.reportsTo)?.name || 'Unknown'}
                               </div>
                             )}
@@ -335,7 +335,7 @@ export const RemoveProjectMembersModal: React.FC<RemoveProjectMembersModalProps>
                         variant="outline"
                         disabled={!!m.isHead || removingId === m._id}
                         onClick={() => handleRemove(m._id, m.isHead)}
-                        className={m.isHead ? "opacity-50 cursor-not-allowed" : ""}
+                        className={`${m.isHead ? "opacity-50 cursor-not-allowed" : ""} w-full sm:w-auto flex-shrink-0`}
                       >
                         {removingId === m._id ? (
                           <>

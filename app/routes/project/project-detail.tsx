@@ -31,6 +31,7 @@ import {
   Eye,
   EyeOff,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +99,7 @@ import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
 import { FilePreviewModal } from "@/components/project/FilePreviewModal";
 import { AttachmentUpload } from "@/components/project/AttachmentUpload";
 import { usePermissions } from "@/hooks/use-permissions";
+import { TruncatedTextModal } from "@/components/ui/truncated-text-modal";
 
 import {
   DndContext,
@@ -132,7 +134,7 @@ interface Task {
   createdAt: string;
 }
 
-type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed' ;
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
 
 interface Project {
   _id: string;
@@ -170,6 +172,7 @@ interface FilterType {
   search: string;
   status: "all" | "to-do" | "in-progress" | "done";
   priority: "all" | "low" | "medium" | "high" | "urgent";
+  assignee: string; // "all" or user ID
 }
 
 interface CurrentUser {
@@ -189,6 +192,7 @@ interface CalendarViewProps {
   navigate: (path: string) => void;
   userRole: string;
   currentUser: CurrentUser | null;
+  project: Project | null; // Added for member list access
 }
 
 const getPriorityColor = (priority: string) => {
@@ -226,6 +230,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
   navigate,
   userRole,
   currentUser,
+  project,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState<"month" | "week" | "day">("month");
@@ -497,205 +502,121 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       {/* Calendar Controls */}
       <Card>
         <CardContent className="p-4">
-          {/* Desktop Filters */}
-          {!isMobile && (
-            <div className="flex gap-2 items-center mb-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-gray-400" />
-                <Input
-                  placeholder="Search tasks..."
-                  className="pl-7 h-8 text-sm"
-                  value={filters.search}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
-                />
-              </div>
-              <Select
-                value={filters.status}
-                onValueChange={(value: string) => updateFilter("status", value)}
-              >
-                <SelectTrigger className="w-24 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="to-do">To Do</SelectItem>
-                  <SelectItem value="in-progress">Active</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.priority}
-                onValueChange={(value: string) => updateFilter("priority", value)}
-              >
-                <SelectTrigger className="w-20 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Med</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-              {(filters.search || filters.status !== "all" || filters.priority !== "all") && (
-                <Button variant="outline" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs">
-                  Clear
+          {/* Calendar Navigation - Modern & Mobile-First */}
+          <div className="space-y-3">
+            {/* Navigation Row */}
+            <div className="flex items-center justify-between">
+              {/* Left: Navigation Controls with Date - Centered on Mobile */}
+              <div className="flex items-center gap-2 flex-1 justify-center sm:justify-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // On mobile, always navigate day-by-day regardless of view
+                    if (isMobile) {
+                      setCurrentDate((prevDate) => {
+                        const newDate = new Date(prevDate);
+                        newDate.setDate(newDate.getDate() - 1);
+                        return newDate;
+                      });
+                    } else {
+                      navigateCalendar("prev");
+                    }
+                  }}
+                  className="h-9 w-9 p-0 rounded-lg flex-shrink-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
-              )}
-            </div>
-          )}
 
-          {/* Calendar Navigation */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigateCalendar("prev")} className="h-8 w-8 p-0">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigateCalendar("next")} className="h-8 w-8 p-0">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToToday} className="h-8 px-3 text-sm">
-                Today
-              </Button>
-              <h2 className="text-lg font-semibold ml-2 text-gray-900">{getCalendarTitle}</h2>
-            </div>
+                {/* Dynamic Date Display - Always Visible */}
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                    {getCalendarTitle}
+                  </h2>
+                  {/* Today button - Hidden on mobile */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToToday}
+                    className="hidden sm:inline-flex h-8 px-3 text-xs rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                  >
+                    Today
+                  </Button>
+                </div>
 
-            <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // On mobile, always navigate day-by-day regardless of view
+                    if (isMobile) {
+                      setCurrentDate((prevDate) => {
+                        const newDate = new Date(prevDate);
+                        newDate.setDate(newDate.getDate() + 1);
+                        return newDate;
+                      });
+                    } else {
+                      navigateCalendar("next");
+                    }
+                  }}
+                  className="h-9 w-9 p-0 rounded-lg flex-shrink-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Right: Eye toggle - Desktop only */}
               {!isMobile && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowTaskDetails(!showTaskDetails)}
-                  className="h-8 px-2 text-xs"
+                  className="h-8 w-8 p-0 rounded-lg flex-shrink-0 hover:bg-blue-50"
                 >
-                  {showTaskDetails ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {showTaskDetails ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </Button>
               )}
-
-              <div className="flex border rounded-md">
-                {(["month", "week", "day"] as const).map((view) => (
-                  <Button
-                    key={view}
-                    variant={calendarView === view ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setCalendarView(view)}
-                    className="h-8 px-2 text-xs capitalize"
-                  >
-                    {view}
-                  </Button>
-                ))}
-              </div>
             </div>
+
+            {/* View Mode Buttons - Desktop Only */}
+            {!isMobile && (
+              <div className="flex items-center justify-center sm:justify-start">
+                <div className="inline-flex bg-gray-100 rounded-lg p-1 gap-1">
+                  {(["month", "week", "day"] as const).map((view) => (
+                    <Button
+                      key={view}
+                      variant={calendarView === view ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCalendarView(view)}
+                      className={cn(
+                        "h-8 px-4 text-xs font-medium capitalize rounded-md transition-all",
+                        calendarView === view
+                          ? "bg-white shadow-sm text-gray-900 hover:bg-white"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      )}
+                    >
+                      {view}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* ✅ UPDATED: Calendar Content with Task Spans */}
+      {/* ✅ UPDATED: Calendar Content - Day View on Mobile, Full Views on Desktop */}
       <Card>
         <CardContent className="p-0">
-          {calendarView === "month" && (
-            <div className="p-4">
-              {/* Week headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-600 py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {getCalendarDays.map((calendarDay, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      "min-h-[100px] p-1 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors",
-                      !calendarDay.isCurrentMonth && "bg-gray-50/50 text-gray-400",
-                      calendarDay.isToday && "bg-blue-50 border-blue-200 ring-1 ring-blue-200"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "text-sm font-medium mb-1 px-1",
-                        calendarDay.isToday && "text-blue-600 font-bold",
-                        !calendarDay.isCurrentMonth && "text-gray-400"
-                      )}
-                    >
-                      {calendarDay.day}
-                    </div>
-                    <div className="space-y-0.5 max-h-20 overflow-y-auto">
-                      {calendarDay.tasks.slice(0, 4).map((task) => (
-                        <TaskItem
-                          key={`${task._id}-${calendarDay.date.toDateString()}`}
-                          task={task}
-                          date={calendarDay.date}
-                          compact={true}
-                        />
-                      ))}
-                      {calendarDay.tasks.length > 4 && (
-                        <div className="text-xs text-gray-500 text-center bg-gray-100 rounded px-1 py-0.5">
-                          +{calendarDay.tasks.length - 4}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {calendarView === "week" && (
-            <div className="p-4">
-              <div className="grid grid-cols-7 gap-4">
-                {getWeekDays.map((weekDay, index) => (
-                  <div key={index} className="space-y-2">
-                    <Card
-                      className={cn(
-                        "text-center p-3",
-                        weekDay.isToday && "bg-blue-50 border-blue-200"
-                      )}
-                    >
-                      <div className="text-xs font-medium text-gray-600">{weekDay.dayName}</div>
-                      <div
-                        className={cn(
-                          "text-lg font-bold",
-                          weekDay.isToday ? "text-blue-600" : "text-gray-900"
-                        )}
-                      >
-                        {weekDay.day}
-                      </div>
-                    </Card>
-                    <ScrollArea className="h-[300px]">
-                      <div className="space-y-1">
-                        {weekDay.tasks.length === 0 ? (
-                          <div className="text-center py-4 text-gray-400 text-xs">No tasks</div>
-                        ) : (
-                          weekDay.tasks.map((task) => (
-                            <TaskItem
-                              key={`${task._id}-${weekDay.date.toDateString()}`}
-                              task={task}
-                              date={weekDay.date}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {calendarView === "day" && (
+          {/* Mobile: Always show Day View */}
+          {isMobile ? (
             <div className="p-4">
               <div className="max-w-2xl mx-auto">
                 <Card
                   className={cn(
                     "text-center p-4 mb-4",
                     new Date().toDateString() === currentDate.toDateString() &&
-                      "bg-blue-50 border-blue-200"
+                    "bg-blue-50 border-blue-200"
                   )}
                 >
                   <h3 className="text-xl font-bold text-gray-900">
@@ -713,7 +634,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                   {getTasksForDate(currentDate).length === 0 ? (
                     <Card className="border-dashed border-2 border-gray-200">
                       <CardContent className="text-center py-8">
-            <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                         <p className="text-gray-500">No tasks scheduled for this day</p>
                       </CardContent>
                     </Card>
@@ -729,41 +650,199 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                 </div>
               </div>
             </div>
+          ) : (
+            /* Desktop: Show selected view (month/week/day) */
+            <>
+              {calendarView === "month" && (
+                <div className="p-4">
+                  {/* Week headers */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center text-sm font-medium text-gray-600 py-2">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {getCalendarDays.map((calendarDay, index) => (
+                      <div
+                        key={index}
+                        className={cn(
+                          "min-h-[100px] p-1 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors",
+                          !calendarDay.isCurrentMonth && "bg-gray-50/50 text-gray-400",
+                          calendarDay.isToday && "bg-blue-50 border-blue-200 ring-1 ring-blue-200"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "text-sm font-medium mb-1 px-1",
+                            calendarDay.isToday && "text-blue-600 font-bold",
+                            !calendarDay.isCurrentMonth && "text-gray-400"
+                          )}
+                        >
+                          {calendarDay.day}
+                        </div>
+                        <div className="space-y-0.5 max-h-20 overflow-y-auto">
+                          {calendarDay.tasks.slice(0, 4).map((task) => (
+                            <TaskItem
+                              key={`${task._id}-${calendarDay.date.toDateString()}`}
+                              task={task}
+                              date={calendarDay.date}
+                              compact={true}
+                            />
+                          ))}
+                          {calendarDay.tasks.length > 4 && (
+                            <div className="text-xs text-gray-500 text-center bg-gray-100 rounded px-1 py-0.5">
+                              +{calendarDay.tasks.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {calendarView === "week" && (
+                <div className="p-4">
+                  <div className="grid grid-cols-7 gap-4">
+                    {getWeekDays.map((weekDay, index) => (
+                      <div key={index} className="space-y-2">
+                        <Card
+                          className={cn(
+                            "text-center p-3",
+                            weekDay.isToday && "bg-blue-50 border-blue-200"
+                          )}
+                        >
+                          <div className="text-xs font-medium text-gray-600">{weekDay.dayName}</div>
+                          <div
+                            className={cn(
+                              "text-lg font-bold",
+                              weekDay.isToday ? "text-blue-600" : "text-gray-900"
+                            )}
+                          >
+                            {weekDay.day}
+                          </div>
+                        </Card>
+                        <ScrollArea className="h-[300px]">
+                          <div className="space-y-1">
+                            {weekDay.tasks.length === 0 ? (
+                              <div className="text-center py-4 text-gray-400 text-xs">No tasks</div>
+                            ) : (
+                              weekDay.tasks.map((task) => (
+                                <TaskItem
+                                  key={`${task._id}-${weekDay.date.toDateString()}`}
+                                  task={task}
+                                  date={weekDay.date}
+                                />
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {calendarView === "day" && (
+                <div className="p-4">
+                  <div className="max-w-2xl mx-auto">
+                    <Card
+                      className={cn(
+                        "text-center p-4 mb-4",
+                        new Date().toDateString() === currentDate.toDateString() &&
+                        "bg-blue-50 border-blue-200"
+                      )}
+                    >
+                      <h3 className="text-xl font-bold text-gray-900">
+                        {(() => {
+                          const date = new Date(currentDate);
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const year = date.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        })()}
+                      </h3>
+                    </Card>
+
+                    <div className="space-y-2">
+                      {getTasksForDate(currentDate).length === 0 ? (
+                        <Card className="border-dashed border-2 border-gray-200">
+                          <CardContent className="text-center py-8">
+                            <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-gray-500">No tasks scheduled for this day</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        getTasksForDate(currentDate).map((task) => (
+                          <TaskItem
+                            key={`${task._id}-${currentDate.toDateString()}`}
+                            task={task}
+                            date={currentDate}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
-      {/* ✅ UPDATED: Enhanced Legend */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
-            <div className="flex items-center gap-4">
-              <span className="text-gray-600 font-medium">Priority:</span>
-              <div className="flex items-center gap-3">
+      {/* ✅ UPDATED: Modern Legend with Cards */}
+      <Card className="bg-gradient-to-br from-gray-50 to-white">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Priority Legend */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-5 bg-blue-500 rounded-full" />
+                <h3 className="text-sm font-semibold text-gray-900">Priority Levels</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2">
                 {[
-                  { color: 'bg-red-500', label: 'Urgent' },
-                  { color: 'bg-orange-500', label: 'High' },
-                  { color: 'bg-yellow-500', label: 'Medium' },
-                  { color: 'bg-green-500', label: 'Low' }
-                ].map(({ color, label }) => (
-                  <div key={label} className="flex items-center gap-1">
-                    <div className={`w-3 h-3 ${color} rounded-full`}></div>
-                    <span className="text-gray-700">{label}</span>
+                  { color: 'bg-red-500', label: 'Urgent', ring: 'ring-red-100' },
+                  { color: 'bg-orange-500', label: 'High', ring: 'ring-orange-100' },
+                  { color: 'bg-yellow-500', label: 'Medium', ring: 'ring-yellow-100' },
+                  { color: 'bg-green-500', label: 'Low', ring: 'ring-green-100' }
+                ].map(({ color, label, ring }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow"
+                  >
+                    <div className={`w-2.5 h-2.5 ${color} rounded-full ring-4 ${ring}`} />
+                    <span className="text-xs font-medium text-gray-700">{label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-gray-600 font-medium">Task Spans:</span>
-              <div className="flex items-center gap-3">
+            {/* Task Spans Legend */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-5 bg-purple-500 rounded-full" />
+                <h3 className="text-sm font-semibold text-gray-900">Multi-Day Tasks</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
-                  { symbol: '▶', label: 'Start' },
-                  { symbol: '─', label: 'Ongoing' },
-                  { symbol: '◀', label: 'End' }
-                ].map(({ symbol, label }) => (
-                  <div key={label} className="flex items-center gap-1">
-                    <span className="text-gray-700">{symbol} {label}</span>
+                  { symbol: '▶', label: 'Start', desc: 'Task begins', color: 'text-green-600', bg: 'bg-green-50' },
+                  { symbol: '─', label: 'Ongoing', desc: 'In progress', color: 'text-blue-600', bg: 'bg-blue-50' },
+                  { symbol: '◀', label: 'End', desc: 'Task ends', color: 'text-purple-600', bg: 'bg-purple-50' }
+                ].map(({ symbol, label, desc, color, bg }) => (
+                  <div
+                    key={label}
+                    className={`flex items-center gap-2 px-3 py-2 ${bg} rounded-lg border border-gray-200 hover:shadow-sm transition-shadow`}
+                  >
+                    <span className={`text-base font-bold ${color}`}>{symbol}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-gray-900">{label}</div>
+                      <div className="text-[10px] text-gray-500 truncate">{desc}</div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -903,19 +982,20 @@ const TaskCard = React.memo<{
 
   return (
     <>
-      <Card
+      <div
+        data-slot="card"
         className={cn(
-          "hover:shadow-md transition-all duration-200 relative group bg-white rounded-lg border border-gray-200",
+          "text-card-foreground flex flex-col gap-6 py-6 shadow-sm hover:shadow-md transition-all duration-200 relative group bg-white rounded-lg border border-gray-200",
           onClick && "cursor-pointer"
         )}
-        onClick={onClick}
+        onClick={handleCardClick}
       >
-        <CardHeader className="p-4 pb-3">
-          {/* Top Row: Priority Badge + 3-dot Menu */}
+        <div data-slot="card-header" className="@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 p-4 pb-3">
           <div className="flex items-start justify-between gap-2 mb-3">
-            <Badge
+            <span
+              data-slot="badge"
               className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded",
+                "inline-flex items-center justify-center border w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden border-transparent [a&]:hover:bg-primary/90 text-xs font-medium px-2 py-0.5 rounded",
                 task.priority === "high" && "bg-red-100 text-red-700",
                 task.priority === "medium" && "bg-yellow-100 text-yellow-700",
                 task.priority === "low" && "bg-blue-100 text-blue-700",
@@ -923,95 +1003,63 @@ const TaskCard = React.memo<{
               )}
             >
               {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-            </Badge>
+            </span>
 
-            {/* ✅ 3-dot Menu */}
             {canManageTask && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
+                  <button
+                    data-slot="dropdown-menu-trigger"
+                    className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 has-[>svg]:px-2.5 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical className="w-4 h-4 text-gray-500" />
-                  </Button>
+                    <MoreVertical className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                  </button>
                 </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onSelect={handleSelectView}>
-                      <Eye className="w-3 h-3 mr-2" />
-                      View Details
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSelectView(); }}>
+                    <Eye className="w-4 h-4 mr-2" /> View Details
+                  </DropdownMenuItem>
+                  {canEditTask && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSelectEdit(); }}>
+                      <Edit className="w-4 h-4 mr-2" /> Edit Task
                     </DropdownMenuItem>
-                    {(!isApproved && canEditTask) && (
-                      <DropdownMenuItem onSelect={handleSelectEdit}>
-                        <Edit className="w-3 h-3 mr-2" />
-                        Edit Task
+                  )}
+                  {canManageTask && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSelectAssign(); }}>
+                      <UserPlus className="w-4 h-4 mr-2" /> Assign Member
+                    </DropdownMenuItem>
+                  )}
+                  {(!isApproved && task.status !== "done") && (
+                    <DropdownMenuItem onSelect={() => handleStatusChange("done")}>
+                      <CheckCircle2 className="w-3 h-3 mr-2" /> Mark as Done
+                    </DropdownMenuItem>
+                  )}
+                  {(!isApproved && canDeleteTask) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={handleSelectDelete} className="text-red-600 focus:text-red-600">
+                        <Trash2 className="w-3 h-3 mr-2" /> Delete Task
                       </DropdownMenuItem>
-                    )}
-                    {(!isApproved && canAssignVisible) && (
-                      <DropdownMenuItem onSelect={handleSelectAssign}>
-                        <Users className="w-3 h-3 mr-2" />
-                        Assign Task
-                      </DropdownMenuItem>
-                    )}
-                    {(!isApproved && task.status !== "to-do") && (
-                      <DropdownMenuItem onSelect={() => handleStatusChange("to-do")}>
-                        <Clock className="w-3 h-3 mr-2" />
-                        Mark as To Do
-                      </DropdownMenuItem>
-                    )}
-                    {(!isApproved && task.status !== "in-progress") && (
-                      <DropdownMenuItem onSelect={() => handleStatusChange("in-progress")}>
-                        <PlayCircle className="w-3 h-3 mr-2" />
-                        Mark In Progress
-                      </DropdownMenuItem>
-                    )}
-                    {(!isApproved && task.status !== "done") && (
-                      <DropdownMenuItem onSelect={() => handleStatusChange("done")}>
-                        <CheckCircle2 className="w-3 h-3 mr-2" />
-                        Mark as Done
-                      </DropdownMenuItem>
-                    )}
-                    {(!isApproved && canDeleteTask) && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onSelect={handleSelectDelete}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="w-3 h-3 mr-2" />
-                          Delete Task
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
-          {/* Title */}
-          <CardTitle className="text-base font-semibold text-gray-900 mb-2 line-clamp-2">
+          <div data-slot="card-title" className="text-base font-semibold text-gray-900 mb-2 line-clamp-2">
             {task.title}
-          </CardTitle>
-
-          {/* Description */}
+          </div>
           {task.description && (
-            <p className="text-sm text-gray-600 line-clamp-3 mb-4">
-              {task.description}
-            </p>
+            <p className="text-sm text-gray-600 line-clamp-3 mb-4">{task.description}</p>
           )}
-        </CardHeader>
+        </div>
 
-        <CardContent className="px-4 pb-4 pt-0 space-y-2">
-          {/* Date */}
+        <div data-slot="card-content" className="px-4 pb-4 pt-0 space-y-2">
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <Clock className="w-4 h-4" />
-            <span className={isOverdue ? "text-red-600 font-medium" : ""}>
+            <Clock className="w-4 h-4" aria-hidden="true" />
+            <span className={cn("font-medium", isOverdue ? "text-red-600" : "")}>
               {(() => {
                 const date = new Date(task.dueDate);
                 const day = String(date.getDate()).padStart(2, '0');
@@ -1021,18 +1069,16 @@ const TaskCard = React.memo<{
               })()}
             </span>
           </div>
-
-          {/* Assignee */}
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <Avatar className="w-4 h-4">
-              <AvatarFallback className="bg-blue-100 text-blue-700 font-medium text-xs">
+            <span data-slot="avatar" className="relative flex size-8 shrink-0 overflow-hidden rounded-full w-4 h-4">
+              <span data-slot="avatar-fallback" className="flex size-full items-center justify-center rounded-full bg-blue-100 text-blue-700 font-medium text-xs">
                 {(task.assignee?.name?.charAt(0) || task.assignee?.email?.charAt(0) || "?")}
-              </AvatarFallback>
-            </Avatar>
+              </span>
+            </span>
             <span>Assigned to {task.assignee?.name || task.assignee?.email || "Unassigned"}</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ✅ NEW: Quick Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
@@ -1043,12 +1089,12 @@ const TaskCard = React.memo<{
           </DialogHeader>
           <ScrollArea className="max-h-[70vh]">
             <QuickEditTaskForm
-            task={task}
-            onClose={() => setShowEditModal(false)}
-            onUpdate={onTaskUpdate}
-            assignableMembers={assignableMembers}
-            project={project}
-          />
+              task={task}
+              onClose={() => setShowEditModal(false)}
+              onUpdate={onTaskUpdate}
+              assignableMembers={assignableMembers}
+              project={project}
+            />
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -1061,11 +1107,11 @@ const TaskCard = React.memo<{
             <DialogDescription>Select an employee to assign this task.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-          <Label className="text-sm">Assignee</Label>
-          <Select
-            value={selectedAssigneeId}
-            onValueChange={(value: string) => setSelectedAssigneeId(value === "__UNASSIGNED__" ? "" : value)}
-          >
+            <Label className="text-sm">Assignee</Label>
+            <Select
+              value={selectedAssigneeId}
+              onValueChange={(value: string) => setSelectedAssigneeId(value === "__UNASSIGNED__" ? "" : value)}
+            >
               <SelectTrigger className="h-8">
                 <SelectValue placeholder="Select assignee" />
               </SelectTrigger>
@@ -1155,30 +1201,30 @@ const QuickEditTaskForm: React.FC<{
       return toast.error("Start date cannot be after due date");
     }
 
-  try {
-    setIsSubmitting(true);
-    await putData(`/task/${task._id}`, formData);
-    toast.success("Task updated successfully");
-    onUpdate?.();
-    onClose();
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Failed to update task");
-  } finally {
-    setIsSubmitting(false);
-  }
+    try {
+      setIsSubmitting(true);
+      await putData(`/task/${task._id}`, formData);
+      toast.success("Task updated successfully");
+      onUpdate?.();
+      onClose();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to update task");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 pr-1">
       <div className="space-y-1">
-          <Label className="text-sm">Title *</Label>
-          <Input
-            value={formData.title}
+        <Label className="text-sm">Title *</Label>
+        <Input
+          value={formData.title}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, title: e.target.value })}
-            className="h-8"
-            placeholder="Task title"
-            required
-          />
+          className="h-8"
+          placeholder="Task title"
+          required
+        />
       </div>
 
       <div className="space-y-1">
@@ -1426,9 +1472,9 @@ const DroppableColumn = ({
           <div className={cn("w-2 h-2 rounded-full", color)} />
           <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
         </div>
-        <Badge variant="secondary" className="text-xs h-5 px-2">
+        <span data-slot="badge" className="inline-flex items-center justify-center rounded-md border py-0.5 font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90 text-xs h-5 px-2">
           {count}
-        </Badge>
+        </span>
       </div>
       {/* Per-column progress: show fraction and visual bar */}
       <div className="mb-3">
@@ -1442,7 +1488,7 @@ const DroppableColumn = ({
           />
         </div>
       </div>
-      <div ref={setNodeRef} className="space-y-2 min-h-80">
+      <div ref={setNodeRef} className="space-y-2 min-h-[20rem]">
         {children}
       </div>
     </div>
@@ -1468,6 +1514,7 @@ const ProjectDetail = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileKanbanStatus, setMobileKanbanStatus] = useState<"to-do" | "in-progress" | "done">("to-do");
   const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Attachment state
@@ -1478,6 +1525,7 @@ const ProjectDetail = () => {
     search: "",
     status: "all",
     priority: "all",
+    assignee: "all",
   });
 
   const [newTask, setNewTask] = useState({
@@ -1533,8 +1581,9 @@ const ProjectDetail = () => {
 
       const matchesStatus = filters.status === "all" || task.status === filters.status;
       const matchesPriority = filters.priority === "all" || task.priority === filters.priority;
+      const matchesAssignee = filters.assignee === "all" || task.assignee?._id === filters.assignee;
 
-      return matchesSearch && matchesStatus && matchesPriority && (task as any).approvalStatus !== "approved";
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && (task as any).approvalStatus !== "approved";
     });
   }, [allTasks, filters]);
 
@@ -1547,8 +1596,9 @@ const ProjectDetail = () => {
 
       const matchesStatus = filters.status === "all" || task.status === filters.status;
       const matchesPriority = filters.priority === "all" || task.priority === filters.priority;
+      const matchesAssignee = filters.assignee === "all" || task.assignee?._id === filters.assignee;
 
-      return matchesSearch && matchesStatus && matchesPriority && (task as any).approvalStatus !== "approved";
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee && (task as any).approvalStatus !== "approved";
     });
   }, [userTasks, filters]);
 
@@ -1588,8 +1638,9 @@ const ProjectDetail = () => {
 
       const matchesStatus = filters.status === "all" || task.status === filters.status;
       const matchesPriority = filters.priority === "all" || task.priority === filters.priority;
+      const matchesAssignee = filters.assignee === "all" || task.assignee?._id === filters.assignee;
 
-      return matchesSearch && matchesStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee;
     });
   }, [allTasks, filters, userRole, currentUser, project]);
 
@@ -1603,8 +1654,8 @@ const ProjectDetail = () => {
     const relevantTasks = ["admin", "super_admin", "super-admin"].includes(userRole)
       ? allTasks
       : ((userRole === "lead" && isProjectMember) || (project?.projectHead?._id || "").toString() === currentUserIdStr)
-      ? kanbanFilteredTasks
-      : userTasks;
+        ? kanbanFilteredTasks
+        : userTasks;
 
     return {
       total: relevantTasks.length,
@@ -1664,7 +1715,7 @@ const ProjectDetail = () => {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setFilters({ search: "", status: "all", priority: "all" });
+    setFilters({ search: "", status: "all", priority: "all", assignee: "all" });
   }, []);
 
   const handleDragStart = useCallback(
@@ -1742,7 +1793,7 @@ const ProjectDetail = () => {
             },
           }
         );
-        
+
         if (projectDetailsResponse.ok) {
           const projectData = await projectDetailsResponse.json();
           if (projectData.project?.isArchived) {
@@ -1809,7 +1860,7 @@ const ProjectDetail = () => {
         setLoading(false);
         return;
       }
-      
+
       const response = await fetchData(`/project/${projectId}`);
       setProject(response.project);
     } catch (error) {
@@ -1959,7 +2010,7 @@ const ProjectDetail = () => {
         fetchAllTasks(),
         fetchUserTasks(),
         fetchAssignableMembers(),
-        (async () => { try { const res = await fetchData(`/project/${projectId}/role`); setProjectRole(res.projectRole || 'member'); } catch {} })(),
+        (async () => { try { const res = await fetchData(`/project/${projectId}/role`); setProjectRole(res.projectRole || 'member'); } catch { } })(),
       ]);
     }
   }, [isAuthenticated, projectId]);
@@ -2003,93 +2054,148 @@ const ProjectDetail = () => {
           <Breadcrumb />
         </div>
 
-        <div className="flex items-center justify-end mb-3">
-          <div className="flex gap-2">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                  <Filter className="w-3.5 h-3.5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 sm:w-72">
-                <SheetHeader>
-                  <SheetTitle className="text-base">Filters</SheetTitle>
-                </SheetHeader>
-                <div className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Search</Label>
-                    <Input
-                      placeholder="Search tasks..."
-                      value={filters.search}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Status</Label>
-                    <Select
-                      value={filters.status}
-                      onValueChange={(value: string) => updateFilter("status", value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="to-do">To Do</SelectItem>
-                        <SelectItem value="in-progress">Active</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Priority</Label>
-                    <Select
-                      value={filters.priority}
-                      onValueChange={(value: string) => updateFilter("priority", value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={clearFilters} variant="outline" className="w-full h-8 text-sm">
-                    Clear All
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            {canCreateTask && (
-              <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 px-2 bg-[#f2761b] hover:bg-[#f2761b]/90">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                <span className="text-xs">Task</span>
+        <div className="flex items-center justify-between mb-3">
+          {/* Filter Button - Left Side */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                <Filter className="w-3.5 h-3.5" />
               </Button>
-            )}
-          </div>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 sm:w-72">
+              <SheetHeader>
+                <SheetTitle className="text-base">Filters</SheetTitle>
+              </SheetHeader>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Search</Label>
+                  <Input
+                    placeholder="Search tasks..."
+                    value={filters.search}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Status</Label>
+                  <Select
+                    value={filters.status}
+                    onValueChange={(value: string) => updateFilter("status", value)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="to-do">To Do</SelectItem>
+                      <SelectItem value="in-progress">Active</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Priority</Label>
+                  <Select
+                    value={filters.priority}
+                    onValueChange={(value: string) => updateFilter("priority", value)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={clearFilters} variant="outline" className="w-full h-8 text-sm">
+                  Clear All
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Team Avatars - Right Side (For Project Lead or Admin) */}
+          {(isProjectLead || isAdmin) && (
+            <TeamAvatars
+              members={project.members || []}
+              maxVisible={3}
+              onClick={() => setShowMembersModal(true)}
+            />
+          )}
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-base font-bold text-gray-900 truncate flex-1 mr-2">
+        {/* MOBILE PROJECT DETAILS - Custom Layout */}
+        <div className="bg-[#E5EFFF] rounded-[10px] p-[15px] space-y-3 mt-3">
+          {/* Project Title */}
+          <div>
+            <h1 className="text-base font-bold text-[#040110] mb-1">
               {project.title}
             </h1>
-            <StatusBadge status={project.status} />
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-gray-900">{project.progress}%</span>
-              <Progress value={project.progress} className="w-16 h-1" />
+
+          {/* Progress Bar - Full Width */}
+          <div>
+            <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+              Progress
             </div>
-            <span className="text-xs text-gray-600">
-              Due:{" "}
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-semibold text-[#040110]">{project.progress}%</span>
+              <Progress value={project.progress} className="flex-1 h-2" />
+            </div>
+          </div>
+
+          {/* Project Lead */}
+          <div>
+            <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+              Project Lead
+            </div>
+            <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
+              {project.projectHead?.name || '—'}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+              Description
+            </div>
+            <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
+              <TruncatedTextModal
+                text={project.description}
+                lines={3}
+                ellipsisClassName="text-[#040110] bg-[#E5EFFF]"
+                modalBgClassName="bg-[#E5EFFF]"
+                modalTitle="Description"
+              />
+            </div>
+          </div>
+
+          {/* Project Start Date */}
+          <div>
+            <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+              Project Start Date
+            </div>
+            <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
+              {(() => {
+                const date = new Date(project.startDate);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+              })()}
+            </div>
+          </div>
+
+          {/* Project End Date */}
+          <div>
+            <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+              Project End Date
+            </div>
+            <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
               {(() => {
                 const date = new Date(project.endDate);
                 const day = String(date.getDate()).padStart(2, '0');
@@ -2097,51 +2203,76 @@ const ProjectDetail = () => {
                 const year = date.getFullYear();
                 return `${day}/${month}/${year}`;
               })()}
-            </span>
-          </div>
-        </div>
-
-        {/* MOBILE STATS - Figma Style */}
-        <div className="grid grid-cols-4 gap-2 mt-3">
-          {[
-            {
-              label: "Total",
-              value: taskStats.total,
-              bg: "#E0E7FF",
-              stripe: "#6366F1",
-            },
-            {
-              label: "Done",
-              value: taskStats.completed,
-              bg: "#D1FAE5",
-              stripe: "#10B981",
-            },
-            {
-              label: "Active",
-              value: taskStats.inProgress,
-              bg: "#FEF3C7",
-              stripe: "#F59E0B",
-            },
-            {
-              label: "Overdue",
-              value: taskStats.overdue,
-              bg: "#FED7AA",
-              stripe: "#F97316",
-            },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="relative rounded-[6px] py-2 px-1 text-center"
-              style={{ backgroundColor: stat.bg }}
-            >
-              <div
-                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-[2px]"
-                style={{ backgroundColor: stat.stripe }}
-              />
-              <div className="text-sm font-bold text-[#040110]">{stat.value}</div>
-              <div className="text-xs text-[#040110] opacity-70">{stat.label}</div>
             </div>
-          ))}
+          </div>
+
+          {/* Duration & Status - 1x2 Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+                Duration
+              </div>
+              <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
+                {(() => {
+                  const start = new Date(project.startDate);
+                  const end = new Date(project.endDate);
+                  start.setHours(0, 0, 0, 0);
+                  end.setHours(0, 0, 0, 0);
+                  const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                  return `${Math.max(1, diffDays)} Days`;
+                })()}
+              </div>
+            </div>
+            <div>
+              <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+                Status
+              </div>
+              <StatusBadge status={project.status} />
+            </div>
+          </div>
+
+          {/* Task Stats - 2x2 Grid */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#D1E3FF]">
+            {[
+              {
+                label: "Total",
+                value: taskStats.total,
+                bg: "#E0E7FF",
+                stripe: "#6366F1",
+              },
+              {
+                label: "Done",
+                value: taskStats.completed,
+                bg: "#D1FAE5",
+                stripe: "#10B981",
+              },
+              {
+                label: "Active",
+                value: taskStats.inProgress,
+                bg: "#FEF3C7",
+                stripe: "#F59E0B",
+              },
+              {
+                label: "Overdue",
+                value: taskStats.overdue,
+                bg: "#FED7AA",
+                stripe: "#F97316",
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="relative rounded-[6px] py-2 px-1 text-center"
+                style={{ backgroundColor: stat.bg }}
+              >
+                <div
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-[2px]"
+                  style={{ backgroundColor: stat.stripe }}
+                />
+                <div className="text-sm font-bold text-[#040110]">{stat.value}</div>
+                <div className="text-xs text-[#040110] opacity-70">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -2217,10 +2348,11 @@ const ProjectDetail = () => {
         </div>
 
         {/* Three Column Layout: Metrics + Overview Panel + Attachments */}
-        <div className="flex gap-4">
-          {/* Left: Metric Cards (2x2 grid, 238px width = 250px * 0.95) */}
-          <div className="w-[238px] flex-shrink-0">
-            <div className="grid grid-cols-2 gap-3">
+        {/* Three Column Layout: Metrics + Overview Panel + Attachments */}
+        <div className="flex flex-wrap xl:flex-nowrap gap-4">
+          {/* Left: Metric Cards */}
+          <div className="w-full md:w-auto xl:w-[238px] flex-shrink-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-2 gap-3">
               {[
                 {
                   label: "Total Task",
@@ -2276,8 +2408,8 @@ const ProjectDetail = () => {
             </div>
           </div>
 
-          {/* Center: Project Overview Panel (589px width = 620px * 0.95) */}
-          <div className="w-[560px] flex-shrink-0">
+          {/* Center: Project Overview Panel */}
+          <div className="w-full md:flex-1 xl:w-[560px] xl:flex-none min-w-[300px]">
             <ProjectOverviewPanel
               projectManager={project.creator.name}
               projectHead={project.projectHead?.name}
@@ -2288,8 +2420,8 @@ const ProjectDetail = () => {
             />
           </div>
 
-          {/* Right: Attachments Sidebar (fills leftover width) */}
-          <div className="flex-1 min-w-0">
+          {/* Right: Attachments Sidebar */}
+          <div className="w-full xl:flex-1 min-w-[300px]">
             <AttachmentsSidebar
               attachments={project.attachments || []}
               canDelete={permissions.isAdmin}
@@ -2315,252 +2447,271 @@ const ProjectDetail = () => {
 
       {/* SCROLLABLE CONTENT */}
       <div className="flex-1">
-          <div className={cn("p-3", !isMobile && "p-4")}> 
-            <Tabs defaultValue="your-tasks" className="space-y-4">
-              <div className="sticky top-0 bg-gray-50 pb-3 z-5">
-                <div className="flex items-center justify-between">
-                  <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
-                    <TabsTrigger
-                      value="your-tasks"
-                      className="text-xs px-2 data-[state=active]:bg-blue-600"
-                    >
-                      <CheckSquare className="w-3 h-3 mr-1" />
-                      <span className="hidden sm:inline">Your</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="kanban"
-                      className="text-xs px-2 data-[state=active]:bg-purple-600"
-                    >
-                      <KanbanSquare className="w-3 h-3 mr-1" />
-                      <span className="hidden sm:inline">Board</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="calendar"
-                      className="text-xs px-2 data-[state=active]:bg-green-600"
-                    >
-                      <CalendarIcon className="w-3 h-3 mr-1" />
-                      <span className="hidden sm:inline">Calendar</span>
-                    </TabsTrigger>
-                  </TabsList>
-                  {(isAdmin || isProjectLead) && (
-                    <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90">
-                      <Plus className="w-3.5 h-3.5 mr-1" />
-                      Create Task
+        <div className={cn("p-3", !isMobile && "p-4")}>
+          <Tabs defaultValue="your-tasks" className="space-y-4">
+            <div className="sticky top-0 bg-gray-50 pb-3 z-5">
+              <div className="flex items-center justify-between">
+                <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
+                  <TabsTrigger
+                    value="your-tasks"
+                    className="text-xs px-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    <CheckSquare className="w-3 h-3 mr-1" />
+                    <span className="hidden sm:inline">Your</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="kanban"
+                    className="text-xs px-2 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+                  >
+                    <KanbanSquare className="w-3 h-3 mr-1" />
+                    <span className="hidden sm:inline">Board</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="calendar"
+                    className="text-xs px-2 data-[state=active]:bg-green-600 data-[state=active]:text-white"
+                  >
+                    <CalendarIcon className="w-3 h-3 mr-1" />
+                    <span className="hidden sm:inline">Calendar</span>
+                  </TabsTrigger>
+                </TabsList>
+                {(isAdmin || isProjectLead) && (
+                  <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90 text-white">
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Create Task
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* YOUR TASKS TAB */}
+            <TabsContent value="your-tasks" className="space-y-3 mt-0">
+              {/* DESKTOP QUICK FILTERS - Updated to match Figma design */}
+              <div className="hidden md:block">
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search..."
+                      className="pl-9 h-10 text-sm border-gray-200 focus:border-gray-300"
+                      value={filters.search}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
+                    />
+                  </div>
+                  <Select
+                    value={filters.status}
+                    onValueChange={(value: string) => updateFilter("status", value)}
+                  >
+                    <SelectTrigger className="w-[140px] h-10 text-sm border-gray-200">
+                      <SelectValue placeholder="Task Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="to-do">To Do</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filters.priority}
+                    onValueChange={(value: string) => updateFilter("priority", value)}
+                  >
+                    <SelectTrigger className="w-[120px] h-10 text-sm border-gray-200">
+                      <SelectValue placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(filters.search || filters.status !== "all" || filters.priority !== "all") && (
+                    <Button variant="outline" size="sm" onClick={clearFilters} className="h-10 px-3 text-sm border-gray-200">
+                      Clear
                     </Button>
                   )}
                 </div>
               </div>
 
-              {/* YOUR TASKS TAB */}
-              <TabsContent value="your-tasks" className="space-y-3 mt-0">
-                {/* DESKTOP QUICK FILTERS - Updated to match Figma design */}
-                <div className="hidden md:block">
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Search..."
-                        className="pl-9 h-10 text-sm border-gray-200 focus:border-gray-300"
-                        value={filters.search}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
-                      />
+              {filteredUserTasks.length === 0 ? (
+                <Card className="border-dashed border-2 border-gray-200 bg-white">
+                  <CardContent className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                      <CheckSquare className="w-8 h-8 text-gray-400" />
                     </div>
-                    <Select
-                      value={filters.status}
-                      onValueChange={(value: string) => updateFilter("status", value)}
-                    >
-                      <SelectTrigger className="w-[140px] h-10 text-sm border-gray-200">
-                        <SelectValue placeholder="Task Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="to-do">To Do</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="done">Done</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={filters.priority}
-                      onValueChange={(value: string) => updateFilter("priority", value)}
-                    >
-                      <SelectTrigger className="w-[120px] h-10 text-sm border-gray-200">
-                        <SelectValue placeholder="Priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Priority</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {(filters.search || filters.status !== "all" || filters.priority !== "all") && (
-                      <Button variant="outline" size="sm" onClick={clearFilters} className="h-10 px-3 text-sm border-gray-200">
-                        Clear
+                    <CardTitle className="text-lg font-semibold mb-2 text-gray-900">No Task Found</CardTitle>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {filters.search || filters.status !== "all" || filters.priority !== "all"
+                        ? "Try adjusting your filters"
+                        : "No task assigned yet"}
+                    </p>
+                    {(isAdmin || isProjectLead) && (
+                      <Button
+                        onClick={() => setShowTaskModal(true)}
+                        className="bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Task
                       </Button>
                     )}
-                  </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div
+                  className={cn(
+                    "grid gap-3 pb-16 md:pb-4",
+                    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  )}
+                >
+                  {filteredUserTasks.map((task) => (
+                    <TaskCard
+                      key={task._id}
+                      task={task}
+                      compact={true}
+                      onClick={() => navigate(`/task/${task._id}`)}
+                      currentUser={currentUser}
+                      project={project}
+                      userRole={userRole}
+                      onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                      assignableMembers={filteredAssignableMembers}
+                      canAssignVisible={isAdmin || isProjectLead}
+                    />
+                  ))}
                 </div>
+              )}
+            </TabsContent>
 
-                {filteredUserTasks.length === 0 ? (
-                  <Card className="border-dashed border-2 border-gray-200 bg-white">
-                    <CardContent className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                        <CheckSquare className="w-8 h-8 text-gray-400" />
+            {/* KANBAN TAB */}
+            <TabsContent value="kanban" className="mt-0">
+              {!canViewKanban ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                    <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {currentUser ? "You are not an employee of this project." : "Loading user data..."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {/* DESKTOP KANBAN FILTERS */}
+                  {/* Responsive Kanban Filters */}
+                  <div className="mb-4">
+                    {/* Search Bar - Full Width */}
+                    <div className="mb-3">
+                      <label className="text-xs font-medium text-gray-700 mb-1.5 block">Search Tasks</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search by title or description..."
+                          className="pl-9 h-9 text-sm"
+                          value={filters.search}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
+                        />
                       </div>
-                      <CardTitle className="text-lg font-semibold mb-2 text-gray-900">No Task Found</CardTitle>
-                      <p className="text-sm text-gray-500 mb-4">
-                        {filters.search || filters.status !== "all" || filters.priority !== "all"
-                          ? "Try adjusting your filters"
-                          : "No task assigned yet"}
-                      </p>
-                      {(isAdmin || isProjectLead) && (
-                        <Button
-                          onClick={() => setShowTaskModal(true)}
-                          className="bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Task
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div
-                    className={cn(
-                      "grid gap-3 pb-16 md:pb-4",
-                      isMobile ? "grid-cols-1 xs:grid-cols-2" : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                    )}
-                  >
-                    {filteredUserTasks.map((task) => (
-                      <TaskCard
-                        key={task._id}
-                        task={task}
-                        compact={true}
-                        onClick={() => navigate(`/task/${task._id}`)}
-                        currentUser={currentUser}
-                        project={project}
-                        userRole={userRole}
-                        onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                        assignableMembers={filteredAssignableMembers}
-                        canAssignVisible={isAdmin || isProjectLead}
-                      />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
+                    </div>
 
-              {/* KANBAN TAB */}
-              <TabsContent value="kanban" className="mt-0">
-                {!canViewKanban ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                      <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
-                      <p className="text-sm text-gray-600">
-                        {currentUser ? "You are not an employee of this project." : "Loading user data..."}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    {/* DESKTOP KANBAN FILTERS */}
-                    <div className="hidden md:block">
-                      <div className="flex gap-2 items-center">
-                        <div className="flex-1 relative">
-                          <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-gray-400" />
-                          <Input
-                            placeholder="Search all tasks..."
-                            className="pl-7 h-8 text-sm"
-                            value={filters.search}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFilter("search", e.target.value)}
-                          />
-                        </div>
+                    {/* Status & Priority - Side by Side */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      {/* Status Filter */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</label>
                         <Select
                           value={filters.status}
                           onValueChange={(value: string) => updateFilter("status", value)}
                         >
-                          <SelectTrigger className="w-20 h-8 text-xs">
+                          <SelectTrigger className="h-9 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="all">All Status</SelectItem>
                             <SelectItem value="to-do">To Do</SelectItem>
-                            <SelectItem value="in-progress">Active</SelectItem>
+                            <SelectItem value="in-progress">In Progress</SelectItem>
                             <SelectItem value="done">Done</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+
+                      {/* Priority Filter */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">Priority</label>
                         <Select
                           value={filters.priority}
                           onValueChange={(value: string) => updateFilter("priority", value)}
                         >
-                          <SelectTrigger className="w-20 h-8 text-xs">
+                          <SelectTrigger className="h-9 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="all">All Priority</SelectItem>
                             <SelectItem value="urgent">Urgent</SelectItem>
                             <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="medium">Med</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
                             <SelectItem value="low">Low</SelectItem>
                           </SelectContent>
                         </Select>
-                        {(filters.search || filters.status !== "all" || filters.priority !== "all") && (
-                          <Button variant="outline" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs">
-                            Clear
+                      </div>
+                    </div>
+
+                    {/* Assignee Filter & Clear Button */}
+                    <div className="mb-3">
+                      <label className="text-xs font-medium text-gray-700 mb-1.5 block">Assigned To</label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={filters.assignee}
+                          onValueChange={(value: string) => updateFilter("assignee", value)}
+                        >
+                          <SelectTrigger className="h-9 text-sm flex-1">
+                            <SelectValue placeholder="All Members" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Members</SelectItem>
+                            {project?.members?.map((member: { userId: { _id: string; name: string; email: string } }) => (
+                              <SelectItem key={member.userId._id} value={member.userId._id}>
+                                {member.userId.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {(filters.search || filters.status !== "all" || filters.priority !== "all" || filters.assignee !== "all") && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="h-9 px-3 text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-300 whitespace-nowrap"
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Clear All Filters
                           </Button>
                         )}
                       </div>
                     </div>
 
-                    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      {isMobile ? (
-                        <div className="space-y-3 pb-16">
-                          {["to-do", "in-progress", "done"].map((status) => {
-                            const statusTasks = kanbanFilteredTasks.filter((t) => t.status === status);
-                            if (statusTasks.length === 0) return null;
+                    {/* Mobile Status Filter */}
+                    {isMobile && (
+                      <div className="mb-3">
+                        <label className="text-xs font-medium text-gray-700 mb-1.5 block">View Status</label>
+                        <Select value={mobileKanbanStatus} onValueChange={(value: "to-do" | "in-progress" | "done") => setMobileKanbanStatus(value)}>
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="to-do">To Do</SelectItem>
+                            <SelectItem value="in-progress">In Progress</SelectItem>
+                            <SelectItem value="done">Done</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
 
-                            return (
-                              <Card key={status} className="border-l-4 border-l-blue-400">
-                                <CardHeader className="p-3 pb-2">
-                                  <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-semibold">
-                                      {status === "to-do"
-                                        ? "To Do"
-                                        : status === "in-progress"
-                                          ? "In Progress"
-                                          : "Done"}
-                                    </h3>
-                                    <Badge variant="secondary" className="text-xs h-4 px-2">
-                                      {statusTasks.length}
-                                    </Badge>
-                                  </div>
-                                </CardHeader>
-                                <CardContent className="p-3 pt-0">
-                                  <div className="space-y-2">
-                                    {statusTasks.map((task) => (
-                                      <TaskCard
-                                        key={task._id}
-                                        task={task}
-                                        compact={true}
-                                        onClick={() => navigate(`/task/${task._id}`)}
-                                        currentUser={currentUser}
-                                        userRole={userRole}
-                                        onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                        assignableMembers={assignableMembers}
-                                        canAssignVisible={isAdmin || isProjectLead}
-                                        project={project}
-                                      />
-                                    ))}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-4 pb-4">
-                          {/* TO-DO COLUMN */}
+                  <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                      <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                        {/* Show all columns on desktop, only selected status on mobile */}
+                        {(!isMobile || mobileKanbanStatus === "to-do") && (
                           <DroppableColumn
                             id="to-do"
                             title="To Do"
@@ -2588,37 +2739,39 @@ const ProjectDetail = () => {
                                 ))}
                             </SortableContext>
                           </DroppableColumn>
+                        )}
 
-                          {/* IN-PROGRESS COLUMN */}
+                        {(!isMobile || mobileKanbanStatus === "in-progress") && (
                           <DroppableColumn
-                            id="in-progress"
-                            title="In Progress"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-orange-400"
+                          id="in-progress"
+                          title="In Progress"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-orange-400"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "in-progress").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "in-progress").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "in-progress")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "in-progress")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                        )}
 
-                          {/* DONE COLUMN */}
+                        {(!isMobile || mobileKanbanStatus === "done") && (
                           <DroppableColumn
                             id="done"
                             title="Done"
@@ -2646,60 +2799,87 @@ const ProjectDetail = () => {
                                 ))}
                             </SortableContext>
                           </DroppableColumn>
+                        )}
+                      </div>
+
+                      {/* Mobile Progress Bar - Shows after status selection */}
+                      {isMobile && (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-end text-xs text-gray-600 mb-1">
+                            <span>
+                              {kanbanFilteredTasks.filter((t) => t.status === mobileKanbanStatus).length}/{kanbanFilteredTasks.length}
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-1.5 rounded-full",
+                                mobileKanbanStatus === "to-do" && "bg-blue-500",
+                                mobileKanbanStatus === "in-progress" && "bg-orange-400",
+                                mobileKanbanStatus === "done" && "bg-green-500"
+                              )}
+                              style={{
+                                width: `${kanbanFilteredTasks.length > 0 ? Math.round((kanbanFilteredTasks.filter((t) => t.status === mobileKanbanStatus).length / kanbanFilteredTasks.length) * 100) : 0}%`
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
 
-                      <DragOverlay>
-                        {activeTask && (
-                          <TaskCard task={activeTask} compact={true} canAssignVisible={false} />
-                        )}
-                      </DragOverlay>
-                    </DndContext>
-                  </div>
-                )}
-              </TabsContent>
+                    <DragOverlay>
+                      {activeTask && (
+                        <TaskCard task={activeTask} compact={true} canAssignVisible={false} />
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                </div>
+              )}
+            </TabsContent>
 
-              {/* CALENDAR TAB */}
-              <TabsContent value="calendar" className="mt-0">
-                {!canViewKanban ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                      <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
-                      <p className="text-sm text-gray-600">
-                    {currentUser ? "You are not an employee of this project." : "Loading user data..."}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <CalendarViewComponent
-                    tasks={kanbanFilteredTasks.filter((t) => (t as any).approvalStatus !== "approved")}
-                    filters={filters}
-                    updateFilter={updateFilter}
-                    clearFilters={clearFilters}
-                    isMobile={isMobile}
-                    navigate={navigate}
-                    userRole={userRole}
-                    currentUser={currentUser}
-                  />
-                )}
-              </TabsContent>
-              <div className="mt-4">
-                {project && <ProjectApprovalMetrics projectId={project._id} />}
-              </div>
-            </Tabs>
-          </div>
+            {/* CALENDAR TAB */}
+            <TabsContent value="calendar" className="mt-0">
+              {!canViewKanban ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                    <CardTitle className="text-base mb-2">Access Restricted</CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {currentUser ? "You are not an employee of this project." : "Loading user data..."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <CalendarViewComponent
+                  tasks={kanbanFilteredTasks.filter((t) => (t as any).approvalStatus !== "approved")}
+                  filters={filters}
+                  updateFilter={updateFilter}
+                  clearFilters={clearFilters}
+                  isMobile={isMobile}
+                  navigate={navigate}
+                  userRole={userRole}
+                  currentUser={currentUser}
+                  project={project}
+                />
+              )}
+            </TabsContent>
+            <div className="mt-4">
+              {project && <ProjectApprovalMetrics projectId={project._id} />}
+            </div>
+          </Tabs>
+        </div>
       </div>
 
       {/* MOBILE FAB */}
-      {isMobile && canCreateTask && (
-        <Button
-          onClick={() => setShowTaskModal(true)}
-          className="fixed bottom-4 right-4 w-11 h-11 rounded-full shadow-lg z-30 p-0 bg-[#f2761b] hover:bg-[#f2761b]/90"
-        >
-          <Plus className="w-5 h-5" />
-        </Button>
-      )}
+      {
+        isMobile && canCreateTask && (
+          <Button
+            onClick={() => setShowTaskModal(true)}
+            className="fixed bottom-4 right-4 w-11 h-11 rounded-full shadow-lg z-30 p-0 bg-[#f2761b] hover:bg-[#f2761b]/90"
+          >
+            <Plus className="w-5 h-5" />
+          </Button>
+        )
+      }
 
       {/* CREATE TASK MODAL */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
@@ -2765,7 +2945,7 @@ const ProjectDetail = () => {
               </div>
 
               <div className="space-y-1">
-            <Label className="text-sm">Assignee (optional)</Label>
+                <Label className="text-sm">Assignee (optional)</Label>
                 <Select
                   value={newTask.assigneeId}
                   onValueChange={(value: string) => setNewTask({ ...newTask, assigneeId: value })}
@@ -2915,7 +3095,7 @@ const ProjectDetail = () => {
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     </svg>
                   </label>
-                  <input 
+                  <input
                     ref={taskFileInputRef}
                     id="attachments"
                     type="file"
@@ -2926,14 +3106,14 @@ const ProjectDetail = () => {
                       const files = e.target.files;
                       if (files && files.length > 0) {
                         const newFiles = Array.from(files) as File[];
-                        
+
                         // Check total files limit (3 files max)
                         const totalFiles = taskAttachments.length + newFiles.length;
                         if (totalFiles > 3) {
                           toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
                           return;
                         }
-                        
+
                         // Check file sizes (5MB limit)
                         const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
                         const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
@@ -2942,7 +3122,7 @@ const ProjectDetail = () => {
                           toast.error(`${fileNames}: File too large (max 5MB per file)`);
                           return;
                         }
-                        
+
                         // Append new files to existing ones
                         setTaskAttachments(prev => [...prev, ...newFiles]);
                       }
@@ -2953,8 +3133,8 @@ const ProjectDetail = () => {
                   <div className="space-y-[6px] mt-[8px]">
                     <div className="flex justify-between items-center mb-[4px]">
                       <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => {
                           setTaskAttachments([]);
                           if (taskFileInputRef.current) {
@@ -2970,8 +3150,8 @@ const ProjectDetail = () => {
                       <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
                         <span className="flex-1 truncate">{file.name}</span>
                         <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => removeTaskAttachment(index)}
                           className="text-[#cd2818] hover:text-[#a01f10]"
                         >
@@ -3039,7 +3219,7 @@ const ProjectDetail = () => {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 

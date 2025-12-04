@@ -278,7 +278,7 @@ const ResponsiveDashboardContent = () => {
           />
 
           {/* Sliding Sidebar */}
-          <div className="fixed inset-y-0 left-0 w-[224px] bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden">
+          <div className="fixed inset-y-0 left-0 w-64 bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden">
             {/* Commented out as per user request */}
             {/* <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
