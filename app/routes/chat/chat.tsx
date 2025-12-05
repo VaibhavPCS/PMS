@@ -100,7 +100,14 @@ const Chat: React.FC = () => {
     const handleNewMessageEvent = (event: CustomEvent) => {
       const { message, chatId } = event.detail;
       if (activeChat && chatId === activeChat._id) {
-        setMessages(prev => [...prev, message]);
+        // Check for duplicates before adding
+        setMessages(prev => {
+          const messageExists = prev.some(m => m._id === message._id);
+          if (messageExists) {
+            return prev;
+          }
+          return [...prev, message];
+        });
       }
     };
 
@@ -177,8 +184,17 @@ const Chat: React.FC = () => {
       console.log('Current active chat:', currentActiveChat?._id, 'Message chat:', message.chat);
 
       if (currentActiveChat && message.chat === currentActiveChat._id) {
-        console.log('Adding message to current chat');
-        setMessages(prev => [...prev, message]);
+        // Check if message already exists to prevent duplicates
+        // This can happen when the sender's own message is broadcast back to them
+        setMessages(prev => {
+          const messageExists = prev.some(m => m._id === message._id);
+          if (messageExists) {
+            console.log('Message already exists, skipping duplicate:', message._id);
+            return prev;
+          }
+          console.log('Adding message to current chat');
+          return [...prev, message];
+        });
       }
       // Update chat list with new last message
       setChats(prev => prev.map(chat =>
@@ -329,8 +345,16 @@ const Chat: React.FC = () => {
         }
 
         // Immediately add the sent message to state for instant feedback
+        // Check for duplicates in case socket already delivered it
         if (sentMessage) {
-          setMessages(prev => [...prev, sentMessage]);
+          setMessages(prev => {
+            const messageExists = prev.some(m => m._id === sentMessage._id);
+            if (messageExists) {
+              console.log('Sent message already exists via socket, skipping:', sentMessage._id);
+              return prev;
+            }
+            return [...prev, sentMessage];
+          });
         }
 
       } catch (error) {
