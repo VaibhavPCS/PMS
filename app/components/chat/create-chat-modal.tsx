@@ -145,11 +145,15 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
       setLoading(true);
       const participants = selectedUsers.map(u => u._id).filter(id => id !== currentUserId);
 
-      const chatData = {
+      const chatData: any = {
         type: chatType,
         participants,
-        name: chatType === 'group' ? chatName.trim() : (selectedUsers[0]?.name || 'Direct Chat')
       };
+
+      // Only set name for group chats - direct chats should compute name dynamically
+      if (chatType === 'group') {
+        chatData.name = chatName.trim();
+      }
 
       await postData('/chats', chatData);
 
@@ -322,8 +326,8 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
                         hasExistingChat
                           ? 'opacity-50 cursor-not-allowed bg-[#f9fafb]'
                           : isSelected
-                          ? 'bg-[#eff6ff] border border-[#4a8cd7] cursor-pointer'
-                          : 'hover:bg-[#f9fafb] cursor-pointer'
+                            ? 'bg-[#eff6ff] border border-[#4a8cd7] cursor-pointer'
+                            : 'hover:bg-[#f9fafb] cursor-pointer'
                       )}
                     >
                       <Avatar className="w-[32px] h-[32px] shrink-0">
@@ -350,7 +354,7 @@ const CreateChatModal: React.FC<CreateChatModalProps> = ({
                       {isSelected && (
                         <div className="w-[18px] h-[18px] bg-[#4a8cd7] rounded-full flex items-center justify-center shrink-0">
                           <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                            <path d="M1 5L4.5 8.5L11 1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M1 5L4.5 8.5L11 1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </div>
                       )}
