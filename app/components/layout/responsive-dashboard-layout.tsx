@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
 import { BadgeProvider, useBadges } from '../../provider/badge-context';
@@ -54,19 +54,69 @@ const ResponsiveDashboardContent = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const { badgeCounts, refreshBadgeCounts } = useBadges();
   const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const isConnectingRef = useRef(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchUserInfo();
-      fetchNotifications();
-      const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-        auth: {
-          token: localStorage.getItem('token')
+    if (!isAuthenticated) {
+      // Cleanup when not authenticated
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+      }
+      isConnectingRef.current = false;
+      return;
+    }
+
+    // Already connected or connecting
+    if (socketRef.current || isConnectingRef.current) {
+      return;
+    }
+
+    fetchUserInfo();
+    fetchNotifications();
+
+    let retryCount = 0;
+    const maxRetries = 5;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    // Initialize socket connection with retry logic for token availability
+    const initSocket = () => {
+      const token = localStorage.getItem('token');
+
+      // If no token yet, retry with exponential backoff (up to maxRetries)
+      if (!token) {
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          // Retry after increasing delay: 200ms, 400ms, 800ms, 1600ms, 3200ms
+          timeoutId = setTimeout(initSocket, 200 * Math.pow(2, retryCount - 1));
         }
+        // Don't log warning - this is expected during React Strict Mode double-invoke
+        return;
+      }
+
+      isConnectingRef.current = true;
+
+      const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+        auth: { token },
+        transports: ['websocket'],
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        autoConnect: false, // We'll connect manually after setup
       });
 
       newSocket.on('connect', () => {
-        // Connected
+        isConnectingRef.current = false;
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.warn('Dashboard: Socket connection error:', error.message);
+        isConnectingRef.current = false;
+        // If auth error, don't keep retrying
+        if (error.message.includes('Authentication')) {
+          newSocket.disconnect();
+        }
       });
 
       newSocket.on('notification', (notification: Notification) => {
@@ -74,15 +124,28 @@ const ResponsiveDashboardContent = () => {
         refreshBadgeCounts();
         try {
           toast.success(notification.title || 'New notification');
-        } catch {}
+        } catch { }
       });
 
+      socketRef.current = newSocket;
       setSocket(newSocket);
-      return () => {
-        newSocket.disconnect();
+
+      // Now connect
+      newSocket.connect();
+    };
+
+    // Start with a small initial delay
+    timeoutId = setTimeout(initSocket, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
         setSocket(null);
-      };
-    }
+      }
+      isConnectingRef.current = false;
+    };
   }, [isAuthenticated]);
 
   const fetchUserInfo = async () => {
@@ -228,7 +291,7 @@ const ResponsiveDashboardContent = () => {
 
           try {
             localStorage.setItem('currentWorkspaceId', data.workspaceId);
-          } catch {}
+          } catch { }
           try {
             await postData('/workspace/switch', { workspaceId: data.workspaceId });
           } catch (err) {
@@ -472,11 +535,10 @@ const ResponsiveDashboardContent = () => {
                   {notifications.map((notification) => (
                     <div
                       key={notification._id}
-                      className={`p-3 rounded-lg cursor-pointer transition-colors border ${
-                        !notification.isRead
-                          ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors border ${!notification.isRead
+                        ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
+                        : 'border-gray-200 hover:bg-gray-50'
+                        }`}
                       onClick={() => handleNotificationClick(notification)}
                     >
                       <div className="flex items-start space-x-3">

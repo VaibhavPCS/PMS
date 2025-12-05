@@ -33,7 +33,12 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
     const fetchUserInfo = async () => {
         try {
             const response = await fetchData('/auth/me');
-            setUser(response.user);
+            // Normalize the user object to ensure _id exists (backend might return id instead of _id)
+            const normalizedUser = {
+                ...response.user,
+                _id: response.user._id || response.user.id
+            };
+            setUser(normalizedUser);
             setIsAuthenticated(true);
             setError(null);
         } catch (err: any) {

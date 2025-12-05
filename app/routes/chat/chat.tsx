@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../provider/auth-context';
 import { fetchData, postData, postMultipart } from '@/lib/fetch-util';
-import ChatSidebar from '../../components/chat/chat-sidebar';
+import ChatSidebarNew from '../../components/chat/chat-sidebar-new';
 import ChatWindow from '../../components/chat/chat-window';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ interface Chat {
     role: 'admin' | 'member';
     joinedAt: string;
   }>;
-  workspace: {
+  workspace?: {
     _id: string;
     name: string;
   };
@@ -58,6 +58,7 @@ interface Message {
   };
   attachments: Array<{
     fileName: string;
+    originalName?: string;
     fileUrl: string;
     fileType: 'image' | 'document';
     fileSize: number;
@@ -84,18 +85,154 @@ const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const isConnectingRef = useRef(false);
+  const activeChatRef = useRef<Chat | null>(null);
+  const pendingChatJoinRef = useRef<string | null>(null);
 
+  // Keep activeChatRef in sync with activeChat state
   useEffect(() => {
-    console.log('Current user:', user);
-    if (user) {
-      initializeSocket();
-      fetchChats();
-    }
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
+  // Listen for custom new-message events from chat window
+  useEffect(() => {
+    const handleNewMessageEvent = (event: CustomEvent) => {
+      const { message, chatId } = event.detail;
+      if (activeChat && chatId === activeChat._id) {
+        setMessages(prev => [...prev, message]);
+      }
+    };
+
+    window.addEventListener('chat:new-message', handleNewMessageEvent as EventListener);
 
     return () => {
-      if (socket) {
-        socket.disconnect();
+      window.removeEventListener('chat:new-message', handleNewMessageEvent as EventListener);
+    };
+  }, [activeChat]);
+
+  useEffect(() => {
+    if (!user) {
+      // Cleanup when no user
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
       }
+      isConnectingRef.current = false;
+      return;
+    }
+
+    // Already connected or connecting
+    if (socketRef.current || isConnectingRef.current) {
+      return;
+    }
+
+    fetchChats();
+
+    // Initialize socket when user is available (authenticated via HTTP-only cookie)
+    if (!user) {
+      console.log('🔄 No user yet, waiting for authentication...');
+      return;
+    }
+
+    console.log('🔌 Initializing socket connection for user:', user.name);
+    isConnectingRef.current = true;
+
+    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+      withCredentials: true, // Send HTTP-only cookies
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 500,
+      timeout: 10000,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket connected successfully!', newSocket.id);
+      isConnectingRef.current = false;
+
+      // Join pending chat room if any
+      if (pendingChatJoinRef.current) {
+        console.log('📤 Joining pending chat:', pendingChatJoinRef.current);
+        newSocket.emit('join-chat', pendingChatJoinRef.current);
+        pendingChatJoinRef.current = null;
+      }
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error.message);
+      isConnectingRef.current = false;
+      // If auth error, don't keep retrying
+      if (error.message.includes('Authentication')) {
+        console.error('Authentication failed - disconnecting socket');
+        newSocket.disconnect();
+      }
+    });
+
+    newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
+      console.log('Socket: new-message received', data);
+      const { message } = data;
+      // Use ref to get the latest activeChat value
+      const currentActiveChat = activeChatRef.current;
+      console.log('Current active chat:', currentActiveChat?._id, 'Message chat:', message.chat);
+
+      if (currentActiveChat && message.chat === currentActiveChat._id) {
+        console.log('Adding message to current chat');
+        setMessages(prev => [...prev, message]);
+      }
+      // Update chat list with new last message
+      setChats(prev => prev.map(chat =>
+        chat._id === message.chat
+          ? {
+            ...chat, lastMessage: {
+              _id: message._id,
+              content: message.content,
+              sender: message.sender,
+              createdAt: message.createdAt
+            }
+          }
+          : chat
+      ));
+    });
+
+    newSocket.on('joined-chat', (data: { chatId: string }) => {
+      console.log('✅ Successfully joined chat room:', data.chatId);
+    });
+
+    newSocket.on('message-updated', (updatedMessage: Message) => {
+      // Use ref to get the latest activeChat value
+      const currentActiveChat = activeChatRef.current;
+      if (currentActiveChat && updatedMessage.chat === currentActiveChat._id) {
+        setMessages(prev => prev.map(msg =>
+          msg._id === updatedMessage._id ? updatedMessage : msg
+        ));
+      }
+    });
+
+    newSocket.on('chat-updated', (payload: any) => {
+      if (payload.updateType === 'created') {
+        setChats(prev => [payload.data, ...prev]);
+      } else if (payload.updateType === 'participant-added') {
+        setChats(prev => prev.map(chat =>
+          chat._id === payload.chatId ? payload.data : chat
+        ));
+      }
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socketRef.current = newSocket;
+    setSocket(newSocket);
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+      }
+      isConnectingRef.current = false;
     };
   }, [user]);
 
@@ -110,7 +247,7 @@ const Chat: React.FC = () => {
 
     // Listen for storage events (when workspace changes in other tabs/components)
     window.addEventListener('storage', handleWorkspaceChange);
-    
+
     // Also listen for custom workspace change events
     window.addEventListener('workspaceChanged', handleWorkspaceChange);
 
@@ -120,77 +257,17 @@ const Chat: React.FC = () => {
     };
   }, []);
 
-  const initializeSocket = () => {
-    // const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-    //   auth: {
-    //     token: localStorage.getItem('token')
-    //   }
-    // });
-
-    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      auth: {
-        token: localStorage.getItem('token')
-      }
-    });
-
-    newSocket.on('connect', () => {
-      console.log('Connected to Socket.IO server');
-    });
-
-    newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
-      const { message } = data;
-      if (activeChat && message.chat === activeChat._id) {
-        setMessages(prev => [...prev, message]);
-      }
-      // Update chat list with new last message
-      setChats(prev => prev.map(chat => 
-        chat._id === message.chat 
-          ? { ...chat, lastMessage: {
-              _id: message._id,
-              content: message.content,
-              sender: message.sender,
-              createdAt: message.createdAt
-            }}
-          : chat
-      ));
-    });
-
-    newSocket.on('message-updated', (updatedMessage: Message) => {
-      if (activeChat && updatedMessage.chat === activeChat._id) {
-        setMessages(prev => prev.map(msg => 
-          msg._id === updatedMessage._id ? updatedMessage : msg
-        ));
-      }
-    });
-
-    newSocket.on('chat-updated', (payload: any) => {
-      if (payload.updateType === 'created') {
-        setChats(prev => [payload.data, ...prev]);
-      } else if (payload.updateType === 'participant-added') {
-        setChats(prev => prev.map(chat => 
-          chat._id === payload.chatId ? payload.data : chat
-        ));
-      }
-    });
-
-    setSocket(newSocket);
-  };
-
   const fetchChats = async () => {
     try {
       setLoading(true);
-      const currentWorkspaceId = localStorage.getItem('currentWorkspaceId');
-      console.log('Current workspace ID from localStorage:', currentWorkspaceId);
-      if (!currentWorkspaceId) {
-        console.error('No workspace ID found');
-        return;
-      }
-      const response = await fetchData(`/chats/workspace/${currentWorkspaceId}`);
+      // Use organization-based endpoint instead of workspace
+      const response = await fetchData('/chats/organization');
       console.log('Chat API response:', response);
       console.log('Chats data:', response.chats || response.data || []);
       setChats(response.chats || response.data || []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
+      toast.error('Failed to load chats');
     } finally {
       setLoading(false);
     }
@@ -208,10 +285,16 @@ const Chat: React.FC = () => {
   const handleChatSelect = (chat: Chat) => {
     setActiveChat(chat);
     fetchMessages(chat._id);
-    
+
     // Join chat room for real-time updates
-    if (socket) {
-      socket.emit('joinChat', chat._id);
+    const currentSocket = socketRef.current;
+    if (currentSocket && currentSocket.connected) {
+      console.log('📤 Emitting join-chat event for chat:', chat._id);
+      currentSocket.emit('join-chat', chat._id);
+    } else {
+      // Socket not ready yet, store pending join
+      console.log('🔄 Socket not ready, queueing chat join for:', chat._id);
+      pendingChatJoinRef.current = chat._id;
     }
   };
 
@@ -223,6 +306,8 @@ const Chat: React.FC = () => {
           replyTo: replyTo || undefined
         };
 
+        let sentMessage: any;
+
         // If there are attachments, create FormData
         if (attachments && attachments.length > 0) {
           const formData = new FormData();
@@ -233,19 +318,21 @@ const Chat: React.FC = () => {
           attachments.forEach(file => {
             formData.append('attachments', file);
           });
-          
+
           // Send message with attachments via REST API
           const response = await postMultipart(`/messages/chat/${activeChat._id}`, formData);
-          messageData = response.data;
+          sentMessage = response.data;
         } else {
           // Send text-only message via REST API
           const response = await postData(`/messages/chat/${activeChat._id}`, messageData);
-          messageData = response.data;
+          sentMessage = response.data;
         }
 
-        // The message will be received via socket broadcast
-        // No need to manually update the messages state here
-        
+        // Immediately add the sent message to state for instant feedback
+        if (sentMessage) {
+          setMessages(prev => [...prev, sentMessage]);
+        }
+
       } catch (error) {
         console.error('Failed to send message:', error);
         toast.error('Failed to send message. Please try again.');
@@ -266,8 +353,8 @@ const Chat: React.FC = () => {
 
   return (
     <div className="w-full h-full flex bg-white flex-col md:flex-row overflow-hidden">
-      <div className={`w-full md:w-[300px] md:border-r border-gray-200 flex flex-col h-full ${activeChat ? 'hidden md:flex' : ''}`}>
-        <ChatSidebar
+      <div className={`w-full md:w-[280px] md:border-r border-gray-200 flex flex-col h-full ${activeChat ? 'hidden md:flex' : ''}`}>
+        <ChatSidebarNew
           chats={chats}
           activeChat={activeChat}
           onChatSelect={handleChatSelect}

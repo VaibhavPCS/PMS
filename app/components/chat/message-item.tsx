@@ -1,18 +1,10 @@
 import React, { useState } from "react";
-import {
-  MoreHorizontal,
-  Reply,
-  Edit,
-  Trash2,
-  Heart,
-  ThumbsUp,
-  Smile,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Reply } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { Socket } from "socket.io-client";
 import FilePreview from "@/components/ui/file-preview";
+import { cn } from "@/lib/utils";
 
 interface Message {
   _id: string;
@@ -34,6 +26,7 @@ interface Message {
   };
   attachments: Array<{
     fileName: string;
+    originalName?: string;
     fileUrl: string;
     fileType: "image" | "document";
     fileSize: number;
@@ -76,262 +69,189 @@ const MessageItem: React.FC<MessageItemProps> = ({
   socket,
 }) => {
   const [showActions, setShowActions] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(message.content);
 
-  const senderId = typeof (message as any).sender === 'string' 
-    ? (message as any).sender 
+  const senderId = typeof (message as any).sender === 'string'
+    ? (message as any).sender
     : (message as any).sender?._id;
   const isOwnMessage = String(senderId || '') === String(currentUser?._id || '');
 
-  const handleReaction = (emoji: string) => {
-    if (socket) {
-      const existingReaction = message.reactions.find(
-        (r) => r.user === currentUser._id && r.emoji === emoji
-      );
-
-      if (existingReaction) {
-        socket.emit("removeReaction", {
-          messageId: message._id,
-          emoji,
-        });
-      } else {
-        socket.emit("addReaction", {
-          messageId: message._id,
-          emoji,
-        });
-      }
-    }
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
-  const handleEdit = () => {
-    if (socket && editContent.trim() !== message.content) {
-      socket.emit("editMessage", {
-        messageId: message._id,
-        content: editContent.trim(),
+  const formatTimeStamp = (date: string) => {
+    const messageDate = new Date(date);
+    const now = new Date();
+    const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return formatDistanceToNow(messageDate, { addSuffix: true });
+    } else {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
-    }
-    setIsEditing(false);
-  };
-
-  const handleDelete = () => {
-    if (
-      socket &&
-      window.confirm("Are you sure you want to delete this message?")
-    ) {
-      socket.emit("deleteMessage", {
-        messageId: message._id,
-      });
+      return formatter.format(messageDate);
     }
   };
 
-  const getReactionCounts = () => {
-    const counts: { [emoji: string]: { count: number; users: string[] } } = {};
-    message.reactions.forEach((reaction) => {
-      if (!counts[reaction.emoji]) {
-        counts[reaction.emoji] = { count: 0, users: [] };
-      }
-      counts[reaction.emoji].count++;
-      counts[reaction.emoji].users.push(reaction.user);
-    });
-    return counts;
-  };
-
-  const reactionCounts = getReactionCounts();
   const shouldHideMessageBubble = (message.attachments && message.attachments.length > 0) && (
     (message.content || '').trim().toLowerCase() === 'file attachment' || (message.content || '').trim() === ''
   );
 
   return (
     <div
-      className={`group flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
+      className="w-full"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <div
-        className={`flex max-w-[92%] sm:max-w-[85%] md:max-w-[75%] xl:max-w-[65%] ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
-      >
-        {/* Avatar */}
-        {showAvatar && !isOwnMessage && (
-          <Avatar className="w-7 h-7 sm:w-8 sm:h-8 mr-2 flex-shrink-0">
-            {message.sender.profilePicture ? (
-              <img
-                src={message.sender.profilePicture}
-                alt={message.sender.name}
-              />
-            ) : null}
-            <AvatarFallback>{message.sender.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-        )}
-
-        {!showAvatar && !isOwnMessage && (
-          <div className="w-7 sm:w-8 mr-2 flex-shrink-0" />
-        )}
-
-        {/* Message Content */}
-        <div
-          className={`flex flex-col ${isOwnMessage ? "items-end" : "items-start"}`}
-        >
-          {/* Sender Name and Time */}
-          {showAvatar && (
-            <div
-              className={`flex items-center space-x-2 mb-1 ${isOwnMessage ? "flex-row-reverse space-x-reverse" : ""}`}
-            >
-              <span className="text-sm font-medium text-gray-900">
-                {isOwnMessage ? "You" : message.sender.name}
-              </span>
-              <span className="text-xs text-gray-500">
-                {formatDistanceToNow(new Date(message.createdAt), {
-                  addSuffix: true,
-                })}
-              </span>
-              {message.isEdited && (
-                <span className="text-xs text-gray-400">(edited)</span>
+      {/* Header Row - Name and Time */}
+      <div className={cn(
+        "flex items-center mb-[8px] sm:mb-[10px]",
+        isOwnMessage ? "justify-end" : "justify-between"
+      )}>
+        {/* Left Side - Sender Info */}
+        {!isOwnMessage && (
+          <div className="flex items-center gap-[10px] sm:gap-[15px]">
+            <div className="flex items-center gap-[6px] sm:gap-[8px]">
+              {showAvatar && (
+                <Avatar className="w-[24px] h-[24px] sm:w-[28px] sm:h-[28px] rounded-[20px] shrink-0">
+                  {message.sender.profilePicture ? (
+                    <img
+                      src={message.sender.profilePicture}
+                      alt={message.sender.name}
+                      className="rounded-[20px] object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-b from-[#344bfd] to-[#4a8cd7] text-white text-[11px] sm:text-[13px] font-medium rounded-[20px]">
+                    {getInitials(message.sender.name)}
+                  </AvatarFallback>
+                </Avatar>
               )}
+              {!showAvatar && <div className="w-[24px] sm:w-[28px]" />}
+              <p className="font-['Inter'] font-normal text-[13px] sm:text-[14px] text-black leading-normal">
+                {message.sender.name}
+              </p>
             </div>
-          )}
+            <div className="flex items-center gap-[5px]">
+              <div className="w-[4px] sm:w-[5px] h-[4px] sm:h-[5px] rounded-full bg-gray-400"></div>
+              <p className="font-['Inter'] font-normal text-[11px] sm:text-[12px] text-[#717182] leading-normal whitespace-nowrap">
+                {formatTimeStamp(message.createdAt)}
+              </p>
+            </div>
+          </div>
+        )}
 
+        {/* Right Side - Own Messages */}
+        {isOwnMessage && (
+          <div className="flex items-center gap-[10px] sm:gap-[15px]">
+            <div className="flex items-center gap-[5px]">
+              <p className="font-['Inter'] font-normal text-[11px] sm:text-[12px] text-[#717182] leading-normal whitespace-nowrap">
+                {formatTimeStamp(message.createdAt)}
+              </p>
+              <div className="w-[4px] sm:w-[5px] h-[4px] sm:h-[5px] rounded-full bg-gray-400"></div>
+            </div>
+            <div className="flex items-center gap-[6px] sm:gap-[8px]">
+              <p className="font-['Inter'] font-normal text-[13px] sm:text-[14px] text-black leading-normal">
+                You
+              </p>
+              {showAvatar && (
+                <Avatar className="w-[24px] h-[24px] sm:w-[28px] sm:h-[28px] rounded-[20px] shrink-0">
+                  {message.sender.profilePicture ? (
+                    <img
+                      src={message.sender.profilePicture}
+                      alt="You"
+                      className="rounded-[20px] object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-b from-[#344bfd] to-[#4a8cd7] text-white text-[11px] sm:text-[13px] font-medium rounded-[20px]">
+                    {getInitials(currentUser.name)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {!showAvatar && <div className="w-[24px] sm:w-[28px]" />}
+            </div>
+          </div>
+        )}
+
+        {/* Reply Button */}
+        {showActions && !isOwnMessage && (
+          <button
+            onClick={() => onReply(message)}
+            className="bg-[#d4c5ff] flex items-center gap-[5px] px-[8px] py-[4px] rounded-[8px] shrink-0 hover:bg-[#c5b3f0] transition-colors"
+          >
+            <Reply className="w-[14px] sm:w-[16px] h-[14px] sm:h-[16px] text-neutral-700" />
+            <span className="font-['Inter'] font-normal text-[11px] sm:text-[12px] text-neutral-700 leading-normal hidden sm:inline">
+              Reply
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* Message Content Row */}
+      <div className={cn(
+       "flex items-center w-full",
+        isOwnMessage ? "justify-end pr-[0px] sm:pr-[35px]" : "justify-start pl-[0px] sm:pl-[35px]"
+      )}>
+        <div className={cn(
+          "max-w-[350px] w-auto",
+          !shouldHideMessageBubble && (
+            isOwnMessage
+              ? "bg-[#DCF8C6] rounded-bl-[8px] rounded-br-[8px] rounded-tl-[8px] px-[10px] py-[8px] sm:px-[12px] sm:py-[10px]"
+              : "bg-[#f1f2f7] rounded-bl-[8px] rounded-br-[8px] rounded-tr-[8px] px-[10px] py-[8px] sm:px-[12px] sm:py-[10px]"
+          )
+        )}>
           {/* Reply To */}
           {message.replyTo && (
-            <div
-              className={`mb-2 p-2 rounded-2xl border-l-4 text-sm ${
-                isOwnMessage 
-                  ? "bg-[#e6f7d9] border-[#b8e7a4]" 
-                  : "bg-[#f7f7f7] border-[#e0e0e0]"
-              }`}
-            >
-              <p className="text-xs text-gray-600 font-medium">
+            <div className="mb-[8px] p-[8px] rounded-[6px] border-l-[3px] bg-white/50 border-[#4a8cd7]">
+              <p className="text-[10px] sm:text-[11px] text-[#717182] font-['Inter'] font-medium">
                 {message.replyTo.sender.name}
               </p>
-              <p className="text-gray-700">{message.replyTo.content}</p>
+              <p className="text-[11px] sm:text-[12px] text-neutral-700 font-['Inter'] mt-[2px] line-clamp-2">
+                {message.replyTo.content}
+              </p>
             </div>
           )}
 
-          {/* Message Bubble */}
-          <div className="relative">
+          {/* Message Content */}
+          {!shouldHideMessageBubble && (
             <div
-              className={`px-3 md:px-4 py-2 rounded-2xl ${
-                isOwnMessage
-                  ? "bg-[#dcf8c6] text-gray-900"
-                  : "bg-[#f5f5f5] text-gray-900"
-              } ${shouldHideMessageBubble ? 'hidden' : ''}`}
-            >
-              {isEditing ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full p-2 border rounded resize-none text-gray-900"
-                    rows={2}
-                    autoFocus
-                  />
-                  <div className="flex space-x-2">
-                    <Button size="sm" onClick={handleEdit}>
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsEditing(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              )}
-            </div>
+              className="font-['Inter'] font-normal text-[13px] sm:text-[14px] text-neutral-700 leading-[1.5] break-words message-content"
+              dangerouslySetInnerHTML={{ __html: message.content }}
+            />
+          )}
 
-            {/* Action Buttons */}
-            {showActions && !isEditing && (
-              <div
-                className={`absolute top-0 ${isOwnMessage ? "left-0 -translate-x-full" : "right-0 translate-x-full"} flex items-center space-x-1 bg-white border rounded-lg shadow-lg p-1`}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReaction("👍")}
-                  className="h-6 w-6 p-0"
-                >
-                  <ThumbsUp className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReaction("❤️")}
-                  className="h-6 w-6 p-0"
-                >
-                  <Heart className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onReply(message)}
-                  className="h-6 w-6 p-0"
-                >
-                  <Reply className="w-3 h-3" />
-                </Button>
-                {isOwnMessage && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsEditing(true)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDelete}
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
+          {/* Attachments */}
           {message.attachments.length > 0 && (
-            <FilePreview attachments={message.attachments} />
-          )}
-
-          {/* Reactions */}
-          {Object.keys(reactionCounts).length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {Object.entries(reactionCounts).map(([emoji, data]) => {
-                const hasReacted = data.users.includes(currentUser._id);
-                return (
-                  <button
-                    key={emoji}
-                    onClick={() => handleReaction(emoji)}
-                    className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs border ${
-                      hasReacted
-                        ? "bg-blue-100 border-blue-300 text-blue-700"
-                        : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    <span>{data.count}</span>
-                  </button>
-                );
-              })}
+            <div className={!shouldHideMessageBubble ? "mt-[10px]" : ""}>
+              <FilePreview attachments={message.attachments} />
             </div>
           )}
 
-          {/* Read Status */}
-          {isOwnMessage && message.readBy.length > 0 && (
-            <div className="text-xs text-gray-400 mt-1">
-              Read by {message.readBy.length}{" "}
-              {message.readBy.length === 1 ? "person" : "people"}
-            </div>
+          {/* Edited Indicator */}
+          {message.isEdited && !shouldHideMessageBubble && (
+            <p className="text-[10px] sm:text-[11px] text-gray-400 font-['Inter'] mt-[4px] italic">
+              (edited)
+            </p>
           )}
         </div>
       </div>
+
+      {/* Read Status */}
+      {isOwnMessage && message.readBy.length > 0 && (
+        <div className="flex justify-end mt-[4px] pr-[0px] sm:pr-[35px]">
+          <p className="text-[10px] sm:text-[11px] text-gray-400 font-['Inter']">
+            Read by {message.readBy.length}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

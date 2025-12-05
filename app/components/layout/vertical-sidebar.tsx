@@ -31,11 +31,11 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: "/assets/analytics-icon.svg", // ✅ Icon path
   },
-  // {
-  //   name: "Chat",
-  //   href: "/chat",
-  //   icon: "/assets/chat.svg", // ✅ Icon path
-  // },
+  {
+    name: "Chat",
+    href: "/chat",
+    icon: "/assets/chat.svg", // ✅ Icon path
+  },
   {
     name: "Administration",
     href: "/administration",

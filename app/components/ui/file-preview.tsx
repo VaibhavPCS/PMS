@@ -6,6 +6,7 @@ import { buildBackendUrl } from '@/lib/config';
 
 interface Attachment {
   fileName: string;
+  originalName?: string;  // Original file name as uploaded by user
   fileUrl: string;
   fileType: 'image' | 'document';
   fileSize: number;
@@ -18,10 +19,10 @@ interface FilePreviewProps {
   onDelete?: (index: number) => void;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({ 
-  attachments, 
-  canDelete = false, 
-  onDelete 
+const FilePreview: React.FC<FilePreviewProps> = ({
+  attachments,
+  canDelete = false,
+  onDelete
 }) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -56,32 +57,32 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
       // Get the file as a blob
       const blob = await response.blob();
-      
+
       // Create a blob URL with the correct MIME type for forced download
-      const blobUrl = URL.createObjectURL(new Blob([blob], { 
+      const blobUrl = URL.createObjectURL(new Blob([blob], {
         type: 'application/octet-stream' // Force download by using generic binary type
       }));
 
       // Create and trigger download link
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = attachment.fileName;
+      link.download = attachment.originalName || attachment.fileName;
       link.style.display = 'none';
-      
+
       // Add to DOM, click, and cleanup
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up the blob URL to free memory
       setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      
+
     } catch (error) {
       console.error('Download failed:', error);
       // Fallback to the original method if fetch fails
       const link = document.createElement('a');
       link.href = buildBackendUrl(attachment.fileUrl);
-      link.download = attachment.fileName;
+      link.download = attachment.originalName || attachment.fileName;
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener noreferrer');
       document.body.appendChild(link);
@@ -103,16 +104,17 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         <div key={index} className="relative">
           {attachment.fileType === 'image' ? (
             // Image Preview
-            <div className="relative max-w-xs">
+            <div className="relative max-w-xs group">
               <img
                 src={buildBackendUrl(attachment.fileUrl)}
-                alt={attachment.fileName}
+                alt={attachment.originalName || attachment.fileName}
                 className="rounded-lg max-h-48 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => setPreviewImage(buildBackendUrl(attachment.fileUrl))}
               />
-              {/* <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                {attachment.fileName}
-              </div> */}
+              {/* Show original file name on hover */}
+              <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                {attachment.originalName || attachment.fileName}
+              </div>
               {canDelete && onDelete && (
                 <Button
                   size="sm"
@@ -134,7 +136,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
                 <File className="w-6 h-6 text-gray-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-normal text-gray-900 truncate">
-                    {attachment.fileName}
+                    {attachment.originalName || attachment.fileName}
                   </div>
                   <div className="text-xs font-normal text-gray-500">
                     {formatFileSize(attachment.fileSize)}

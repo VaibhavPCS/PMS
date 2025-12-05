@@ -269,3 +269,62 @@ body {
 
 /* Date Picker Size Reduction and Scrollbar Overrides */
 @import "./styles/date-picker-overrides.css";
+
+/* Chat Sidebar Scrollbar */
+.chat-sidebar-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.chat-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #cccccc;
+  border-radius: 2px;
+}
+
+/* TipTap Rich Text Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #a1a1a1;
+  float: left;
+  pointer-events: none;
+  height: 0;
+}
+
+/* TipTap formatting styles */
+.ProseMirror strong {
+  font-weight: 600;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+}
+
+/* Message content HTML formatting */
+.message-content strong {
+  font-weight: 600;
+}
+
+.message-content em {
+  font-style: italic;
+}
+
+.message-content u {
+  text-decoration: underline;
+}
+
+.message-content p {
+  margin: 0;
+}
