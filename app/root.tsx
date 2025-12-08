@@ -18,7 +18,7 @@ export const links = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
-    href: "https://fonts.gstatic.com",
+    href: "https://fonts.gstatic.com",     
     crossOrigin: "anonymous",
   },
   {
@@ -95,4 +95,5 @@ export function ErrorBoundary({ error }: { error: Error }) {
       )}
     </main>
   );
+  // TODO: Add a link to the help center
 }
