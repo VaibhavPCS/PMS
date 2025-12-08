@@ -177,6 +177,21 @@ interface Task {
     newEndDate?: string;
   }>;
   currentlyOnHold?: boolean;
+  referenceLinks?: string[];
+  isRecurring?: boolean;
+  recurringFrequency?: "daily" | "weekly" | "monthly";
+  recurringEndDate?: string;
+  lastCompletedDate?: string;
+  nextDueDate?: string;
+  recurringCompletionHistory?: Array<{
+    completedAt: string;
+    completedBy: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    status: "completed" | "skipped";
+  }>;
 }
 
 interface Comment {
@@ -1524,11 +1539,12 @@ const TaskDetail = () => {
       return;
     }
 
-    // ✅ NEW: Validate rejection attachments based on task requirements
+    // ✅ MODIFIED: Make rejection attachments optional (default to 'either')
     const attachmentType = task?.rejectionAttachmentType || 'either';
     const hasFile = rejectionFiles.length > 0;
     const hasLink = rejectionLink.trim();
 
+    // Only validate if task explicitly requires attachments
     if (attachmentType === 'file' && !hasFile) {
       toast.error("File attachment is required for rejection");
       return;
@@ -1537,10 +1553,7 @@ const TaskDetail = () => {
       toast.error("Link is required for rejection (Figma/GitHub)");
       return;
     }
-    if (attachmentType === 'either' && !hasFile && !hasLink) {
-      toast.error("At least a file or a link is required for rejection");
-      return;
-    }
+    // For 'either' type, attachments are now optional - users can add both/none
     // Both file and link can be provided together
 
     // ✅ NEW: Validate link format if provided
@@ -2097,6 +2110,64 @@ const TaskDetail = () => {
                       <p className="text-sm text-neutral-700 font-normal">{task.durationDays ? `${task.durationDays} Day${task.durationDays > 1 ? 's' : ''}` : 'N/A'}</p>
                     </div>
 
+                    {/* ✅ NEW: Recurring Task Information */}
+                    {task.isRecurring && (
+                      <div className="border border-blue-200 rounded-[8px] p-3 bg-blue-50/50 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                            <path d="M21 3v5h-5"/>
+                          </svg>
+                          <p className="text-sm font-semibold text-blue-900">Recurring Task</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="text-blue-700 font-medium">Frequency</p>
+                            <p className="text-blue-900 capitalize">{task.recurringFrequency}</p>
+                          </div>
+                          <div>
+                            <p className="text-blue-700 font-medium">Next Due</p>
+                            <p className="text-blue-900">
+                              {task.nextDueDate ? formatDate(task.nextDueDate) : 'No more occurrences'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-blue-700 font-medium">Last Completed</p>
+                            <p className="text-blue-900">
+                              {task.lastCompletedDate ? formatDate(task.lastCompletedDate) : 'Not yet completed'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-blue-700 font-medium">Recurs Until</p>
+                            <p className="text-blue-900">{task.recurringEndDate ? formatDate(task.recurringEndDate) : 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        {task.recurringCompletionHistory && task.recurringCompletionHistory.length > 0 && (
+                          <div className="pt-2 border-t border-blue-200">
+                            <p className="text-xs text-blue-700 font-medium mb-1">
+                              Completion History ({task.recurringCompletionHistory.length} times)
+                            </p>
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                              {task.recurringCompletionHistory.slice(0, 5).map((history, index) => (
+                                <div key={index} className="text-xs text-blue-800 flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                                  <span>{formatDate(history.completedAt)}</span>
+                                  <span className="text-blue-600">by {history.completedBy.name}</span>
+                                </div>
+                              ))}
+                              {task.recurringCompletionHistory.length > 5 && (
+                                <p className="text-xs text-blue-600 italic">
+                                  +{task.recurringCompletionHistory.length - 5} more...
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Status - Full width */}
                     <div className="flex flex-col gap-[5px]">
                       <p className="text-sm text-[#040110] opacity-60 font-normal">Status</p>
@@ -2640,117 +2711,7 @@ const TaskDetail = () => {
                 </p>
               </div>
 
-              {/* ✅ NEW: Rejection Attachment Section */}
-              <div className="space-y-[6px]">
-                <label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
-                  Attachment {task?.rejectionAttachmentType === 'either' ? '(File and/or Link)' : task?.rejectionAttachmentType === 'file' ? '(File Required)' : '(Link Required)'} <span className="text-[#cd2818] font-['Work_Sans']">*</span>
-                </label>
-
-                {/* File Upload - Show if type is 'file' or 'either' */}
-                {(task?.rejectionAttachmentType === 'file' || task?.rejectionAttachmentType === 'either') && (
-                  <div className="space-y-2">
-                    <div className="border border-[#d5d7da] rounded-[8px]">
-                      <label htmlFor="rejection-files" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
-                        <Upload className="w-4 h-4 text-[#717680]" />
-                        <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">
-                          {rejectionFiles.length > 0 ? `${rejectionFiles.length} file(s) selected` : 'Upload rejection file(s)'}
-                        </span>
-                      </label>
-                      <input
-                        ref={rejectionFileInputRef}
-                        id="rejection-files"
-                        type="file"
-                        multiple
-                        className="hidden"
-                        accept="image/*,.pdf,.docx"
-                        onChange={(e) => {
-                          const files = e.target.files;
-                          if (files && files.length > 0) {
-                            const newFiles = Array.from(files) as File[];
-
-                            // Check total files limit (3 files max)
-                            const totalFiles = rejectionFiles.length + newFiles.length;
-                            if (totalFiles > 3) {
-                              toast.error(`Maximum 3 files allowed. You currently have ${rejectionFiles.length} file(s) and tried to add ${newFiles.length} more.`);
-                              return;
-                            }
-
-                            // Check file sizes (5MB limit)
-                            const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
-                            const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
-                            if (oversizedFiles.length > 0) {
-                              const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
-                              toast.error(`${fileNames}: File too large (max 5MB per file)`);
-                              return;
-                            }
-
-                            // Append new files to existing ones
-                            setRejectionFiles(prev => [...prev, ...newFiles]);
-                          }
-                        }}
-                      />
-                    </div>
-                    {rejectionFiles.length > 0 && (
-                      <div className="space-y-[6px] mt-[8px]">
-                        <div className="flex justify-between items-center mb-[4px]">
-                          <span className="text-[10px] text-gray-500">{rejectionFiles.length} of 3 files</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRejectionFiles([]);
-                              if (rejectionFileInputRef.current) {
-                                rejectionFileInputRef.current.value = '';
-                              }
-                            }}
-                            className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
-                          >
-                            Clear All
-                          </button>
-                        </div>
-                        {rejectionFiles.map((file, index) => (
-                          <div key={index} className="flex items-center gap-2 text-xs text-gray-600">
-                            <File className="w-3 h-3" />
-                            <span className="flex-1 truncate">{file.name}</span>
-                            <span className="text-[10px] text-gray-400">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRejectionFiles(rejectionFiles.filter((_, i) => i !== index));
-                              }}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Link Input - Show if type is 'link' or 'either' */}
-                {(task?.rejectionAttachmentType === 'link' || task?.rejectionAttachmentType === 'either') && (
-                  <div className="space-y-2">
-                    {task?.rejectionAttachmentType === 'either' && rejectionFiles.length > 0 && (
-                      <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
-                        And/or provide a link:
-                      </p>
-                    )}
-                    <Input
-                      type="url"
-                      value={rejectionLink}
-                      onChange={(e) => setRejectionLink(e.target.value)}
-                      placeholder="Figma or GitHub link (e.g., https://figma.com/...)"
-                      className="h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] placeholder:text-[#717680]"
-                    />
-                    <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
-                      Only Figma and GitHub links are accepted. You can provide both file and link.
-                    </p>
-                  </div>
-                )}
-              </div>
+              {/* ✅ NEW: Rejection Attachment Section - REMOVED */}
             </div>
           </div>
 

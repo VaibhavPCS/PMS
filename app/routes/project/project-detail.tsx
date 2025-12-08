@@ -32,6 +32,7 @@ import {
   EyeOff,
   Users,
   UserPlus,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1572,7 +1573,12 @@ const ProjectDetail = () => {
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
   const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
+  const [taskReferenceLink, setTaskReferenceLink] = useState("");
   const taskFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Recurring task state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
 
   // Function to remove a specific attachment
   const removeTaskAttachment = (index: number) => {
@@ -1992,11 +1998,20 @@ const ProjectDetail = () => {
         return toast.error("Due date cannot be after project end date");
       }
 
+      // Validate reference link if provided (must be Figma or GitHub)
+      if (taskReferenceLink.trim()) {
+        const figmaPattern = /^https?:\/\/(www\.)?figma\.com\//i;
+        const githubPattern = /^https?:\/\/(www\.)?github\.com\//i;
+        if (!figmaPattern.test(taskReferenceLink) && !githubPattern.test(taskReferenceLink)) {
+          return toast.error("Only Figma and GitHub links are allowed");
+        }
+      }
+
       try {
         setSubmittingTask(true);
 
-        // Use FormData if there are attachments, otherwise use JSON
-        if (taskAttachments.length > 0) {
+        // Use FormData if there are attachments or reference link, otherwise use JSON
+        if (taskAttachments.length > 0 || taskReferenceLink.trim()) {
           const formData = new FormData();
           formData.append("title", newTask.title);
           formData.append("description", newTask.description);
@@ -2010,6 +2025,18 @@ const ProjectDetail = () => {
           formData.append("projectId", projectId || "");
           formData.append("rejectionAttachmentType", newTask.rejectionAttachmentType); // ✅ NEW
 
+          // Add reference link as array if provided
+          if (taskReferenceLink.trim()) {
+            formData.append("referenceLinks", JSON.stringify([taskReferenceLink.trim()]));
+          }
+
+          // Add recurring task data
+          formData.append("isRecurring", isRecurring.toString());
+          if (isRecurring) {
+            formData.append("recurringFrequency", recurringFrequency);
+            formData.append("recurringEndDate", project?.endDate || "");
+          }
+
           taskAttachments.forEach((file) => {
             formData.append("attachments", file);
           });
@@ -2019,6 +2046,16 @@ const ProjectDetail = () => {
           const payload: any = { ...newTask, projectId };
           if (!newTask.assigneeId) {
             delete payload.assigneeId;
+          }
+          // Add reference link as array if provided
+          if (taskReferenceLink.trim()) {
+            payload.referenceLinks = [taskReferenceLink.trim()];
+          }
+          // Add recurring task data
+          payload.isRecurring = isRecurring;
+          if (isRecurring) {
+            payload.recurringFrequency = recurringFrequency;
+            payload.recurringEndDate = project?.endDate || "";
           }
           await postData("/task", payload);
         }
@@ -2037,6 +2074,9 @@ const ProjectDetail = () => {
         setStartDateObj(undefined);
         setDueDateObj(undefined);
         setTaskAttachments([]);
+        setTaskReferenceLink("");
+        setIsRecurring(false);
+        setRecurringFrequency("daily");
         // Clear the file input
         if (taskFileInputRef.current) {
           taskFileInputRef.current.value = '';
@@ -2058,7 +2098,7 @@ const ProjectDetail = () => {
         setSubmittingTask(false);
       }
     },
-    [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments]
+    [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments, taskReferenceLink, isRecurring, recurringFrequency]
   );
 
   useEffect(() => {
@@ -2073,6 +2113,15 @@ const ProjectDetail = () => {
       ]);
     }
   }, [isAuthenticated, projectId]);
+
+  // Auto-set due date to project end date when recurring is checked
+  useEffect(() => {
+    if (isRecurring && project?.endDate) {
+      const projectEndDate = new Date(project.endDate);
+      setDueDateObj(projectEndDate);
+      setNewTask(prev => ({ ...prev, dueDate: projectEndDate.toISOString() }));
+    }
+  }, [isRecurring, project?.endDate]);
 
   // Loading and error states (unchanged)
   if (loading) {
@@ -3145,6 +3194,54 @@ const ProjectDetail = () => {
               </div>
 
               <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isRecurring}
+                    data-state={isRecurring ? "checked" : "unchecked"}
+                    onClick={() => setIsRecurring(!isRecurring)}
+                    className="peer h-4 w-4 shrink-0 rounded-sm border border-input shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                  >
+                    {isRecurring && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check size-4">
+                        <path d="M20 6 9 17l-5-5"/>
+                      </svg>
+                    )}
+                  </button>
+                  <label
+                    htmlFor="isRecurring"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 cursor-pointer"
+                    onClick={() => setIsRecurring(!isRecurring)}
+                  >
+                    Recurring Task
+                  </label>
+                </div>
+                
+                {isRecurring && (
+                  <div className="space-y-1 ml-6">
+                    <Label className="text-sm">Frequency</Label>
+                    <Select
+                      value={recurringFrequency}
+                      onValueChange={(value: "daily" | "weekly" | "monthly") => setRecurringFrequency(value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-600">
+                      Task will recur {recurringFrequency} until project ends
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
                 <Label className="text-sm">Description</Label>
                 <Textarea
                   value={newTask.description}
@@ -3156,7 +3253,7 @@ const ProjectDetail = () => {
               </div>
 
               {/* ✅ NEW: Rejection Attachment Type Selector */}
-              <div className="space-y-1">
+              {/* <div className="space-y-1">
                 <Label className="text-sm">Rejection Attachment Requirement</Label>
                 <Select
                   value={newTask.rejectionAttachmentType}
@@ -3174,53 +3271,56 @@ const ProjectDetail = () => {
                 <p className="text-xs text-gray-500">
                   Specify what type of attachment is required when rejecting this task
                 </p>
-              </div>
+              </div> */}
+
+
 
               <div className="space-y-1">
                 <Label className="text-sm">Attachments (optional)</Label>
-                <div className="border border-[#d5d7da] rounded-[8px]">
-                  <label htmlFor="attachments" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
-                    <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">Upload</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-upload text-[#717680]" aria-hidden="true">
-                      <path d="M12 3v12"></path>
-                      <path d="m17 8-5-5-5 5"></path>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    </svg>
-                  </label>
-                  <input
-                    ref={taskFileInputRef}
-                    id="attachments"
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept="image/*,.pdf,.docx"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const files = e.target.files;
-                      if (files && files.length > 0) {
-                        const newFiles = Array.from(files) as File[];
 
-                        // Check total files limit (3 files max)
-                        const totalFiles = taskAttachments.length + newFiles.length;
-                        if (totalFiles > 3) {
-                          toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
-                          return;
+                {/* File Upload Section */}
+                <div className="space-y-2">
+                  <div className="border border-[#d5d7da] rounded-[8px]">
+                    <label htmlFor="attachments" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
+                      <Upload className="w-4 h-4 text-[#717680]" />
+                      <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">
+                        {taskAttachments.length > 0 ? `${taskAttachments.length} file(s) selected` : 'Upload file(s)'}
+                      </span>
+                    </label>
+                    <input
+                      ref={taskFileInputRef}
+                      id="attachments"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept="image/*,.pdf,.docx"
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          const newFiles = Array.from(files) as File[];
+
+                          // Check total files limit (3 files max)
+                          const totalFiles = taskAttachments.length + newFiles.length;
+                          if (totalFiles > 3) {
+                            toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
+                            return;
+                          }
+
+                          // Check file sizes (5MB limit)
+                          const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
+                          const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
+                          if (oversizedFiles.length > 0) {
+                            const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
+                            toast.error(`${fileNames}: File too large (max 5MB per file)`);
+                            return;
+                          }
+
+                          // Append new files to existing ones
+                          setTaskAttachments(prev => [...prev, ...newFiles]);
                         }
-
-                        // Check file sizes (5MB limit)
-                        const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
-                        const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
-                        if (oversizedFiles.length > 0) {
-                          const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
-                          toast.error(`${fileNames}: File too large (max 5MB per file)`);
-                          return;
-                        }
-
-                        // Append new files to existing ones
-                        setTaskAttachments(prev => [...prev, ...newFiles]);
-                      }
-                    }}
-                  />
-                </div>
+                      }}
+                    />
+                  </div>
                 {taskAttachments.length > 0 && (
                   <div className="space-y-[6px] mt-[8px]">
                     <div className="flex justify-between items-center mb-[4px]">
@@ -3256,6 +3356,26 @@ const ProjectDetail = () => {
                     ))}
                   </div>
                 )}
+
+                  {/* Link Input Section */}
+                  <div className="space-y-2">
+                    {taskAttachments.length > 0 && (
+                      <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
+                        And/or provide a reference link:
+                      </p>
+                    )}
+                    <Input
+                      type="url"
+                      value={taskReferenceLink}
+                      onChange={(e) => setTaskReferenceLink(e.target.value)}
+                      placeholder="Figma or GitHub link (e.g., https://figma.com/...)"
+                      className="border-[#d5d7da] rounded-[8px] px-[14px] py-[10px] text-[14px] font-['Inter'] placeholder:text-[#717680]"
+                    />
+                    <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
+                      Reference links help provide context for the task. Only Figma and GitHub links are allowed.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-3 border-t">
