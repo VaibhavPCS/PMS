@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectSeparator
 } from '@/components/ui/select';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Building2 } from 'lucide-react';
 
 interface Workspace {
   _id: string;
@@ -31,23 +31,12 @@ export function WorkspaceSelector({
 }: WorkspaceSelectorProps) {
   return (
     <Select value={currentWorkspace?._id || ''} onValueChange={onSwitchWorkspace}>
-      <SelectTrigger className="w-[250px] h-[51px] border border-gray-200 rounded-[10px] px-[10px] py-[5px] bg-white hover:bg-gray-50">
-        <div className="flex items-center gap-[10px] w-full">
-          <div className="w-[35px] h-[35px] rounded-[20px] bg-gradient-to-b from-[#344BFD] to-[#4A8CD7] flex items-center justify-center shrink-0">
-            <span className="text-white text-[16px] font-medium font-['Inter']">
-              {currentWorkspace?.name?.[0] || 'W'}
-            </span>
-          </div>
-          <div className="flex flex-col items-start flex-1 min-w-0">
-            <span className="text-[14px] font-medium text-[#1D2939] font-['Inter'] truncate w-full">
-              {currentWorkspace?.name || 'Select Workspace'}
-            </span>
-            <span className="text-[12px] font-medium text-[#717182] font-['Inter'] truncate w-full">
-              {currentWorkspace?.description || 'Workspace'}
-            </span>
-          </div>
-          <ChevronDown className="h-[24px] w-[24px] text-gray-500 shrink-0" />
-        </div>
+      <SelectTrigger className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px] border-none focus:ring-0 w-auto min-w-[120px]">
+        <Building2 className="w-4 h-4 shrink-0" />
+        <span className="truncate max-w-[150px]">
+          {currentWorkspace?.name || 'Select Workspace'}
+        </span>
+        <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
       </SelectTrigger>
       <SelectContent className="w-[250px]">
         {workspaces.map((workspace) => (

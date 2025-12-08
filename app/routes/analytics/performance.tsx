@@ -20,10 +20,10 @@ const Performance = () => {
   const { user } = useAuth();
   const { selectedRole } = useRole();
   const roleStr = String(selectedRole || '');
-  
+
   // ✅ Get selected workspace and project (IDs and names) from FilterContext
-  const { 
-    selectedWorkspaceId, 
+  const {
+    selectedWorkspaceId,
     selectedProjectId,
     selectedWorkspaceName,
     selectedProjectName,
@@ -31,7 +31,7 @@ const Performance = () => {
     setSelectedProject
   } = useFilter();
   const projectsCount = Number(sessionStorage.getItem('analyticsProjectsCount') || '0');
-  
+
   // Get date range from URL params or use defaults
   const startDate = searchParams.get("startDate") || undefined;
   const endDate = searchParams.get("endDate") || undefined;
@@ -58,12 +58,12 @@ const Performance = () => {
     })();
   }, [searchParams, selectedProjectId, setSelectedWorkspace, setSelectedProject]);
 
-  const { 
-    data, 
-    isLoading, 
-    error, 
+  const {
+    data,
+    isLoading,
+    error,
     refetch,
-    isFetching 
+    isFetching
   } = useProjectAnalytics({
     projectId,
     startDate,
@@ -79,7 +79,7 @@ const Performance = () => {
       const blob = new Blob([resp.data], { type: 'application/vnd.ms-excel' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      const name = data?.project?.title ? data.project.title.replace(/[^a-z0-9\- ]/gi,'') : pid;
+      const name = data?.project?.title ? data.project.title.replace(/[^a-z0-9\- ]/gi, '') : pid;
       link.download = `project-${name}-analytics.xls`;
       document.body.appendChild(link);
       link.click();
@@ -123,7 +123,7 @@ const Performance = () => {
       const blob = new Blob([resp.data], { type: 'text/csv' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      const name = data?.project?.title ? data.project.title.replace(/[^a-z0-9\- ]/gi,'') : pid;
+      const name = data?.project?.title ? data.project.title.replace(/[^a-z0-9\- ]/gi, '') : pid;
       link.download = `project-${name}-analytics.csv`;
       document.body.appendChild(link);
       link.click();
@@ -137,23 +137,24 @@ const Performance = () => {
 
   // Handle date range change
   const handleDateRangeChange = (newStartDate: string, newEndDate: string) => {
-    console.log("Date range changed:", { newStartDate, newEndDate });
+    // console.log("Date range changed:", { newStartDate, newEndDate });
   };
 
   // ✅ ALWAYS SHOW HEADER WITH DATE FILTER (even during loading/error/no-data)
   const renderHeader = () => (
-    <div className="flex justify-between items-start gap-4 mb-6">
-      <div className="flex-1">
-        <h2 className="text-xl font-semibold text-gray-900">Performance Metrics</h2>
-        <p className="text-sm text-gray-600">
-          Project: <span className="font-medium">{data?.project?.title || selectedProjectName || '...'}</span> 
+    <div className="flex flex-col gap-4 mb-6">
+      {/* Title Section */}
+      <div className="flex flex-col gap-2">
+        <h2 className="text-[18px] md:text-xl font-semibold text-gray-900 font-['Inter']">Performance Metrics</h2>
+        <p className="text-[13px] md:text-sm text-gray-600 font-['Inter']">
+          Project: <span className="font-medium">{data?.project?.title || selectedProjectName || '...'}</span>
           {data?.totalTasks !== undefined && (
             <span className="ml-2 text-gray-500">({data.totalTasks} tasks)</span>
           )}
         </p>
         {/* ✅ Show selected workspace/project names instead of IDs */}
         {selectedWorkspaceName && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-[12px] md:text-xs text-gray-500 font-['Inter']">
             Workspace: <span className="font-medium">{selectedWorkspaceName || '...'}</span>
             {selectedProjectName && selectedProjectName !== 'All Projects' && (
               <> | Project: <span className="font-medium">{selectedProjectName}</span></>
@@ -162,31 +163,27 @@ const Performance = () => {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Filters and Actions Section */}
+      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-2">
+        {/* Workspace/Project Selectors - Full width on mobile, auto width on desktop */}
         {(roleStr === 'admin' || roleStr === 'super_admin') && (
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-3 w-full md:w-auto">
             <WorkspaceProjectSelector />
           </div>
         )}
         {roleStr === 'project_lead' && (
-          <div className="text-xs text-gray-500">Restricted: showing your projects only</div>
+          <div className="text-[12px] md:text-xs text-gray-500 font-['Inter']">Restricted: showing your projects only</div>
         )}
-        {/* ✅ Date Range Filter - Always visible */}
-        <DateRangeFilter onChange={handleDateRangeChange} />
 
-        {/* Refresh Button */}
-        <div className="flex items-center gap-2">
-          {/* <Button 
-            onClick={() => refetch()} 
-            disabled={isFetching}
-            variant="outline"
-            size="default"
+        {/* Date Range Filter and Download Button */}
+        <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full md:w-auto md:ml-auto">
+          <DateRangeFilter onChange={handleDateRangeChange} />
+          <Button
+            onClick={downloadProjectExcel}
+            className="w-full sm:w-auto bg-[#F2761B] hover:bg-[#F2761B]/90 text-white font-['Inter'] whitespace-nowrap"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button> */}
-          <Button onClick={downloadProjectExcel} className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white">Download Excel</Button>
-          {/* <Button onClick={downloadProjectCsv} variant="outline">Download CSV</Button> */}
+            Download Excel
+          </Button>
         </div>
       </div>
     </div>
@@ -283,9 +280,9 @@ const Performance = () => {
     <div className="space-y-4">
       {/* ✅ Header with Date Filter - Always visible */}
       {renderHeader()}
-      
-      <VelocityChart 
-        data={data.analytics.overall.velocity.timeSeries || []} 
+
+      <VelocityChart
+        data={data.analytics.overall.velocity.timeSeries || []}
         isLoading={isFetching}
       />
       {/* <Card>
@@ -315,7 +312,7 @@ const Performance = () => {
           </div>
         </CardContent>
       </Card> */}
-      
+
       {/* Existing Metrics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Overall Metrics Card */}
@@ -404,15 +401,14 @@ const Performance = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data?.analytics.overall.statusDistribution && 
+              {data?.analytics.overall.statusDistribution &&
                 Object.entries(data.analytics.overall.statusDistribution).map(([status, count]) => (
                   <div key={status} className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${
-                        status === 'done' ? 'bg-green-500' :
-                        status === 'in-progress' ? 'bg-blue-500' :
-                        'bg-gray-400'
-                      }`} />
+                      <div className={`w-3 h-3 rounded-full ${status === 'done' ? 'bg-green-500' :
+                          status === 'in-progress' ? 'bg-blue-500' :
+                            'bg-gray-400'
+                        }`} />
                       <span className="text-gray-600 capitalize">{status.replace('-', ' ')}:</span>
                     </div>
                     <span className="font-semibold">{count as number}</span>
@@ -430,15 +426,14 @@ const Performance = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data?.analytics.overall.priorityDistribution && 
+              {data?.analytics.overall.priorityDistribution &&
                 Object.entries(data.analytics.overall.priorityDistribution).map(([priority, count]) => (
                   <div key={priority} className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${
-                        priority === 'high' ? 'bg-red-500' :
-                        priority === 'medium' ? 'bg-amber-500' :
-                        'bg-blue-500'
-                      }`} />
+                      <div className={`w-3 h-3 rounded-full ${priority === 'high' ? 'bg-red-500' :
+                          priority === 'medium' ? 'bg-amber-500' :
+                            'bg-blue-500'
+                        }`} />
                       <span className="text-gray-600 capitalize">{priority}:</span>
                     </div>
                     <span className="font-semibold">{count as number}</span>
@@ -456,7 +451,7 @@ const Performance = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data?.analytics.overall.completionTimeByPriority && 
+              {data?.analytics.overall.completionTimeByPriority &&
                 Object.entries(data.analytics.overall.completionTimeByPriority).map(([priority, time]) => (
                   <div key={priority} className="flex justify-between items-center">
                     <span className="text-gray-600 capitalize">{priority}:</span>

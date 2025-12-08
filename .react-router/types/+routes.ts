@@ -136,8 +136,8 @@ type RouteFiles = {
     id: "routes/auth/verify-email";
     page: "/verify-email";
   };
-  "components/layout/dashboard-layout.tsx": {
-    id: "components/layout/dashboard-layout";
+  "components/layout/responsive-dashboard-layout.tsx": {
+    id: "components/layout/responsive-dashboard-layout";
     page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/administration/project-management/task-lifecycle" | "/administration/project-management/workspace-report" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal";
   };
   "routes/dashboard/dashboard.tsx": {

@@ -51,7 +51,12 @@ export const VelocityChart = ({ data, isLoading }: VelocityChartProps) => {
   // Format data for the chart
   const formattedData = data.map(item => ({
     ...item,
-    formattedDate: format(new Date(item.date), 'MMM dd')
+    formattedDate: (() => {
+      const date = new Date(item.date);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${day}/${month}`;
+    })()
   }));
 
   return (

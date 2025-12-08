@@ -21,8 +21,8 @@ export function PersonalStats() {
   // Extract user ID - handle both _id and id fields
   const userId = user?._id || (user as any)?.id;
   
-  console.log('PersonalStats - Full User Object:', JSON.stringify(user, null, 2));
-  console.log('PersonalStats - Extracted userId:', userId);
+  // console.log('PersonalStats - Full User Object:', JSON.stringify(user, null, 2));
+  // console.log('PersonalStats - Extracted userId:', userId);
   
   const { data, isLoading: queryLoading, isError, error } = useUserAnalytics(
     userId || '', 
@@ -104,7 +104,7 @@ export function PersonalStats() {
     }
   };
 
-  console.log('PersonalStats - API Data:', data);
+  // console.log('PersonalStats - API Data:', data);
 
   return (
     <div className="w-full space-y-6">
@@ -215,7 +215,13 @@ export function PersonalStats() {
                     </div>
                     <div className="ml-4 text-right flex-shrink-0">
                       <div className="text-sm font-medium text-gray-900">
-                        {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                        {(() => {
+                          const date = new Date(task.dueDate);
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const year = date.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        })()}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {format(new Date(task.dueDate), 'EEEE')}

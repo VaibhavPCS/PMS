@@ -17,12 +17,12 @@ const Workspace = () => {
     }
   }, []);
 
-  const { 
-    data, 
-    isLoading, 
-    error, 
+  const {
+    data,
+    isLoading,
+    error,
     refetch,
-    isFetching 
+    isFetching
   } = useWorkspaceAnalytics(workspaceId);
 
   const downloadWorkspaceCsv = async () => {
@@ -112,25 +112,40 @@ const Workspace = () => {
   return (
     <div className="space-y-6">
       {/* Header with Refresh Button */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Workspace Intelligence</h2>
-          <p className="text-sm text-gray-600">
+      <div className="flex flex-col gap-4">
+        {/* Title Section */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-[18px] md:text-xl font-semibold text-gray-900 font-['Inter']">Workspace Intelligence</h2>
+          <p className="text-[13px] md:text-sm text-gray-600 font-['Inter']">
             Overview of workspace activity and team workload
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={() => refetch()} 
+
+        {/* Buttons Section */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <Button
+            onClick={() => refetch()}
             disabled={isFetching}
             variant="outline"
             size="default"
+            className="w-full sm:w-auto font-['Inter']"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={downloadWorkspaceExcel} className="bg-[#F2761B] hover:bg-[#F2761B]/90 text-white">Download Excel</Button>
-          <Button onClick={downloadWorkspaceCsv} variant="outline">Download CSV</Button>
+          <Button
+            onClick={downloadWorkspaceExcel}
+            className="w-full sm:w-auto bg-[#F2761B] hover:bg-[#F2761B]/90 text-white font-['Inter']"
+          >
+            Download Excel
+          </Button>
+          <Button
+            onClick={downloadWorkspaceCsv}
+            variant="outline"
+            className="w-full sm:w-auto font-['Inter']"
+          >
+            Download CSV
+          </Button>
         </div>
       </div>
 
@@ -210,17 +225,17 @@ const Workspace = () => {
                           Click to view detailed analytics
                         </p>
                       </div>
-                      <svg 
-                        className="w-5 h-5 text-gray-400" 
-                        fill="none" 
-                        stroke="currentColor" 
+                      <svg
+                        className="w-5 h-5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          strokeWidth={2} 
-                          d="M9 5l7 7-7 7" 
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
                         />
                       </svg>
                     </div>
@@ -237,8 +252,8 @@ const Workspace = () => {
         </Card>
 
         {/* Workload Distribution Chart */}
-        <WorkloadChart 
-          data={data?.workloadDistribution || []} 
+        <WorkloadChart
+          data={data?.workloadDistribution || []}
           isLoading={isFetching}
         />
       </div>

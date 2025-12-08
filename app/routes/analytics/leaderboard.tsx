@@ -142,25 +142,32 @@ const Leaderboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-amber-500" />
+      <div className="flex flex-col gap-4">
+        {/* Title Section */}
+        <div className="flex flex-col gap-2">
+          <h2 className="text-[18px] md:text-xl font-semibold text-gray-900 flex items-center gap-2 font-['Inter']">
+            <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-500" />
             Project Leaderboard
           </h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-[13px] md:text-sm text-gray-600 font-['Inter']">
             {data?.totalProjects || 0} projects ranked by completion
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-3">
+
+        {/* Selectors and Actions */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Workspace/Project Selector */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <WorkspaceProjectSelector />
           </div>
+
+          {/* Refresh Button */}
           <Button
             onClick={() => refetch()}
             disabled={isFetching}
             variant="outline"
             size="default"
+            className="w-full sm:w-auto font-['Inter']"
           >
             <RefreshCw
               className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
@@ -299,7 +306,10 @@ const Leaderboard = () => {
                           const month = date.getUTCMonth();
                           const day = date.getUTCDate();
                           const localDate = new Date(year, month, day);
-                          return format(localDate, "MMM dd, yyyy");
+                          const formattedDay = String(localDate.getDate()).padStart(2, '0');
+                          const formattedMonth = String(localDate.getMonth() + 1).padStart(2, '0');
+                          const formattedYear = localDate.getFullYear();
+                          return `${formattedDay}/${formattedMonth}/${formattedYear}`;
                         })()}
                       </TableCell>
                     </TableRow>

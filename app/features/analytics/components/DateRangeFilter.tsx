@@ -123,11 +123,18 @@ export const DateRangeFilter = ({ onChange, className }: DateRangeFilterProps) =
   const getDisplayText = (): string => {
     if (!dateRange?.from) return "Select date range";
     
+    const formatDate = (date: Date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    
     if (!dateRange.to) {
-      return `${format(dateRange.from, "MMM dd, yyyy")} - ...`;
+      return `${formatDate(dateRange.from)} - ...`;
     }
 
-    return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
+    return `${formatDate(dateRange.from)} - ${formatDate(dateRange.to)}`;
   };
 
   return (

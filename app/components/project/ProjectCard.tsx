@@ -186,7 +186,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
       if (onDelete) {
         await onDelete(project._id);
       }
-      toast.success('Project deleted successfully');
+      // Toast is handled by parent component (workspace page)
     } catch (error: any) {
       let errMsg = 'Failed to delete project';
       if (axios.isAxiosError(error)) {
@@ -214,7 +214,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
       // Fetch project tasks to get the first task for editing
       const response = await fetchData(`/project/${project._id}/tasks`);
       const tasks = response.tasks || [];
-      
+
       if (tasks.length === 0) {
         toast.info('No tasks found in this project');
         return;
@@ -252,7 +252,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
     <>
       <Card
         className={cn(
-          "w-[273.75px] h-[313px] rounded-[10px] border-[0.5px] p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-white",
+          "w-full h-[313px] rounded-[10px] border-[0.5px] p-0 overflow-hidden cursor-pointer hover:shadow-md transition-shadow bg-white",
           statusBorderColors[project.status]
         )}
         onClick={handleCardClick}
@@ -261,7 +261,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
           {/* Header */}
           <div className="flex items-center justify-between">
             <StatusBadge status={project.status} />
-          {(isAdmin || isProjectLead) && (
+            {(isAdmin || isProjectLead) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -284,49 +284,49 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
 
                   {/* Status Change Options */}
                   {project.status !== 'Planning' && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    handleStatusChange('Planning');
-                  }}
-                  className="font-['Inter']"
-                >
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        handleStatusChange('Planning');
+                      }}
+                      className="font-['Inter']"
+                    >
                       <Pause className="mr-2 h-4 w-4" />
                       Mark as Proposed
                     </DropdownMenuItem>
                   )}
                   {project.status !== 'In Progress' && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    handleStatusChange('In Progress');
-                  }}
-                  className="font-['Inter']"
-                >
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        handleStatusChange('In Progress');
+                      }}
+                      className="font-['Inter']"
+                    >
                       <PlayCircle className="mr-2 h-4 w-4" />
                       Mark as Ongoing
                     </DropdownMenuItem>
                   )}
                   {project.status !== 'On Hold' && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    handleStatusChange('On Hold');
-                  }}
-                  className="font-['Inter']"
-                >
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        handleStatusChange('On Hold');
+                      }}
+                      className="font-['Inter']"
+                    >
                       <Pause className="mr-2 h-4 w-4" />
                       Mark as On Hold
                     </DropdownMenuItem>
                   )}
                   {project.status !== 'Completed' && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.stopPropagation();
-                    handleStatusChange('Completed');
-                  }}
-                  className="font-['Inter']"
-                >
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        handleStatusChange('Completed');
+                      }}
+                      className="font-['Inter']"
+                    >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       Mark as Completed
                     </DropdownMenuItem>
@@ -334,20 +334,20 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
 
                   <DropdownMenuSeparator />
 
-                {isAdmin && (
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.stopPropagation();
-                      setShowEdit(true);
-                    }}
-                    className="font-['Inter']"
-                  >
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        setShowEdit(true);
+                      }}
+                      className="font-['Inter']"
+                    >
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Project
                     </DropdownMenuItem>
-                )}
+                  )}
 
-                {/* {isAdmin && (
+                  {/* {isAdmin && (
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.stopPropagation();
@@ -360,18 +360,18 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
                     </DropdownMenuItem>
                 )} */}
 
-                {isAdmin && (
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.stopPropagation();
-                      handleDelete();
-                    }}
-                    className="font-['Inter'] text-red-600 focus:text-red-600"
-                  >
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.stopPropagation();
+                        handleDelete();
+                      }}
+                      className="font-['Inter'] text-red-600 focus:text-red-600"
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete Project
                     </DropdownMenuItem>
-                )}
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -429,7 +429,7 @@ export function ProjectCard({ project, onStatusChange, onDelete, onUpdated }: Pr
       </Card>
 
       {/* Edit Modal */}
-    {(isAdmin || isProjectLead) && (
+      {(isAdmin || isProjectLead) && (
         <EditProjectModal
           open={showEdit}
           onClose={() => setShowEdit(false)}

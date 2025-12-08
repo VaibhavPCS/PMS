@@ -19,8 +19,8 @@ export default [
     route("verify-email", "routes/auth/verify-email.tsx"),
   ]),
 
-  // Protected routes with dashboard layout
-  layout("components/layout/dashboard-layout.tsx", [
+  // Protected routes with responsive dashboard layout
+  layout("components/layout/responsive-dashboard-layout.tsx", [
     route("dashboard", "routes/dashboard/dashboard.tsx"),
     route("workspace", "routes/workspace/workspace.tsx"),
     route("tasks", "routes/tasks/tasks.tsx"),

@@ -4,14 +4,10 @@ import { useState, useEffect } from "react";
 import { Navigate, Outlet, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { RoleProvider, useRole } from "@/features/analytics/context/RoleContext";
-import { RoleSwitcher } from "@/features/analytics/components/RoleSwitcher";
 import { ManualRefreshButton } from "@/features/analytics/components/ManualRefreshButton";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Loader2, BarChart3, Users, Trophy, User } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import { FilterProvider } from "@/features/analytics/context/FilterContext";
-import { WorkspaceProjectSelector } from "@/features/analytics/components/WorkspaceProjectSelector";
 
 // Inner component that uses RoleProvider
 function AnalyticsContent() {
@@ -91,15 +87,15 @@ function AnalyticsContent() {
   const showPersonalTab = true; // All roles can see personal
 
   return (
-    <div className="min-h-screen bg-[#f1f2f7] p-6">
-      <div className="max-w-full mx-auto space-y-6">
+    <div className="min-h-screen bg-[#F9F9F9] p-[10px] md:p-6">
+      <div className="max-w-full mx-auto space-y-4 md:space-y-6">
         {/* Page Header with Manual Refresh Button and Role Switcher */}
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-[20px] md:text-2xl font-bold text-gray-900 font-['Inter']">
               Analytics Dashboard
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-[13px] md:text-sm text-gray-600 mt-1 font-['Inter']">
               Monitor performance, workspace metrics, and leaderboard standings
             </p>
           </div>
@@ -110,75 +106,59 @@ function AnalyticsContent() {
         </div>
 
         {/* Navigation Tabs */}
-        <Card className="border border-[#e9ecf1]">
-          <div className="p-4">
-            <div className="flex items-center gap-2 border-b border-gray-200">
+        <Card className="border border-[#e9ecf1] rounded-[8px] bg-white">
+          <div className="p-[10px] md:p-4">
+            <div className="flex items-center gap-[10px] border-b-[0.5px] border-[#949291] overflow-x-auto scrollbar-visible">
               {/* Performance Tab */}
               {showPerformanceTab && (
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => handleTabChange("performance")}
-                  className={cn(
-                    "px-4 py-2 rounded-t-lg text-sm font-medium transition-all",
-                    activeTab === "performance"
-                      ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
+                  className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "performance"
+                    ? "border-b-[1px] border-[#f2761b] opacity-100"
+                    : "opacity-60 hover:opacity-100"
+                    }`}
                 >
-                  <BarChart3 className="w-4 h-4 mr-2" />
                   Performance
-                </Button>
+                </button>
               )}
 
               {/* Workspace Tab */}
               {showWorkspaceTab && (
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => handleTabChange("workspace")}
-                  className={cn(
-                    "px-4 py-2 rounded-t-lg text-sm font-medium transition-all",
-                    activeTab === "workspace"
-                      ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
+                  className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "workspace"
+                    ? "border-b-[1px] border-[#f2761b] opacity-100"
+                    : "opacity-60 hover:opacity-100"
+                    }`}
                 >
-                  <Users className="w-4 h-4 mr-2" />
                   Workspace
-                </Button>
+                </button>
               )}
 
               {/* Leaderboard Tab */}
               {showLeaderboardTab && (
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => handleTabChange("leaderboard")}
-                  className={cn(
-                    "px-4 py-2 rounded-t-lg text-sm font-medium transition-all",
-                    activeTab === "leaderboard"
-                      ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
+                  className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "leaderboard"
+                    ? "border-b-[1px] border-[#f2761b] opacity-100"
+                    : "opacity-60 hover:opacity-100"
+                    }`}
                 >
-                  <Trophy className="w-4 h-4 mr-2" />
                   Leaderboard
-                </Button>
+                </button>
               )}
 
               {/* Personal Tab */}
               {showPersonalTab && (
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => handleTabChange("personal")}
-                  className={cn(
-                    "px-4 py-2 rounded-t-lg text-sm font-medium transition-all",
-                    activeTab === "personal"
-                      ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  )}
+                  className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "personal"
+                    ? "border-b-[1px] border-[#f2761b] opacity-100"
+                    : "opacity-60 hover:opacity-100"
+                    }`}
                 >
-                  <User className="w-4 h-4 mr-2" />
                   Personal
-                </Button>
+                </button>
               )}
             </div>
           </div>

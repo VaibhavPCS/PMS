@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Building2, ChevronDown } from 'lucide-react';
 
 interface WorkspaceData {
   workspaceId: {
@@ -43,13 +44,13 @@ interface ProjectResponse {
 
 export function WorkspaceProjectSelector() {
   const { user } = useAuth();
-  const { 
-    selectedWorkspaceId, 
-    selectedProjectId, 
-    setSelectedWorkspace, 
-    setSelectedProject 
+  const {
+    selectedWorkspaceId,
+    selectedProjectId,
+    setSelectedWorkspace,
+    setSelectedProject
   } = useFilter();
-  
+
   const [workspaces, setWorkspaces] = useState<WorkspaceData[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
@@ -68,15 +69,15 @@ export function WorkspaceProjectSelector() {
       try {
         setLoadingWorkspaces(true);
         const data = await fetchData<WorkspaceResponse>('/workspace');
-        
-        console.log('Fetched workspace response:', data);
-        
+
+        // console.log('Fetched workspace response:', data);
+
         const workspaceList = data?.workspaces || [];
         setWorkspaces(workspaceList);
-        
+
         if (data?.currentWorkspace?._id && !selectedWorkspaceId) {
           setSelectedWorkspace(data.currentWorkspace._id, data.currentWorkspace.name);
-          try { localStorage.setItem('currentWorkspaceId', data.currentWorkspace._id); } catch {}
+          try { localStorage.setItem('currentWorkspaceId', data.currentWorkspace._id); } catch { }
         }
       } catch (error) {
         console.error('Failed to fetch workspaces:', error);
@@ -93,7 +94,7 @@ export function WorkspaceProjectSelector() {
   useEffect(() => {
     if (!selectedWorkspaceId || selectedWorkspaceId === 'all') {
       setProjects([]);
-      try { sessionStorage.setItem('analyticsProjectsCount', '0'); } catch {}
+      try { sessionStorage.setItem('analyticsProjectsCount', '0'); } catch { }
       return;
     }
 
@@ -101,14 +102,14 @@ export function WorkspaceProjectSelector() {
       try {
         setLoadingProjects(true);
         const data = await fetchData<ProjectResponse>(`/project?workspace=${selectedWorkspaceId}`);
-        
-        console.log('Fetched projects response:', data);
-        
+
+        // console.log('Fetched projects response:', data);
+
         const projectList = data?.projects || [];
         const filtered = projectList.filter(p => `${p.workspace}` === selectedWorkspaceId);
         setProjects(filtered);
-        try { sessionStorage.setItem('analyticsProjectsCount', String(filtered.length)); } catch {}
-        
+        try { sessionStorage.setItem('analyticsProjectsCount', String(filtered.length)); } catch { }
+
         if (projectList.length > 0 && !selectedProjectId) {
           setSelectedProject(projectList[0]._id, projectList[0].title);
         }
@@ -144,15 +145,17 @@ export function WorkspaceProjectSelector() {
   const handleWorkspaceChange = async (workspaceId: string) => {
     if (workspaceId === 'all') {
       setSelectedWorkspace('all', 'All Workspaces');
-      try { localStorage.removeItem('currentWorkspaceId'); } catch {}
+      try { localStorage.removeItem('currentWorkspaceId'); } catch { }
     } else {
       const workspace = workspaces.find(w => w.workspaceId._id === workspaceId);
       if (workspace) {
         try {
           await postData('/workspace/switch', { workspaceId });
-        } catch {}
+        } catch { }
         setSelectedWorkspace(workspaceId, workspace.workspaceId.name);
-        try { localStorage.setItem('currentWorkspaceId', workspaceId); } catch {}
+        try { localStorage.setItem('currentWorkspaceId', workspaceId); } catch { }
+        // Dispatch custom event for workspace change - COMMENTED OUT
+        // window.dispatchEvent(new CustomEvent('workspaceChanged'));
         setProjects([]);
       }
     }
@@ -173,13 +176,17 @@ export function WorkspaceProjectSelector() {
   return (
     <div className="flex items-center gap-3">
       {/* Workspace Selector */}
-      <Select 
+      <Select
         value={selectedWorkspaceId || ''} // ✅ Fix: Use empty string instead of undefined
         onValueChange={handleWorkspaceChange}
         disabled={loadingWorkspaces}
       >
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select Workspace" />
+        <SelectTrigger className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px] border-none focus:ring-0 w-auto min-w-[120px]">
+          <Building2 className="w-4 h-4 shrink-0" />
+          <span className="truncate max-w-[150px]">
+            <SelectValue placeholder="Select Workspace" />
+          </span>
+          <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Workspaces</SelectItem>
@@ -192,17 +199,21 @@ export function WorkspaceProjectSelector() {
       </Select>
 
       {/* Project Selector */}
-      <Select 
+      <Select
         value={selectedProjectId || ''} // ✅ Fix: Use empty string instead of undefined
         onValueChange={handleProjectChange}
         disabled={!selectedWorkspaceId || selectedWorkspaceId === 'all' || loadingProjects || projects.length === 0}
       >
-        <SelectTrigger className="w-[160px] sm:w-[200px]">
-          <SelectValue placeholder={
-            loadingProjects ? "Loading..." :
-            projects.length === 0 ? "--" :
-            supportsAllProjects ? "Select Project" : "Select the project"
-          } />
+        <SelectTrigger className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px] border-none focus:ring-0 w-auto min-w-[120px]">
+          <Building2 className="w-4 h-4 shrink-0" />
+          <span className="truncate max-w-[150px]">
+            <SelectValue placeholder={
+              loadingProjects ? "Loading..." :
+                projects.length === 0 ? "--" :
+                  supportsAllProjects ? "Select Project" : "Select the project"
+            } />
+          </span>
+          <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
         </SelectTrigger>
         <SelectContent>
           {projects.length > 0 && supportsAllProjects && <SelectItem value="all">All Projects</SelectItem>}

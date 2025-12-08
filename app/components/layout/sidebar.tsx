@@ -41,6 +41,8 @@ interface Notification {
     meetingId?: string;
     inviteId?: string;
   };
+  relatedTask?: string;
+  relatedComment?: string;
   createdAt: string;
   readAt?: string;
 }
@@ -164,7 +166,10 @@ const Sidebar = () => {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
     
-    return date.toLocaleDateString();
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const getNotificationIcon = (type: string) => {
@@ -180,6 +185,36 @@ const Sidebar = () => {
     }
   };
 
+  // Generate href for notification navigation
+  const getNotificationHref = (notification: Notification): string => {
+    const { data, relatedTask, type } = notification;
+    
+    // Handle comment notifications that use relatedTask field
+    if (type === 'task_comment' && relatedTask) {
+      return `/task/${relatedTask}`;
+    }
+    
+    // Handle cases where data might be undefined or null
+    if (!data) {
+      return '/dashboard';
+    }
+    
+    // Decide the most specific target route first
+    if (data.taskId) {
+      return `/task/${data.taskId}`;
+    } else if (data.projectId) {
+      return `/project/${data.projectId}`;
+    } else if (data.workspaceId) {
+      return `/workspace`;
+    } else if (data.meetingId) {
+      return `/meetings`;
+    } else if (data.inviteId) {
+      return `/workspace`;
+    }
+    
+    return '/dashboard';
+  };
+
   // Navigate to relevant page for a notification and mark as read with existence checks
   const handleNotificationClick = async (notification: Notification) => {
     try {
@@ -191,16 +226,26 @@ const Sidebar = () => {
 
       const { data } = notification;
       
+      // Handle comment notifications that don't have data field but have relatedTask
+      if (notification.type === 'task_comment' && notification.relatedTask) {
+        // Don't navigate to dashboard yet, let the navigation logic handle it
+      } else if (!data) {
+        // If no data and not a comment notification, navigate to dashboard
+        navigate('/dashboard');
+        return;
+      }
+      
       // Check resource existence before navigation
       try {
-        if (data.taskId) {
-          const existsResponse = await fetch(buildApiUrl(`/task/${data.taskId}/exists`), { credentials: 'include' });
+        const taskId = data.taskId || (notification.type === 'task_comment' && notification.relatedTask);
+        if (taskId) {
+          const existsResponse = await fetch(buildApiUrl(`/task/${taskId}/exists`), { credentials: 'include' });
           if (!existsResponse.ok) {
             toast.error("This task no longer exists.");
             return;
           }
           // Check if task is deleted/archived
-          const taskResponse = await fetch(buildApiUrl(`/task/${data.taskId}`), { credentials: 'include' });
+          const taskResponse = await fetch(buildApiUrl(`/task/${taskId}`), { credentials: 'include' });
           if (taskResponse.ok) {
             const taskData = await taskResponse.json();
             // If isActive is false, task is deleted/archived - don't redirect
@@ -228,7 +273,7 @@ const Sidebar = () => {
         }
         
         // Check workspace existence if provided
-        if (data.workspaceId) {
+        if (data?.workspaceId) {
           const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
           if (!existsResponse.ok) {
             toast.error("This workspace no longer exists or you don't have access to it");
@@ -263,15 +308,19 @@ const Sidebar = () => {
 
       // Choose the most specific route first
       let targetPath = '/dashboard';
-      if (data.taskId) {
+      
+      // Handle comment notifications that use relatedTask field
+      if (notification.type === 'task_comment' && notification.relatedTask) {
+        targetPath = `/task/${notification.relatedTask}`;
+      } else if (data?.taskId) {
         targetPath = `/task/${data.taskId}`;
-      } else if (data.projectId) {
+      } else if (data?.projectId) {
         targetPath = `/project/${data.projectId}`;
-      } else if (data.workspaceId) {
+      } else if (data?.workspaceId) {
         targetPath = `/workspace`;
-      } else if (data.meetingId) {
+      } else if (data?.meetingId) {
         targetPath = `/meetings`;
-      } else if (data.inviteId) {
+      } else if (data?.inviteId) {
         targetPath = `/workspace`;
       }
 
@@ -357,14 +406,18 @@ const Sidebar = () => {
           ) : (
             <div className="p-4 space-y-3">
               {notifications.map((notification) => (
-                <div
+                <a
                   key={notification._id}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                  href={getNotificationHref(notification)}
+                  className={`block p-3 rounded-lg cursor-pointer transition-colors no-underline ${
                     !notification.isRead 
                       ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
                       : 'hover:bg-gray-50'
                   }`}
-                  onClick={() => handleNotificationClick(notification)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNotificationClick(notification);
+                  }}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="text-lg flex-shrink-0">
@@ -396,7 +449,7 @@ const Sidebar = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           )}
@@ -448,14 +501,18 @@ const Sidebar = () => {
         ) : (
           <div className="p-2">
             {notifications.map((notification) => (
-              <div
+              <a
                 key={notification._id}
-                className={`p-3 mb-2 rounded-md cursor-pointer transition-colors ${
+                href={getNotificationHref(notification)}
+                className={`block p-3 mb-2 rounded-md cursor-pointer transition-colors no-underline ${
                   !notification.isRead 
                     ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
                     : 'hover:bg-gray-50'
                 }`}
-                onClick={() => handleNotificationClick(notification)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNotificationClick(notification);
+                }}
               >
                 <div className="flex items-start space-x-3">
                   <div className="text-lg flex-shrink-0">
@@ -487,7 +544,7 @@ const Sidebar = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         )}

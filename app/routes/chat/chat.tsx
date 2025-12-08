@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../provider/auth-context';
-import { fetchData } from '@/lib/fetch-util';
-import ChatSidebar from '../../components/chat/chat-sidebar';
+import { fetchData, postData, postMultipart } from '@/lib/fetch-util';
+import ChatSidebarNew from '../../components/chat/chat-sidebar-new';
 import ChatWindow from '../../components/chat/chat-window';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 
 interface Chat {
   _id: string;
@@ -19,7 +20,7 @@ interface Chat {
     role: 'admin' | 'member';
     joinedAt: string;
   }>;
-  workspace: {
+  workspace?: {
     _id: string;
     name: string;
   };
@@ -57,6 +58,7 @@ interface Message {
   };
   attachments: Array<{
     fileName: string;
+    originalName?: string;
     fileUrl: string;
     fileType: 'image' | 'document';
     fileSize: number;
@@ -83,91 +85,293 @@ const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const isConnectingRef = useRef(false);
+  const activeChatRef = useRef<Chat | null>(null);
+  const pendingChatJoinRef = useRef<string | null>(null);
 
+  // Keep activeChatRef in sync with activeChat state
   useEffect(() => {
-    if (user) {
-      initializeSocket();
-      fetchChats();
-    }
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
 
-    return () => {
-      if (socket) {
-        socket.disconnect();
+  // Listen for custom new-message events from chat window
+  useEffect(() => {
+    const handleNewMessageEvent = (event: CustomEvent) => {
+      const { message, chatId } = event.detail;
+      if (activeChat && chatId === activeChat._id) {
+        // Check for duplicates before adding
+        setMessages(prev => {
+          const messageExists = prev.some(m => m._id === message._id);
+          if (messageExists) {
+            return prev;
+          }
+          return [...prev, message];
+        });
       }
     };
-  }, [user]);
 
-  const initializeSocket = () => {
-    // const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-    //   auth: {
-    //     token: localStorage.getItem('token')
-    //   }
-    // });
+    window.addEventListener('chat:new-message', handleNewMessageEvent as EventListener);
+
+    return () => {
+      window.removeEventListener('chat:new-message', handleNewMessageEvent as EventListener);
+    };
+  }, [activeChat]);
+
+  useEffect(() => {
+    if (!user) {
+      // Cleanup when no user
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+      }
+      isConnectingRef.current = false;
+      return;
+    }
+
+    // Already connected or connecting
+    if (socketRef.current || isConnectingRef.current) {
+      return;
+    }
+
+    fetchChats();
+
+    // Initialize socket when user is available (authenticated via HTTP-only cookie)
+    if (!user) {
+      console.log('🔄 No user yet, waiting for authentication...');
+      return;
+    }
+
+    console.log('🔌 Initializing socket connection for user:', user.name);
+    isConnectingRef.current = true;
+
+    // Track if this effect instance is still mounted
+    let isMounted = true;
 
     const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      auth: {
-        token: localStorage.getItem('token')
-      }
+      withCredentials: true, // Send HTTP-only cookies
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 500,
+      timeout: 10000,
     });
 
     newSocket.on('connect', () => {
-      console.log('Connected to Socket.IO server');
+      if (!isMounted) {
+        // Component unmounted during connection (React Strict Mode), close silently
+        newSocket.disconnect();
+        return;
+      }
+      console.log('✅ Socket connected successfully!', newSocket.id);
+      isConnectingRef.current = false;
+
+      // Join pending chat room if any
+      if (pendingChatJoinRef.current) {
+        console.log('📤 Joining pending chat:', pendingChatJoinRef.current);
+        newSocket.emit('join-chat', pendingChatJoinRef.current);
+        pendingChatJoinRef.current = null;
+      }
     });
 
-    newSocket.on('message', (message: Message) => {
-      if (activeChat && message.chat === activeChat._id) {
-        setMessages(prev => [...prev, message]);
+    // Debug: Log all incoming events
+    newSocket.onAny((eventName, ...args) => {
+      console.log('🔔 Socket event received:', eventName, args);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error.message);
+      isConnectingRef.current = false;
+      // If auth error, don't keep retrying
+      if (error.message.includes('Authentication')) {
+        console.error('Authentication failed - disconnecting socket');
+        newSocket.disconnect();
       }
-      // Update chat list with new last message
-      setChats(prev => prev.map(chat => 
-        chat._id === message.chat 
-          ? { ...chat, lastMessage: {
+    });
+
+    // Helper to fetch chat if it doesn't exist locally (for new direct chats initiated by others)
+    const fetchMissingChat = async (chatId: string) => {
+      try {
+        const response = await fetchData(`/chats/${chatId}`);
+        if (response.chat) {
+          setChats(current => {
+            // Check again to avoid duplicates
+            if (current.some(c => c._id === chatId)) return current;
+            return [response.chat, ...current];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch missing chat:', err);
+      }
+    };
+
+    newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
+      const { message } = data;
+      // Use ref to get the latest activeChat value
+      const currentActiveChat = activeChatRef.current;
+
+      // Update active chat messages if matched
+      if (currentActiveChat && message.chat === currentActiveChat._id) {
+        setMessages(prev => {
+          const messageExists = prev.some(m => m._id === message._id);
+          if (messageExists) {
+            return prev;
+          }
+          return [...prev, message];
+        });
+      }
+
+      // Update chat list with new last message OR add if missing
+      setChats(prev => {
+        const chatIndex = prev.findIndex(c => c._id === message.chat);
+
+        if (chatIndex === -1) {
+          // Chat doesn't exist in sidebar - fetch full details in background
+          fetchMissingChat(message.chat);
+
+          // Immediately create a temporary chat object to show in sidebar
+          // This ensures the chat appears instantly while we fetch full details
+          const tempChat: Chat = {
+            _id: message.chat,
+            type: 'direct', // Will be updated when full chat is fetched
+            participants: [
+              {
+                user: message.sender,
+                role: 'member',
+                joinedAt: new Date().toISOString()
+              }
+            ],
+            lastMessage: {
               _id: message._id,
               content: message.content,
               sender: message.sender,
               createdAt: message.createdAt
-            }}
-          : chat
-      ));
+            },
+            createdAt: message.createdAt,
+            updatedAt: message.createdAt
+          };
+
+          return [tempChat, ...prev];
+        }
+
+        // Chat exists - just update last message and move to top
+        const updatedChat = {
+          ...prev[chatIndex],
+          lastMessage: {
+            _id: message._id,
+            content: message.content,
+            sender: message.sender,
+            createdAt: message.createdAt
+          },
+          updatedAt: message.createdAt
+        };
+
+        // Remove from current position and add to top
+        const newChats = [...prev];
+        newChats.splice(chatIndex, 1);
+        return [updatedChat, ...newChats];
+      });
     });
 
-    newSocket.on('messageUpdate', (updatedMessage: Message) => {
-      if (activeChat && updatedMessage.chat === activeChat._id) {
-        setMessages(prev => prev.map(msg => 
+    newSocket.on('joined-chat', (data: { chatId: string }) => {
+      console.log('✅ Successfully joined chat room:', data.chatId);
+    });
+
+    newSocket.on('message-updated', (updatedMessage: Message) => {
+      // Use ref to get the latest activeChat value
+      const currentActiveChat = activeChatRef.current;
+      if (currentActiveChat && updatedMessage.chat === currentActiveChat._id) {
+        setMessages(prev => prev.map(msg =>
           msg._id === updatedMessage._id ? updatedMessage : msg
         ));
       }
     });
 
-    newSocket.on('chatUpdate', (data: any) => {
-      if (data.type === 'created') {
-        setChats(prev => [data.chat, ...prev]);
-      } else if (data.type === 'participant-added') {
-        setChats(prev => prev.map(chat => 
-          chat._id === data.chatId ? data.chat : chat
+    newSocket.on('chat-updated', (payload: any) => {
+      if (payload.updateType === 'created') {
+        setChats(prev => [payload.data, ...prev]);
+      } else if (payload.updateType === 'participant-added') {
+        setChats(prev => prev.map(chat =>
+          chat._id === payload.chatId ? payload.data : chat
         ));
       }
     });
 
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected:', reason);
+    });
+
+    socketRef.current = newSocket;
     setSocket(newSocket);
-  };
+
+    return () => {
+      isMounted = false;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+      }
+      isConnectingRef.current = false;
+    };
+  }, [user]);
+
+  // Auto-refresh when workspace changes
+  useEffect(() => {
+    const handleWorkspaceChange = () => {
+      fetchChats();
+      // Clear active chat when workspace changes
+      setActiveChat(null);
+      setMessages([]);
+    };
+
+    // Listen for storage events (when workspace changes in other tabs/components)
+    window.addEventListener('storage', handleWorkspaceChange);
+
+    // Also listen for custom workspace change events
+    window.addEventListener('workspaceChanged', handleWorkspaceChange);
+
+    return () => {
+      window.removeEventListener('storage', handleWorkspaceChange);
+      window.removeEventListener('workspaceChanged', handleWorkspaceChange);
+    };
+  }, []);
 
   const fetchChats = async () => {
     try {
       setLoading(true);
-      const response = await fetchData('/chats');
-      setChats(response.data || []);
+      // Use organization-based endpoint instead of workspace
+      const response = await fetchData('/chats/organization');
+      console.log('Chat API response:', response);
+      console.log('Chats data:', response.chats || response.data || []);
+      setChats(response.chats || response.data || []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
+      toast.error('Failed to load chats');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChatCreated = (chat?: any) => {
+    if (chat) {
+      // If a chat object is provided, add it to the sidebar immediately
+      setChats(prev => {
+        const exists = prev.some(c => c._id === chat._id);
+        if (!exists) {
+          return [chat, ...prev];
+        }
+        return prev;
+      });
+    } else {
+      // If no chat provided, do a full refresh
+      fetchChats();
     }
   };
 
   const fetchMessages = async (chatId: string) => {
     try {
       const response = await fetchData(`/messages/chat/${chatId}`);
-      setMessages(response.data || []);
+      setMessages(response.messages || response.data || []);
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
@@ -176,21 +380,98 @@ const Chat: React.FC = () => {
   const handleChatSelect = (chat: Chat) => {
     setActiveChat(chat);
     fetchMessages(chat._id);
-    
+
+    // Add chat to local state if not already there (for newly created chats)
+    setChats(prev => {
+      const exists = prev.some(c => c._id === chat._id);
+      if (!exists) {
+        return [chat, ...prev];
+      }
+      return prev;
+    });
+
     // Join chat room for real-time updates
-    if (socket) {
-      socket.emit('joinChat', chat._id);
+    const currentSocket = socketRef.current;
+    if (currentSocket && currentSocket.connected) {
+      currentSocket.emit('join-chat', chat._id);
+    } else {
+      // Socket not ready yet, store pending join
+      pendingChatJoinRef.current = chat._id;
     }
   };
 
-  const handleSendMessage = (content: string, attachments?: File[], replyTo?: string) => {
-    if (socket && activeChat) {
-      socket.emit('sendMessage', {
-        chatId: activeChat._id,
-        content,
-        attachments,
-        replyTo
-      });
+  const handleSendMessage = async (content: string, attachments?: File[], replyTo?: string) => {
+    if (activeChat) {
+      try {
+        let messageData: any = {
+          content: content || '',
+          replyTo: replyTo || undefined
+        };
+
+        let sentMessage: any;
+
+        // If there are attachments, create FormData
+        if (attachments && attachments.length > 0) {
+          const formData = new FormData();
+          formData.append('content', content || '');
+          if (replyTo) {
+            formData.append('replyTo', replyTo);
+          }
+          attachments.forEach(file => {
+            formData.append('attachments', file);
+          });
+
+          // Send message with attachments via REST API
+          const response = await postMultipart(`/messages/chat/${activeChat._id}`, formData);
+          sentMessage = response.data;
+        } else {
+          // Send text-only message via REST API
+          const response = await postData(`/messages/chat/${activeChat._id}`, messageData);
+          sentMessage = response.data;
+        }
+
+        // Immediately add the sent message to state for instant feedback
+        // Check for duplicates in case socket already delivered it
+        if (sentMessage) {
+          setMessages(prev => {
+            const messageExists = prev.some(m => m._id === sentMessage._id);
+            if (messageExists) {
+              console.log('Sent message already exists via socket, skipping:', sentMessage._id);
+              return prev;
+            }
+            return [...prev, sentMessage];
+          });
+
+          // Update chat list to ensure the chat appears in sidebar with the new message
+          setChats(prev => {
+            const chatExists = prev.some(c => c._id === activeChat._id);
+
+            if (!chatExists) {
+              // Chat doesn't exist in sidebar - add it
+              return [activeChat, ...prev];
+            }
+
+            // Chat exists - update last message
+            return prev.map(chat =>
+              chat._id === activeChat._id
+                ? {
+                  ...chat,
+                  lastMessage: {
+                    _id: sentMessage._id,
+                    content: sentMessage.content,
+                    sender: sentMessage.sender,
+                    createdAt: sentMessage.createdAt
+                  }
+                }
+                : chat
+            );
+          });
+        }
+
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        toast.error('Failed to send message. Please try again.');
+      }
     }
   };
 
@@ -206,19 +487,21 @@ const Chat: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex bg-white">
-      {/* Chat Sidebar */}
-      <div className="w-80 border-r border-gray-200 flex flex-col">
-        <ChatSidebar
+    <div className="w-full h-full flex bg-white flex-col md:flex-row overflow-hidden">
+      <div className={`w-full md:w-[280px] md:border-r border-gray-200 flex flex-col h-full ${activeChat ? 'hidden md:flex' : ''}`}>
+        <ChatSidebarNew
           chats={chats}
           activeChat={activeChat}
           onChatSelect={handleChatSelect}
           onRefresh={fetchChats}
+          onChatCreated={handleChatCreated}
         />
       </div>
 
-      {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+      <div className={`
+        ${activeChat ? 'fixed top-0 left-0 z-50 w-full h-[100dvh] flex flex-col bg-white' : 'hidden'} 
+        md:static md:z-auto md:flex md:flex-1 md:flex-col md:h-full
+      `}>
         {activeChat ? (
           <ChatWindow
             chat={activeChat}
@@ -226,6 +509,7 @@ const Chat: React.FC = () => {
             currentUser={user!}
             onSendMessage={handleSendMessage}
             socket={socket}
+            onBack={() => setActiveChat(null)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">

@@ -59,7 +59,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
   const [inviting, setInviting] = useState(false);
 
   const [deleting, setDeleting] = useState(false);
-  
+
   // Migration state
   const [showMigration, setShowMigration] = useState(false);
   const [migrationData, setMigrationData] = useState<{ tasks: any[], projects: any[], subordinates: any[], memberName: string }>({ tasks: [], projects: [], subordinates: [], memberName: '' });
@@ -69,7 +69,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
 
   // Determine current user's role within this workspace for permission gating (used for display only)
   const currentUserRole = members.find((m) => m._id === user?._id)?.role || 'member';
-  
+
   // Consistent error message extraction for API failures
   const getErrorMessage = (error: any, fallback: string, specific?: Record<number, string>) => {
     const status = error?.response?.status as number | undefined;
@@ -83,7 +83,7 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
     if (status === 500) return 'Server error. Please try again later.';
     return error?.message || fallback;
   };
-  
+
 
   useEffect(() => {
     if (open && workspaceId) {
@@ -232,16 +232,16 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         fetchData('/workspace/all-tasks'),
         fetchData('/project/recent?limit=1000')
       ]);
-      
+
       const allTasks = tasksRes.tasks || [];
       const allProjects = projectsRes.projects || [];
 
-    const userTasks = allTasks.filter((t: any) => 
-       (t.assignedTo?._id === member._id || t.assignedTo === member._id) && 
-       (['todo', 'to-do', 'in_progress', 'in-progress'].includes(t.status) || t.approvalStatus === 'pending-approval')
-     );
+      const userTasks = allTasks.filter((t: any) =>
+        (t.assignedTo?._id === member._id || t.assignedTo === member._id) &&
+        (['todo', 'to-do', 'in_progress', 'in-progress'].includes(t.status) || t.approvalStatus === 'pending-approval')
+      );
       const leadProjects = allProjects.filter((p: any) => p.projectHead?._id === member._id);
-      
+
       let subordinates: any[] = [];
       allProjects.forEach((p: any) => {
         if (Array.isArray(p.members)) {
@@ -308,8 +308,8 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               setShowMigration(false);
               setPendingRemovalId(null);
@@ -331,17 +331,17 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="bg-[#E5EFFF] p-3 rounded-lg">
-              <Settings className="w-6 h-6 text-[#3a5afe]" />
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="bg-[#E5EFFF] p-2 md:p-3 rounded-lg">
+              <Settings className="w-5 h-5 md:w-6 md:h-6 text-[#3a5afe]" />
             </div>
             <div>
-              <DialogTitle className="text-[18px] font-semibold font-['Inter']">
+              <DialogTitle className="text-[16px] md:text-[18px] font-semibold font-['Inter']">
                 Workspace Settings
               </DialogTitle>
-              <p className="text-[14px] text-gray-500 font-['Inter'] mt-1">
+              <p className="text-[12px] md:text-[14px] text-gray-500 font-['Inter'] mt-1">
                 {workspace?.name || 'Select Workspace'}
               </p>
             </div>
@@ -349,179 +349,191 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
         </DialogHeader>
 
         {showMigration ? renderMigrationContent() : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="h-auto bg-transparent border-b-[0.5px] border-[#949291] rounded-none p-0 justify-start w-full gap-0 mb-2">
-            <TabsTrigger value="general" className="px-[12px] py-[8px] text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B]">
-              General
-            </TabsTrigger>
-            <TabsTrigger value="add" className="px-[12px] py-[8px] text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B]">
-              <UserPlus className="w-3.5 h-3.5 mr-1" /> Add Employee
-            </TabsTrigger>
-            <TabsTrigger value="roles" className="px-[12px] py-[8px] text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B]">
-              <Users className="w-3.5 h-3.5 mr-1" /> Change Roles
-            </TabsTrigger>
-            <TabsTrigger value="delete" className="px-[12px] py-[8px] text-[13px] font-['Inter'] data-[state=active]:border-b-[1px] data-[state=active]:border-[#F2761B]">
-              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete Workspace
-            </TabsTrigger>
-          </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-hidden">
+            <TabsList className="flex items-center gap-[10px] overflow-x-auto scrollbar-visible">
+              <TabsTrigger
+                value="general"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
+                General
+              </TabsTrigger>
+              <TabsTrigger
+                value="add"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
+                <UserPlus className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Add Employee
+              </TabsTrigger>
+              <TabsTrigger
+                value="roles"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
+                <Users className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Change Roles
+              </TabsTrigger>
+              <TabsTrigger
+                value="delete"
+                className="px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap opacity-60 data-[state=active]:opacity-100 data-[state=active]:border-b-[1px] data-[state=active]:border-[#f2761b]"
+              >
+                <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Delete Workspace
+              </TabsTrigger>
+            </TabsList>
 
-          {/* General Tab */}
-          <TabsContent value="general">
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">Workspace name</Label>
-                <Input
-                  type="text"
-                  value={generalName}
-                  onChange={(e) => setGeneralName(e.target.value)}
-                  placeholder="Workspace name"
-                  className="h-[40px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">Description</Label>
-                <textarea
-                  value={generalDescription}
-                  onChange={(e) => setGeneralDescription(e.target.value)}
-                  placeholder="Short description"
-                  className="h-[90px] w-full border border-[#d5d7da] rounded-[8px] px-[10px] py-[8px] text-[14px]"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleUpdateWorkspace}
-                  disabled={savingGeneral}
-                  className="bg-[#3a5afe] hover:bg-[#334fdc] text-white font-['Inter']"
-                >
-                  {savingGeneral ? 'Saving…' : 'Save Changes'}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Add Employee Tab */}
-          <TabsContent value="add">
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">
-                  Employee email <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  aria-required="true"
-                  className="h-[40px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">
-                  Role <span className="text-red-500">*</span>
-                </Label>
-                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'member' | 'admin' | 'lead' | 'viewer' | 'head')}>
-                  <SelectTrigger className="h-[40px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] font-['Inter'] text-[14px]">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent className="font-['Inter'] text-[14px]">
-                    <SelectItem value="member">Employee</SelectItem>
-                    <SelectItem value="lead">Lead</SelectItem>
-                    {/* Viewer role is deprecated in UI; commented out intentionally */}
-                    {/** <SelectItem value="viewer">Viewer</SelectItem> **/}
-                    {/* Head renamed to Lead in UI; keep backend value for compatibility */}
-                    {/* <SelectItem value="head">Lead</SelectItem> */}
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[12px] text-[#717182]">Employee can collaborate; Admin can manage employees and projects.</p>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleInvite}
-                  disabled={inviting}
-                  className="bg-[#f2761b] hover:bg-[#d96816] text-white font-['Inter']"
-                  aria-disabled={inviting}
-                >
-                  {inviting ? 'Adding…' : 'Add Employee'}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Change Roles Tab */}
-          <TabsContent value="roles">
-            <div className="space-y-3">
-              {loadingMembers ? (
-                <div className="flex items-center text-sm text-[#717182]"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading employees…</div>
-              ) : members.length === 0 ? (
-                <div className="text-sm text-[#717182]">No employees found for this workspace.</div>
-              ) : (
-                <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                  {members.map((member) => (
-                    <div key={member._id} className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <div className="font-medium text-[14px] text-[#040110] truncate">{member.name}</div>
-                          <div className="text-[12px] text-[#717182] truncate">{member.email}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={member.role}
-                            onValueChange={(val) => handleRoleChange(member, (val as 'member' | 'admin' | 'lead' | 'viewer' | 'head'))}
-                            disabled={member.role === 'owner'}
-                          >
-                            <SelectTrigger className="h-[34px] border-[#d5d7da] rounded-[8px] px-[10px] py-[6px] font-['Inter'] text-[13px]">
-                              <SelectValue placeholder="Role" />
-                            </SelectTrigger>
-                            <SelectContent className="font-['Inter'] text-[13px]">
-                              <SelectItem value="member">Employee</SelectItem>
-                              <SelectItem value="lead">Lead</SelectItem>
-                              {/* Viewer role is deprecated in UI; commented out intentionally */}
-                              {/** <SelectItem value="viewer">Viewer</SelectItem> **/}
-                              {/* Head renamed to Lead in UI; keep backend value for compatibility */}
-                              {/* <SelectItem value="head">Lead</SelectItem> */}
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            className="px-2 h-[34px] text-red-600 hover:text-red-700"
-                            aria-label={`Remove ${member.name}`}
-                            disabled={member.role === 'owner'}
-                            onClick={() => handleRemoveMember(member)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="w-full mt-2 text-[12px] text-[#717182]">
-                        {roleDescriptions[member.role] || ''}
-                      </div>
-                    </div>
-                  ))}
+            {/* General Tab */}
+            <TabsContent value="general">
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">Workspace name</Label>
+                  <Input
+                    type="text"
+                    value={generalName}
+                    onChange={(e) => setGeneralName(e.target.value)}
+                    placeholder="Workspace name"
+                    className="h-[40px]"
+                  />
                 </div>
-              )}
-            </div>
-          </TabsContent>
+                <div className="space-y-2">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">Description</Label>
+                  <textarea
+                    value={generalDescription}
+                    onChange={(e) => setGeneralDescription(e.target.value)}
+                    placeholder="Short description"
+                    className="h-[90px] w-full border border-[#d5d7da] rounded-[8px] px-[10px] py-[8px] text-[14px]"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleUpdateWorkspace}
+                    disabled={savingGeneral}
+                    className="bg-[#3a5afe] hover:bg-[#334fdc] text-white font-['Inter']"
+                  >
+                    {savingGeneral ? 'Saving…' : 'Save Changes'}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
 
-          {/* Delete Workspace Tab */}
-          <TabsContent value="delete">
-            <div className="space-y-3">
-              <div className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                Deleting a workspace is irreversible. All projects and data inside may become inaccessible.
+            {/* Add Employee Tab */}
+            <TabsContent value="add">
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">
+                    Employee email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    aria-required="true"
+                    className="h-[40px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">
+                    Role <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'member' | 'admin' | 'lead' | 'viewer' | 'head')}>
+                    <SelectTrigger className="h-[40px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] font-['Inter'] text-[14px]">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent className="font-['Inter'] text-[14px]">
+                      <SelectItem value="member">Employee</SelectItem>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      {/* Viewer role is deprecated in UI; commented out intentionally */}
+                      {/** <SelectItem value="viewer">Viewer</SelectItem> **/}
+                      {/* Head renamed to Lead in UI; keep backend value for compatibility */}
+                      {/* <SelectItem value="head">Lead</SelectItem> */}
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[12px] text-[#717182]">Employee can collaborate; Admin can manage employees and projects.</p>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleInvite}
+                    disabled={inviting}
+                    className="bg-[#f2761b] hover:bg-[#d96816] text-white font-['Inter']"
+                    aria-disabled={inviting}
+                  >
+                    {inviting ? 'Adding…' : 'Add Employee'}
+                  </Button>
+                </div>
               </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleDeleteWorkspace}
-                  disabled={deleting}
-                  className="bg-red-600 hover:bg-red-700 text-white font-['Inter']"
-                >
-                  {deleting ? 'Deleting…' : 'Delete Workspace'}
-                </Button>
+            </TabsContent>
+
+            {/* Change Roles Tab */}
+            <TabsContent value="roles">
+              <div className="space-y-3">
+                {loadingMembers ? (
+                  <div className="flex items-center text-sm text-[#717182]"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading employees…</div>
+                ) : members.length === 0 ? (
+                  <div className="text-sm text-[#717182]">No employees found for this workspace.</div>
+                ) : (
+                  <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                    {members.map((member) => (
+                      <div key={member._id} className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0">
+                            <div className="font-medium text-[14px] text-[#040110] truncate">{member.name}</div>
+                            <div className="text-[12px] text-[#717182] truncate">{member.email}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={member.role}
+                              onValueChange={(val) => handleRoleChange(member, (val as 'member' | 'admin' | 'lead' | 'viewer' | 'head'))}
+                              disabled={member.role === 'owner'}
+                            >
+                              <SelectTrigger className="h-[34px] border-[#d5d7da] rounded-[8px] px-[10px] py-[6px] font-['Inter'] text-[13px]">
+                                <SelectValue placeholder="Role" />
+                              </SelectTrigger>
+                              <SelectContent className="font-['Inter'] text-[13px]">
+                                <SelectItem value="member">Employee</SelectItem>
+                                <SelectItem value="lead">Lead</SelectItem>
+                                {/* Viewer role is deprecated in UI; commented out intentionally */}
+                                {/** <SelectItem value="viewer">Viewer</SelectItem> **/}
+                                {/* Head renamed to Lead in UI; keep backend value for compatibility */}
+                                {/* <SelectItem value="head">Lead</SelectItem> */}
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              className="px-2 h-[34px] text-red-600 hover:text-red-700"
+                              aria-label={`Remove ${member.name}`}
+                              disabled={member.role === 'owner'}
+                              onClick={() => handleRemoveMember(member)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="w-full mt-2 text-[12px] text-[#717182]">
+                          {roleDescriptions[member.role] || ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+
+            {/* Delete Workspace Tab */}
+            <TabsContent value="delete">
+              <div className="space-y-3">
+                <div className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  Deleting a workspace is irreversible. All projects and data inside may become inaccessible.
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleDeleteWorkspace}
+                    disabled={deleting}
+                    className="bg-red-600 hover:bg-red-700 text-white font-['Inter']"
+                  >
+                    {deleting ? 'Deleting…' : 'Delete Workspace'}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
 
         {!showMigration && (

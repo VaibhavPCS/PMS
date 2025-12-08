@@ -152,18 +152,18 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
   const breadcrumbItems = getBreadcrumbItems();
 
   return (
-    <div className="flex items-center text-[14px] text-[#717182] font-['Inter'] gap-[10px]">
+    <div className="flex items-center text-[12px] md:text-[14px] text-[#717182] font-['Inter'] gap-[8px] md:gap-[10px]">
       {/* Back Button */}
       <button
         onClick={handleBack}
-        className="flex items-center gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[14px] font-['Inter'] hover:text-[#040110] transition-colors p-0"
+        className="flex items-center gap-[6px] md:gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[12px] md:text-[14px] font-['Inter'] hover:text-[#040110] transition-colors p-0"
       >
-        <ArrowLeft size={16} strokeWidth={2} />
-        <span className="font-medium">Back</span>
+        <ArrowLeft size={14} strokeWidth={2} className="md:w-4 md:h-4" />
+        <span className="hidden md:inline font-medium">Back</span>
       </button>
 
       {/* Separator */}
-      <span className="text-[#949291] text-[16px]">/</span>
+      <span className="text-[#949291] text-[14px] md:text-[16px]">/</span>
 
       {/* Breadcrumb Items */}
       {breadcrumbItems.map((item, index) => (
@@ -175,21 +175,21 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
                 e.preventDefault();
                 navigate(item.href!);
               }}
-              className="flex items-center gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
+              className="flex items-center gap-[6px] md:gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
             >
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
+              <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
+              <span className="hidden md:inline">{item.label}</span>
             </a>
           ) : (
-            <div className={`flex items-center gap-[8px] ${item.isActive ? 'text-[#040110]' : 'text-[#717182]'}`}>
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
+            <div className={`flex items-center gap-[6px] md:gap-[8px] ${item.isActive ? 'text-[#040110]' : 'text-[#717182]'}`}>
+              <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
+              <span className="hidden md:inline">{item.label}</span>
             </div>
           )}
 
           {/* Separator between items (except last) */}
           {index < breadcrumbItems.length - 1 && (
-            <span className="text-[#949291] text-[16px]">/</span>
+            <span className="text-[#949291] text-[14px] md:text-[16px]">/</span>
           )}
         </React.Fragment>
       ))}

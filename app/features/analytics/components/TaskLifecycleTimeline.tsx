@@ -29,7 +29,15 @@ const colorClass = (t: string) => {
   return 'text-blue-600 bg-blue-50';
 };
 
-const formatTs = (ts: string) => new Date(ts).toLocaleString();
+const formatTs = (ts: string) => {
+  const date = new Date(ts);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
 const titleMap: Record<string, string> = {
   created: 'Created',
   assigned: 'Assigned',
