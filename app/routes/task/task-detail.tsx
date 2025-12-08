@@ -611,7 +611,7 @@ const ChatMessage: React.FC<{
               )}
             </div>
 
-            <div
+            {/* <div
               className={`flex items-center gap-2 mt-1 text-xs ${isOwnMessage ? "justify-end" : "justify-start"
                 }`}
             >
@@ -642,7 +642,7 @@ const ChatMessage: React.FC<{
                   Delete
                 </button>
               )}
-            </div>
+            </div> */}
 
             {hasReplies && (
               <div className="mt-2">
@@ -1731,7 +1731,7 @@ const TaskDetail = () => {
                     className="w-[20px] h-[20px]"
                     viewBox="0 0 20 20"
                     fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+                    // xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
                       d="M6 10L9 13L14 7"
