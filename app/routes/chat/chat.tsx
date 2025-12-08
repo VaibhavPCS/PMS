@@ -146,6 +146,9 @@ const Chat: React.FC = () => {
     console.log('🔌 Initializing socket connection for user:', user.name);
     isConnectingRef.current = true;
 
+    // Track if this effect instance is still mounted
+    let isMounted = true;
+
     const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
       withCredentials: true, // Send HTTP-only cookies
       transports: ['websocket', 'polling'],
@@ -155,6 +158,11 @@ const Chat: React.FC = () => {
     });
 
     newSocket.on('connect', () => {
+      if (!isMounted) {
+        // Component unmounted during connection (React Strict Mode), close silently
+        newSocket.disconnect();
+        return;
+      }
       console.log('✅ Socket connected successfully!', newSocket.id);
       isConnectingRef.current = false;
 
@@ -164,6 +172,11 @@ const Chat: React.FC = () => {
         newSocket.emit('join-chat', pendingChatJoinRef.current);
         pendingChatJoinRef.current = null;
       }
+    });
+
+    // Debug: Log all incoming events
+    newSocket.onAny((eventName, ...args) => {
+      console.log('🔔 Socket event received:', eventName, args);
     });
 
     newSocket.on('connect_error', (error) => {
@@ -176,39 +189,62 @@ const Chat: React.FC = () => {
       }
     });
 
+    // Helper to fetch chat if it doesn't exist locally (for new direct chats initiated by others)
+    const fetchMissingChat = async (chatId: string) => {
+      try {
+        const response = await fetchData(`/chats/${chatId}`);
+        if (response.chat) {
+          setChats(current => {
+            // Check again to avoid duplicates
+            if (current.some(c => c._id === chatId)) return current;
+            return [response.chat, ...current];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch missing chat:', err);
+      }
+    };
+
     newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
-      console.log('Socket: new-message received', data);
       const { message } = data;
       // Use ref to get the latest activeChat value
       const currentActiveChat = activeChatRef.current;
-      console.log('Current active chat:', currentActiveChat?._id, 'Message chat:', message.chat);
 
+      // Update active chat messages if matched
       if (currentActiveChat && message.chat === currentActiveChat._id) {
-        // Check if message already exists to prevent duplicates
-        // This can happen when the sender's own message is broadcast back to them
         setMessages(prev => {
           const messageExists = prev.some(m => m._id === message._id);
           if (messageExists) {
-            console.log('Message already exists, skipping duplicate:', message._id);
             return prev;
           }
-          console.log('Adding message to current chat');
           return [...prev, message];
         });
       }
-      // Update chat list with new last message
-      setChats(prev => prev.map(chat =>
-        chat._id === message.chat
-          ? {
-            ...chat, lastMessage: {
-              _id: message._id,
-              content: message.content,
-              sender: message.sender,
-              createdAt: message.createdAt
+
+      // Update chat list with new last message OR fetch if missing
+      setChats(prev => {
+        const chatExists = prev.some(c => c._id === message.chat);
+
+        if (!chatExists) {
+          // Chat doesn't exist in sidebar - fetch it
+          fetchMissingChat(message.chat);
+          return prev;
+        }
+
+        // Chat exists - just update last message
+        return prev.map(chat =>
+          chat._id === message.chat
+            ? {
+              ...chat, lastMessage: {
+                _id: message._id,
+                content: message.content,
+                sender: message.sender,
+                createdAt: message.createdAt
+              }
             }
-          }
-          : chat
-      ));
+            : chat
+        );
+      });
     });
 
     newSocket.on('joined-chat', (data: { chatId: string }) => {
@@ -243,6 +279,7 @@ const Chat: React.FC = () => {
     setSocket(newSocket);
 
     return () => {
+      isMounted = false;
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -289,6 +326,22 @@ const Chat: React.FC = () => {
     }
   };
 
+  const handleChatCreated = (chat?: any) => {
+    if (chat) {
+      // If a chat object is provided, add it to the sidebar immediately
+      setChats(prev => {
+        const exists = prev.some(c => c._id === chat._id);
+        if (!exists) {
+          return [chat, ...prev];
+        }
+        return prev;
+      });
+    } else {
+      // If no chat provided, do a full refresh
+      fetchChats();
+    }
+  };
+
   const fetchMessages = async (chatId: string) => {
     try {
       const response = await fetchData(`/messages/chat/${chatId}`);
@@ -302,14 +355,21 @@ const Chat: React.FC = () => {
     setActiveChat(chat);
     fetchMessages(chat._id);
 
+    // Add chat to local state if not already there (for newly created chats)
+    setChats(prev => {
+      const exists = prev.some(c => c._id === chat._id);
+      if (!exists) {
+        return [chat, ...prev];
+      }
+      return prev;
+    });
+
     // Join chat room for real-time updates
     const currentSocket = socketRef.current;
     if (currentSocket && currentSocket.connected) {
-      console.log('📤 Emitting join-chat event for chat:', chat._id);
       currentSocket.emit('join-chat', chat._id);
     } else {
       // Socket not ready yet, store pending join
-      console.log('🔄 Socket not ready, queueing chat join for:', chat._id);
       pendingChatJoinRef.current = chat._id;
     }
   };
@@ -355,6 +415,31 @@ const Chat: React.FC = () => {
             }
             return [...prev, sentMessage];
           });
+
+          // Update chat list to ensure the chat appears in sidebar with the new message
+          setChats(prev => {
+            const chatExists = prev.some(c => c._id === activeChat._id);
+
+            if (!chatExists) {
+              // Chat doesn't exist in sidebar - add it
+              return [activeChat, ...prev];
+            }
+
+            // Chat exists - update last message
+            return prev.map(chat =>
+              chat._id === activeChat._id
+                ? {
+                  ...chat,
+                  lastMessage: {
+                    _id: sentMessage._id,
+                    content: sentMessage.content,
+                    sender: sentMessage.sender,
+                    createdAt: sentMessage.createdAt
+                  }
+                }
+                : chat
+            );
+          });
         }
 
       } catch (error) {
@@ -383,6 +468,7 @@ const Chat: React.FC = () => {
           activeChat={activeChat}
           onChatSelect={handleChatSelect}
           onRefresh={fetchChats}
+          onChatCreated={handleChatCreated}
         />
       </div>
 

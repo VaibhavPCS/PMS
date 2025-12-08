@@ -41,32 +41,38 @@ interface ChatSidebarNewProps {
   activeChat: Chat | null;
   onChatSelect: (chat: Chat) => void;
   onRefresh: () => void;
+  onChatCreated?: (chat?: any) => void;
 }
 
 const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
   chats,
   activeChat,
   onChatSelect,
-  onRefresh
+  onRefresh,
+  onChatCreated
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'groups'>('all');
   const { user } = useAuth();
+  const currentUserId = (user as any)?._id || (user as any)?.id;
+
+  const getChatName = (chat: Chat) => {
+    if (chat.name) return chat.name;
+    if (chat.type === 'direct') {
+      const other = chat.participants.find(p => {
+        const pId = (p.user as any)?._id || (p.user as any)?.id || p.user;
+        return pId !== currentUserId;
+      });
+      return other?.user?.name || 'Direct message';
+    }
+    return chat.participants.map(p => p.user.name).filter(Boolean).join(', ');
+  };
 
   // Filter chats based on search and tab
   const filteredChats = chats.filter(chat => {
     // Search filter
-    let chatName = chat.name || '';
-    if (!chatName) {
-      if (chat.type === 'direct') {
-        const other = chat.participants.find(p => p.user._id !== user?._id);
-        chatName = other?.user?.name || '';
-      } else {
-        const names = chat.participants.map(p => p.user.name).filter(Boolean);
-        chatName = names.join(', ');
-      }
-    }
+    const chatName = getChatName(chat);
 
     const matchesSearch = chatName.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
@@ -83,14 +89,7 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
 
   const totalUnread = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
 
-  const getChatName = (chat: Chat) => {
-    if (chat.name) return chat.name;
-    if (chat.type === 'direct') {
-      const other = chat.participants.find(p => p.user._id !== user?._id);
-      return other?.user?.name || 'Direct message';
-    }
-    return chat.participants.map(p => p.user.name).filter(Boolean).join(', ');
-  };
+  const getChatNameOriginal = (chat: Chat) => getChatName(chat);
 
   const formatUnread = (count?: number) => {
     if (!count || count <= 0) return null;
@@ -131,7 +130,10 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
       );
     }
 
-    const otherParticipant = chat.participants.find(p => p.user._id !== user?._id);
+    const otherParticipant = chat.participants.find(p => {
+      const pId = (p.user as any)?._id || (p.user as any)?.id || p.user;
+      return pId !== currentUserId;
+    });
     if (!otherParticipant) return null;
 
     return (
@@ -346,7 +348,8 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
       <CreateChatModal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onChatCreated={onRefresh}
+        onChatCreated={onChatCreated || onRefresh}
+        onSelectChat={onChatSelect}
       />
     </div>
   );
