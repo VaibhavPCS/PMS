@@ -168,8 +168,13 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
     if (!chat.lastMessage) return '';
 
     const isCurrentUser = chat.lastMessage.sender._id === user?._id;
-    const senderName = isCurrentUser ? 'You' : (chat.lastMessage.sender.name || 'Unknown').split(' ')[0];
 
+    // Don't show preview if the current user is the sender
+    if (isCurrentUser) {
+      return null;
+    }
+
+    const senderName = (chat.lastMessage.sender.name || 'Unknown').split(' ')[0];
     let content = chat.lastMessage.content || '';
 
     // Skip encoded content or placeholder text - only show real text
@@ -181,10 +186,7 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
 
     return (
       <>
-        <span className={cn(
-          "font-normal",
-          isCurrentUser ? "text-[#949291]" : "text-[#949291]"
-        )}>
+        <span className="font-normal text-[#949291]">
           {senderName}:
         </span>{' '}
         <span className="font-normal text-[#717182]">
