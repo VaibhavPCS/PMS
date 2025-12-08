@@ -123,7 +123,7 @@ interface Task {
   _id: string;
   title: string;
   description: string;
-  status: "to-do" | "in-progress" | "done";
+  status: "to-do" | "in-progress" | "on-hold" | "done";
   priority: "low" | "medium" | "high" | "urgent";
   assignee?: { _id: string; name: string; email: string } | null;
   creator: { _id: string; name: string; email: string };
@@ -170,7 +170,7 @@ interface AssignableMember {
 
 interface FilterType {
   search: string;
-  status: "all" | "to-do" | "in-progress" | "done";
+  status: "all" | "to-do" | "in-progress" | "on-hold" | "done";
   priority: "all" | "low" | "medium" | "high" | "urgent";
   assignee: string; // "all" or user ID
 }
@@ -212,6 +212,7 @@ const getStatusColor = (status: string) => {
   const colors = {
     done: "bg-green-50 text-green-700 border-green-200",
     "in-progress": "bg-blue-50 text-blue-700 border-blue-200",
+    "on-hold": "bg-yellow-50 text-yellow-700 border-yellow-200",
     "to-do": "bg-gray-50 text-gray-700 border-gray-200",
   };
   return (
@@ -409,6 +410,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const baseColors: Record<string, string> = {
         "to-do": "bg-gray-100 text-gray-800",
         "in-progress": "bg-blue-100 text-blue-800",
+        "on-hold": "bg-yellow-100 text-yellow-800",
         done: "bg-green-100 text-green-800",
       };
 
@@ -422,6 +424,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const borderColors: Record<string, string> = {
         "to-do": "border-l-gray-500 border-r-gray-500",
         "in-progress": "border-l-blue-500 border-r-blue-500",
+        "on-hold": "border-l-yellow-500 border-r-yellow-500",
         done: "border-l-green-500 border-r-green-500",
       };
 
@@ -1542,7 +1545,7 @@ const ProjectDetail = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileKanbanStatus, setMobileKanbanStatus] = useState<"to-do" | "in-progress" | "done">("to-do");
+  const [mobileKanbanStatus, setMobileKanbanStatus] = useState<"to-do" | "in-progress" | "on-hold" | "done">("to-do");
   const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Attachment state
@@ -1564,6 +1567,7 @@ const ProjectDetail = () => {
     assigneeId: "",
     startDate: "",
     dueDate: "",
+    rejectionAttachmentType: "either", // ✅ NEW: Default to 'either'
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
@@ -2004,6 +2008,7 @@ const ProjectDetail = () => {
           formData.append("startDate", newTask.startDate);
           formData.append("dueDate", newTask.dueDate);
           formData.append("projectId", projectId || "");
+          formData.append("rejectionAttachmentType", newTask.rejectionAttachmentType); // ✅ NEW
 
           taskAttachments.forEach((file) => {
             formData.append("attachments", file);
@@ -2027,6 +2032,7 @@ const ProjectDetail = () => {
           assigneeId: "",
           startDate: "",
           dueDate: "",
+          rejectionAttachmentType: "either", // ✅ NEW
         });
         setStartDateObj(undefined);
         setDueDateObj(undefined);
@@ -2749,13 +2755,16 @@ const ProjectDetail = () => {
                     {isMobile && (
                       <div className="mb-3">
                         <label className="text-xs font-medium text-gray-700 mb-1.5 block">View Status</label>
-                        <Select value={mobileKanbanStatus} onValueChange={(value: "to-do" | "in-progress" | "done") => setMobileKanbanStatus(value)}>
+                        <Select value={mobileKanbanStatus} onValueChange={(value: "to-do" | "in-progress" | "on-hold" | "done") => setMobileKanbanStatus(value)}>
                           <SelectTrigger className="h-9 text-sm">
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="to-do">To Do</SelectItem>
                             <SelectItem value="in-progress">In Progress</SelectItem>
+                            {(isAdmin || isProjectLead || projectRole === "owner") && (
+                              <SelectItem value="on-hold">On Hold</SelectItem>
+                            )}
                             <SelectItem value="done">Done</SelectItem>
                           </SelectContent>
                         </Select>
@@ -2764,7 +2773,7 @@ const ProjectDetail = () => {
                   </div>
 
                   <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
+                      <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : (isAdmin || isProjectLead || projectRole === "owner") ? "md:grid-cols-4" : "md:grid-cols-3")}>
                         {/* Show all columns on desktop, only selected status on mobile */}
                         {(!isMobile || mobileKanbanStatus === "to-do") && (
                           <DroppableColumn
@@ -2824,6 +2833,37 @@ const ProjectDetail = () => {
                               ))}
                           </SortableContext>
                         </DroppableColumn>
+                        )}
+
+                        {/* ✅ NEW: On Hold Column - Only visible to admins, project leads, and owners */}
+                        {(isAdmin || isProjectLead || projectRole === "owner") && (!isMobile || mobileKanbanStatus === "on-hold") && (
+                          <DroppableColumn
+                            id="on-hold"
+                            title="On Hold"
+                            count={kanbanFilteredTasks.filter((t) => t.status === "on-hold").length}
+                            total={kanbanFilteredTasks.length}
+                            color="bg-yellow-500"
+                          >
+                            <SortableContext
+                              items={kanbanFilteredTasks.filter((t) => t.status === "on-hold").map((t) => t._id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {kanbanFilteredTasks
+                                .filter((t) => t.status === "on-hold")
+                                .map((task) => (
+                                  <SortableTaskCard
+                                    key={task._id}
+                                    task={task}
+                                    currentUser={currentUser}
+                                    userRole={userRole}
+                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                    assignableMembers={filteredAssignableMembers}
+                                    canAssignVisible={isAdmin || isProjectLead}
+                                    project={project}
+                                  />
+                                ))}
+                            </SortableContext>
+                          </DroppableColumn>
                         )}
 
                         {(!isMobile || mobileKanbanStatus === "done") && (
@@ -3113,6 +3153,27 @@ const ProjectDetail = () => {
                   rows={3}
                   className="resize-none text-sm"
                 />
+              </div>
+
+              {/* ✅ NEW: Rejection Attachment Type Selector */}
+              <div className="space-y-1">
+                <Label className="text-sm">Rejection Attachment Requirement</Label>
+                <Select
+                  value={newTask.rejectionAttachmentType}
+                  onValueChange={(value: string) => setNewTask({ ...newTask, rejectionAttachmentType: value })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="either">File or Link (Either)</SelectItem>
+                    <SelectItem value="file">File Required</SelectItem>
+                    <SelectItem value="link">Link Required (Figma/GitHub)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Specify what type of attachment is required when rejecting this task
+                </p>
               </div>
 
               <div className="space-y-1">
