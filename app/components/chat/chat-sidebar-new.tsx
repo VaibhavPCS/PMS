@@ -332,12 +332,12 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-end justify-between">
+                    {/* Last message preview - commented out as per user request */}
+                    {/* <div className="flex items-end justify-between">
                       <p className="flex-1 text-[12px] font-medium text-[#717178] truncate">
                         {getLastMessagePreview(chat)}
                       </p>
-
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               );
