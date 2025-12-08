@@ -436,7 +436,10 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
     date,
     compact = false,
   }) => {
-    const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "done";
+    // Task is overdue if due date is before today (not today or later)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isOverdue = new Date(task.dueDate) < today && task.status !== "done";
     const positionType = getTaskPositionType(task, date);
     const isStartDay = positionType === "start" || positionType === "single";
 
@@ -872,7 +875,10 @@ const TaskCard = React.memo<{
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== "done";
+  // Task is overdue if due date is before today (not today or later)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isOverdue = new Date(task.dueDate) < today && task.status !== "done";
 
   // ✅ ENHANCED: Permission checks aligned with backend
   const isAdmin = useMemo(() => {
@@ -1679,12 +1685,16 @@ const ProjectDetail = () => {
         ? kanbanFilteredTasks
         : userTasks;
 
+    // Get today's date at midnight for overdue calculation
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return {
       total: relevantTasks.length,
       completed: relevantTasks.filter((t) => t.status === "done").length,
       inProgress: relevantTasks.filter((t) => t.status === "in-progress").length,
       overdue: relevantTasks.filter(
-        (t) => new Date(t.dueDate) < new Date() && t.status !== "done"
+        (t) => new Date(t.dueDate) < today && t.status !== "done"
       ).length,
     };
   }, [allTasks, userTasks, kanbanFilteredTasks, userRole, currentUser, project]);

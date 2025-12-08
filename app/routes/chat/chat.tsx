@@ -221,29 +221,55 @@ const Chat: React.FC = () => {
         });
       }
 
-      // Update chat list with new last message OR fetch if missing
+      // Update chat list with new last message OR add if missing
       setChats(prev => {
-        const chatExists = prev.some(c => c._id === message.chat);
+        const chatIndex = prev.findIndex(c => c._id === message.chat);
 
-        if (!chatExists) {
-          // Chat doesn't exist in sidebar - fetch it
+        if (chatIndex === -1) {
+          // Chat doesn't exist in sidebar - fetch full details in background
           fetchMissingChat(message.chat);
-          return prev;
+
+          // Immediately create a temporary chat object to show in sidebar
+          // This ensures the chat appears instantly while we fetch full details
+          const tempChat: Chat = {
+            _id: message.chat,
+            type: 'direct', // Will be updated when full chat is fetched
+            participants: [
+              {
+                user: message.sender,
+                role: 'member',
+                joinedAt: new Date().toISOString()
+              }
+            ],
+            lastMessage: {
+              _id: message._id,
+              content: message.content,
+              sender: message.sender,
+              createdAt: message.createdAt
+            },
+            createdAt: message.createdAt,
+            updatedAt: message.createdAt
+          };
+
+          return [tempChat, ...prev];
         }
 
-        // Chat exists - just update last message
-        return prev.map(chat =>
-          chat._id === message.chat
-            ? {
-              ...chat, lastMessage: {
-                _id: message._id,
-                content: message.content,
-                sender: message.sender,
-                createdAt: message.createdAt
-              }
-            }
-            : chat
-        );
+        // Chat exists - just update last message and move to top
+        const updatedChat = {
+          ...prev[chatIndex],
+          lastMessage: {
+            _id: message._id,
+            content: message.content,
+            sender: message.sender,
+            createdAt: message.createdAt
+          },
+          updatedAt: message.createdAt
+        };
+
+        // Remove from current position and add to top
+        const newChats = [...prev];
+        newChats.splice(chatIndex, 1);
+        return [updatedChat, ...newChats];
       });
     });
 
