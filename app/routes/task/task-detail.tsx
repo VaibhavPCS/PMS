@@ -611,7 +611,7 @@ const ChatMessage: React.FC<{
               )}
             </div>
 
-            <div
+            {/* <div
               className={`flex items-center gap-2 mt-1 text-xs ${isOwnMessage ? "justify-end" : "justify-start"
                 }`}
             >
@@ -642,7 +642,7 @@ const ChatMessage: React.FC<{
                   Delete
                 </button>
               )}
-            </div>
+            </div> */}
 
             {hasReplies && (
               <div className="mt-2">
@@ -968,9 +968,9 @@ const TaskDetail = () => {
     handoverEditor.on('selectionUpdate', updateActive);
     handoverEditor.on('update', updateActive);
     return () => {
-      try { handoverEditor.off('transaction', updateActive); } catch {}
-      try { handoverEditor.off('selectionUpdate', updateActive); } catch {}
-      try { handoverEditor.off('update', updateActive); } catch {}
+      try { handoverEditor.off('transaction', updateActive); } catch { }
+      try { handoverEditor.off('selectionUpdate', updateActive); } catch { }
+      try { handoverEditor.off('update', updateActive); } catch { }
     };
   }, [handoverEditor]);
 
@@ -2228,42 +2228,42 @@ const TaskDetail = () => {
               </CardContent>
             </Card>
             {isTLAssignedToParent && (
-            <Card className="shadow-sm border-gray-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Subtasks</CardTitle>
-                  {canCreateSubtask && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowCreateSubtask(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
-                    >
-                      Create Subtask
-                    </Button>
-                  )}
-                </div>
-                <CardDescription className="text-xs sm:text-sm">Manage subtasks for this task</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {subtasks.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="text-xs sm:text-sm">No subtasks yet.</p>
+              <Card className="shadow-sm border-gray-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Subtasks</CardTitle>
+                    {canCreateSubtask && (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowCreateSubtask(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
+                      >
+                        Create Subtask
+                      </Button>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {subtasks.map((st) => (
-                      <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
-                          <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
+                  <CardDescription className="text-xs sm:text-sm">Manage subtasks for this task</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {subtasks.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-xs sm:text-sm">No subtasks yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subtasks.map((st) => (
+                        <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
+                            <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
+                          </div>
+                          <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
                         </div>
-                        <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
