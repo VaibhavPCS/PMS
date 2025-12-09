@@ -267,7 +267,7 @@ export function AddProjectModal({ open, onClose, onProjectAdded }: AddProjectMod
                   </SelectContent>
                 </Select>
                 <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
-                  Only employees with the ‘lead’ role can be selected
+                  Only employees with the 'lead' role can be selected
                 </p>
               </div>
 
