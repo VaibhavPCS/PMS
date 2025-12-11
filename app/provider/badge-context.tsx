@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { fetchData } from '@/lib/fetch-util';
 import { io } from 'socket.io-client';
+import { useAuth } from './auth-context';
 
 interface BadgeCounts {
   notifications: number;
@@ -19,8 +20,10 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     notifications: 0,
     messages: 0,
   });
+  const { isAuthenticated } = useAuth();
 
   const refreshBadgeCounts = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       // Fetch notifications count
       const notificationResponse = await fetchData('/notification');
@@ -31,9 +34,8 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         const messagesResponse = await fetchData('/chats/unread/count');
         unreadMessages = messagesResponse.count || 0;
-        console.log('BadgeContext: unreadMessages fetched:', unreadMessages);
       } catch (e) {
-        console.error('Failed to fetch chat unread count in BadgeContext', e);
+        // ignore network errors silently
       }
 
       setBadgeCounts({
@@ -41,14 +43,16 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         messages: unreadMessages,
       });
     } catch (error) {
-      console.error('Failed to fetch badge counts:', error);
+      // ignore network errors silently
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const activeChatIdRef = React.useRef<string | null>(null);
 
   useEffect(() => {
-    refreshBadgeCounts();
+    if (isAuthenticated) {
+      refreshBadgeCounts();
+    }
 
     const handleChatRead = (e: CustomEvent) => {
       setBadgeCounts(prev => ({ ...prev, messages: Math.max(0, prev.messages - (e.detail?.count || 0)) }));
@@ -65,31 +69,35 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.addEventListener('chat:refresh-unread', handleRefresh);
 
     // Socket connection for real-time updates
-    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      withCredentials: true,
-      transports: ['websocket', 'polling'],
-    });
+    const newSocket = isAuthenticated
+      ? io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+          withCredentials: true,
+          transports: ['websocket', 'polling'],
+        })
+      : null;
 
-    newSocket.on('new-message', (data: { message: any; chatId: string }) => {
-      const isChatOpen = activeChatIdRef.current === data.chatId;
-      const isWindowFocused = document.hasFocus();
+    if (newSocket) {
+      newSocket.on('new-message', (data: { message: any; chatId: string }) => {
+        const isChatOpen = activeChatIdRef.current === data.chatId;
+        const isWindowFocused = document.hasFocus();
 
-      if (!isChatOpen || !isWindowFocused) {
-        setBadgeCounts(prev => ({ ...prev, messages: prev.messages + 1 }));
-      }
-    });
+        if (!isChatOpen || !isWindowFocused) {
+          setBadgeCounts(prev => ({ ...prev, messages: prev.messages + 1 }));
+        }
+      });
+    }
 
     // Refresh badge counts every 30 seconds
-    const interval = setInterval(refreshBadgeCounts, 30000);
+    const interval = isAuthenticated ? setInterval(refreshBadgeCounts, 30000) : undefined;
 
     return () => {
       window.removeEventListener('chat:read', handleChatRead as EventListener);
       window.removeEventListener('chat:active-change', handleActiveChange as EventListener);
       window.removeEventListener('chat:refresh-unread', handleRefresh);
-      clearInterval(interval);
-      newSocket.disconnect();
+      if (interval) clearInterval(interval as unknown as number);
+      if (newSocket) newSocket.disconnect();
     };
-  }, [refreshBadgeCounts]);
+  }, [refreshBadgeCounts, isAuthenticated]);
 
   return (
     <BadgeContext.Provider value={{ badgeCounts, refreshBadgeCounts }}>

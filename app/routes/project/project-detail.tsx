@@ -3197,7 +3197,7 @@ const ProjectDetail = () => {
 
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  {/* <button
+                  <button
                     type="button"
                     role="checkbox"
                     aria-checked={isRecurring}
@@ -3217,7 +3217,7 @@ const ProjectDetail = () => {
                     onClick={() => setIsRecurring(!isRecurring)}
                   >
                     Recurring Task
-                  </label> */}
+                  </label>
                 </div>
 
                 {isRecurring && (

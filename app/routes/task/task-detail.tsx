@@ -2154,7 +2154,7 @@ const TaskDetail = () => {
                     </div>
 
                     {/* ✅ NEW: Recurring Task Information */}
-                    {/* {task.isRecurring && (
+                    {task.isRecurring && (
                       <div className="border border-blue-200 rounded-[8px] p-3 bg-blue-50/50 space-y-2">
                         <div className="flex items-center gap-2">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
@@ -2209,7 +2209,7 @@ const TaskDetail = () => {
                           </div>
                         )}
                       </div>
-                    )} */}
+                    )}
 
                     {/* Status - Full width */}
                     <div className="flex flex-col gap-[5px]">
