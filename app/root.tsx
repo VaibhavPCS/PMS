@@ -18,7 +18,7 @@ export const links = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
-    href: "https://fonts.gstatic.com",     
+    href: "https://fonts.gstatic.com",
     crossOrigin: "anonymous",
   },
   {
@@ -41,7 +41,7 @@ export function meta() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

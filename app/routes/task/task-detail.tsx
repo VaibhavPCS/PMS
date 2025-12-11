@@ -28,6 +28,7 @@ import {
   File,
   Image,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import RichTextEditor from "@/components/ui/rich-text-editor";
 import { Button } from "@/components/ui/button";
@@ -1022,9 +1023,9 @@ const TaskDetail = () => {
     handoverEditor.on('selectionUpdate', updateActive);
     handoverEditor.on('update', updateActive);
     return () => {
-      try { handoverEditor.off('transaction', updateActive); } catch {}
-      try { handoverEditor.off('selectionUpdate', updateActive); } catch {}
-      try { handoverEditor.off('update', updateActive); } catch {}
+      try { handoverEditor.off('transaction', updateActive); } catch { }
+      try { handoverEditor.off('selectionUpdate', updateActive); } catch { }
+      try { handoverEditor.off('update', updateActive); } catch { }
     };
   }, [handoverEditor]);
 
@@ -1213,7 +1214,13 @@ const TaskDetail = () => {
     }
 
     if (task.approvalStatus === "approved") {
-      toast.error("Approved tasks are locked and cannot change status");
+      toast.error("This task has been approved and is locked. It must be reassigned to make changes.");
+      return;
+    }
+
+    // Prevent status changes when task is done and awaiting approval
+    if (task.status === "done" && task.approvalStatus === "pending-approval") {
+      toast.error("This task is awaiting approval. It must be approved, rejected, or reassigned before status can be changed.");
       return;
     }
 
@@ -1235,7 +1242,8 @@ const TaskDetail = () => {
     try {
       setIsChangingStatus(true);
       await postData(`/task/${taskId}/status`, { status: newStatus });
-      setTask({ ...task, status: newStatus as any });
+      // Refresh task details to get latest state (including approval status side-effects)
+      await fetchTaskDetails();
       toast.success("Task status updated");
     } catch (error) {
       console.error("Failed to update task status:", error);
@@ -1851,13 +1859,23 @@ const TaskDetail = () => {
   const isProjectHead = String(task?.project?.projectHead?._id || task?.project?.projectHead || '') === String(activeUser?._id || activeUser?.id || '');
   const meMemberEntry = assignableMembers.find((m) => String(m._id) === String(activeUser?._id || activeUser?.id || ''));
   const isTLAssignedToParent = Boolean(meMemberEntry && (meMemberEntry.role === 'tl') && isAssignee);
-  const canCreateSubtask = isTLAssignedToParent && task?.status !== 'done';
   const canApprove = task?.status === "done" && task?.approvalStatus === "pending-approval" && isCreator;
 
   // ✅ NEW: Hold/Resume permissions
   const isTL = Boolean(meMemberEntry && (meMemberEntry.role === 'tl'));
   const canPutOnHold = (isAssignee || isProjectHead || isTL || isAdmin) && ['to-do', 'in-progress'].includes(task?.status || '');
   const canResume = (isAssignee || isProjectHead || isTL || isAdmin) && task?.currentlyOnHold;
+
+  // ✅ NEW: Task locking logic - lock when done and awaiting approval or approved
+  // Only unlock when rejected or reassigned
+  const isTaskLocked = task?.status === 'done' &&
+    (task?.approvalStatus === 'pending-approval' || task?.approvalStatus === 'approved');
+
+  // Show warning banner when task is locked
+  const showLockWarning = isTaskLocked && isAssignee;
+
+  // Subtask creation permission - only TL assigned to parent, task not locked
+  const canCreateSubtask = isTLAssignedToParent && !isTaskLocked;
 
   if (loading) {
     return (
@@ -1946,7 +1964,7 @@ const TaskDetail = () => {
                     className="w-[20px] h-[20px]"
                     viewBox="0 0 20 20"
                     fill="none"
-                    // xmlns="http://www.w3.org/2000/svg"
+                  // xmlns="http://www.w3.org/2000/svg"
                   >
                     <path
                       d="M6 10L9 13L14 7"
@@ -1972,6 +1990,29 @@ const TaskDetail = () => {
           />
         </div>
 
+        {/* Warning Banner for Locked Tasks */}
+        {showLockWarning && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  Task Locked
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>
+                    This task is currently locked because it's {task?.approvalStatus === 'approved' ? 'been approved' : 'awaiting approval'}.
+                    {isCreator
+                      ? ' You can reassign this task to unlock it and make changes.'
+                      : ' The task creator must reassign it to unlock and make changes.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modern Responsive Layout */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
@@ -2025,37 +2066,39 @@ const TaskDetail = () => {
                         </Button>
                       )}
 
-                      {/* Hold Button */}
-                      {canPutOnHold && (
-                        <Button
-                          size="sm"
-                          onClick={() => setShowHoldDialog(true)}
-                          disabled={isHolding}
-                          className="bg-white border border-[#d5d7da] text-[#414651] hover:bg-gray-50 font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-full xs:w-auto justify-center"
-                        >
-                          <PauseCircle className="w-4 h-4 mr-2" />
-                          {isHolding ? "Putting on hold..." : "Put on Hold"}
-                        </Button>
-                      )}
-
-                      {/* Resume Button */}
-                      {canResume && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            // Check if end date was crossed during hold
-                            const lastHold = task.holdHistory?.[task.holdHistory.length - 1];
-                            if (lastHold?.endDateCrossedDuringHold) {
-                              setEndDateCrossed(true);
+                      {/* Status Dropdown - Unified Control */}
+                      {(isAssignee || isProjectHead || isAdmin || isTL) && !isTaskLocked && (
+                        <Select
+                          value={task.currentlyOnHold ? "on-hold" : task.status}
+                          onValueChange={(value) => {
+                            if (value === "on-hold") {
+                              setShowHoldDialog(true);
+                            } else if (task.currentlyOnHold && value !== "on-hold") {
+                              // Trigger Resume Flow
+                              const lastHold = task.holdHistory?.[task.holdHistory.length - 1];
+                              if (lastHold?.endDateCrossedDuringHold) {
+                                setEndDateCrossed(true);
+                              }
+                              setShowResumeDialog(true);
+                            } else {
+                              handleStatusChange(value);
                             }
-                            setShowResumeDialog(true);
                           }}
-                          disabled={isResuming}
-                          className="bg-[#3b82f6] hover:bg-[#2563eb] text-white font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-full xs:w-auto justify-center"
+                          disabled={isChangingStatus || isHolding || isResuming}
                         >
-                          <PlayCircle className="w-4 h-4 mr-2" />
-                          {isResuming ? "Resuming..." : "Resume Task"}
-                        </Button>
+                          <SelectTrigger className="bg-white border border-[#d5d7da] text-[#414651] hover:bg-gray-50 font-medium font-['Inter'] text-[13px] h-9 px-4 rounded-lg shadow-sm transition-all w-[150px] justify-between">
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(task.status)}
+                              <span className="capitalize truncate">{task.currentlyOnHold ? 'On Hold' : task.status.replace('-', ' ')}</span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="to-do">To Do</SelectItem>
+                            <SelectItem value="in-progress">In Progress</SelectItem>
+                            <SelectItem value="done">Done</SelectItem>
+                            <SelectItem value="on-hold">Put on Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
                       )}
                     </div>
                   </div>
@@ -2111,12 +2154,12 @@ const TaskDetail = () => {
                     </div>
 
                     {/* ✅ NEW: Recurring Task Information */}
-                    {task.isRecurring && (
+                    {/* {task.isRecurring && (
                       <div className="border border-blue-200 rounded-[8px] p-3 bg-blue-50/50 space-y-2">
                         <div className="flex items-center gap-2">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                            <path d="M21 3v5h-5"/>
+                            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                            <path d="M21 3v5h-5" />
                           </svg>
                           <p className="text-sm font-semibold text-blue-900">Recurring Task</p>
                         </div>
@@ -2166,41 +2209,18 @@ const TaskDetail = () => {
                           </div>
                         )}
                       </div>
-                    )}
+                    )} */}
 
                     {/* Status - Full width */}
                     <div className="flex flex-col gap-[5px]">
                       <p className="text-sm text-[#040110] opacity-60 font-normal">Status</p>
-                      {isAssignee && task.approvalStatus !== "approved" ? (
-                        <div className="flex items-center gap-[6px] sm:gap-[10px] border-b-[1px] border-[#e0e0e0] overflow-x-auto">
-                          {[
-                            { value: "to-do", label: "To Do" },
-                            { value: "in-progress", label: "In Progress" },
-                            { value: "done", label: "Done" }
-                          ].map((status) => (
-                            <button
-                              key={status.value}
-                              onClick={() => !isChangingStatus && handleStatusChange(status.value)}
-                              disabled={isChangingStatus}
-                              className={`px-[6px] sm:px-[10px] py-[8px] text-[12px] sm:text-[13px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap
-                                ${task.status === status.value
-                                  ? 'border-b-[2px] border-[#f2761b] opacity-100 -mb-[1px]'
-                                  : 'opacity-60 hover:opacity-100'}
-                                ${isChangingStatus ? 'cursor-wait' : 'cursor-pointer'}
-                              `}
-                            >
-                              {status.label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className={`text-sm font-medium capitalize ${task.status === 'done' ? 'text-[#22c55e]' :
-                          task.status === 'in-progress' ? 'text-[#f2761b]' :
-                            'text-neutral-700'
-                          }`}>
-                          {task.status.replace("-", " ")}
-                        </p>
-                      )}
+                      {/* Read-only status display */}
+                      <p className={`text-sm font-medium capitalize ${task.status === 'done' ? 'text-[#22c55e]' :
+                        task.status === 'in-progress' ? 'text-[#f2761b]' :
+                          'text-neutral-700'
+                        }`}>
+                        {task.status.replace("-", " ")}
+                      </p>
                     </div>
 
                     {/* Approval Status - Inline Display with Rejection Reason */}
@@ -2266,6 +2286,36 @@ const TaskDetail = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 pt-4">
+                {/* Reference Links Section */}
+
+                {task.referenceLinks && task.referenceLinks.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 mb-3">Reference Links</h3>
+                    <ul className="space-y-2">
+                      {task.referenceLinks.map((linkStr, idx) => {
+                        // Handle potentially double-stringified arrays
+                        let links = [linkStr];
+                        try {
+                          if (linkStr.startsWith('[') && linkStr.endsWith(']')) {
+                            links = JSON.parse(linkStr);
+                          }
+                        } catch (e) {
+                          // keep as is
+                        }
+
+                        return links.map((link, i) => (
+                          <li key={`${idx}-${i}`} className="flex items-center gap-2">
+                            <ExternalLink className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                            <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                              {link}
+                            </a>
+                          </li>
+                        ));
+                      })}
+                    </ul>
+                  </div>
+                )}
+
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-sm sm:text-base text-gray-900">Attachments</h3>
@@ -2326,7 +2376,7 @@ const TaskDetail = () => {
               )}
 
               {/* Message Composer - Figma Design */}
-              {isAssignee && (
+              {isAssignee && !isTaskLocked && (
                 <div className="bg-white rounded-lg border border-[#cccccc]">
                   {/* Rich Text Editor */}
                   <div className="p-2 pb-0">
@@ -2453,6 +2503,18 @@ const TaskDetail = () => {
                   </div>
                 </div>
               )}
+
+              {/* Show locked message when task is locked */}
+              {isAssignee && isTaskLocked && (
+                <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Handover notes are disabled because this task is {task?.approvalStatus === 'approved' ? 'approved' : 'awaiting approval'}.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    The task must be reassigned to add new handover notes.
+                  </p>
+                </div>
+              )}
             </div>
 
           </div>
@@ -2484,9 +2546,9 @@ const TaskDetail = () => {
                           key={comment._id}
                           comment={comment}
                           currentUser={activeUser}
-                          canReply={true}
-                          canEdit={true}
-                          canDelete={true}
+                          canReply={!isTaskLocked}
+                          canEdit={!isTaskLocked}
+                          canDelete={!isTaskLocked}
                           replies={replies[comment._id] || []}
                           isExpanded={expandedThreads.has(comment._id)}
                           onReply={(c) => setReplyingTo(c)}
@@ -2502,111 +2564,124 @@ const TaskDetail = () => {
 
                 {/* Comment Input */}
                 <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-                  {replyingTo && (
-                    <div className="mb-2 sm:mb-3 p-2 bg-blue-50 rounded-lg flex items-start justify-between">
-                      <div className="flex-1">
-                        <span className="text-[10px] sm:text-xs text-blue-600 font-medium">
-                          Replying to {replyingTo.author.name}
-                        </span>
-                        <p className="text-[10px] sm:text-xs text-gray-600 truncate">
-                          {replyingTo.content.substring(0, 50)}...
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setReplyingTo(null)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </button>
+                  {isTaskLocked ? (
+                    <div className="bg-gray-50 border border-gray-300 rounded-lg p-4 text-center">
+                      <p className="text-sm text-gray-600">
+                        Discussion is disabled because this task is {task?.approvalStatus === 'approved' ? 'approved' : 'awaiting approval'}.
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        The task must be reassigned to continue the discussion.
+                      </p>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {replyingTo && (
+                        <div className="mb-2 sm:mb-3 p-2 bg-blue-50 rounded-lg flex items-start justify-between">
+                          <div className="flex-1">
+                            <span className="text-[10px] sm:text-xs text-blue-600 font-medium">
+                              Replying to {replyingTo.author.name}
+                            </span>
+                            <p className="text-[10px] sm:text-xs text-gray-600 truncate">
+                              {replyingTo.content.substring(0, 50)}...
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setReplyingTo(null)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </button>
+                        </div>
+                      )}
 
-                  <div className="flex gap-2 sm:gap-3">
-                    <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
-                      <AvatarFallback className="text-xs bg-blue-500 text-white">
-                        {activeUser?.name?.charAt(0).toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-2">
-                      <Textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder={
-                          replyingTo
-                            ? `Reply to ${replyingTo.author.name}...`
-                            : "Write a comment..."
-                        }
-                        className="min-h-[70px] sm:min-h-[80px] resize-none text-sm"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddComment();
-                          }
-                        }}
-                      />
-                      <div className="mt-2 flex items-center gap-2">
-                        <FileUpload
-                          onFilesSelect={setSelectedFiles}
-                          selectedFiles={selectedFiles}
-                          maxFiles={3}
-                          maxFileSize={5}
-                        />
-                        <Button
-                          onClick={handleAddComment}
-                          disabled={isSubmitting || (!newComment.trim() && selectedFiles.length === 0)}
-                          size="sm"
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
-                        >
-                          <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
-                          {isSubmitting ? "Sending..." : "Send"}
-                        </Button>
+                      <div className="flex gap-2 sm:gap-3">
+                        <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
+                          <AvatarFallback className="text-xs bg-blue-500 text-white">
+                            {activeUser?.name?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-2">
+                          <Textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder={
+                              replyingTo
+                                ? `Reply to ${replyingTo.author.name}...`
+                                : "Write a comment..."
+                            }
+                            className="min-h-[70px] sm:min-h-[80px] resize-none text-sm"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAddComment();
+                              }
+                            }}
+                          />
+                          <div className="mt-2 flex items-center gap-2">
+                            <FileUpload
+                              onFilesSelect={setSelectedFiles}
+                              selectedFiles={selectedFiles}
+                              maxFiles={3}
+                              maxFileSize={5}
+                            />
+                            <Button
+                              onClick={handleAddComment}
+                              disabled={isSubmitting || (!newComment.trim() && selectedFiles.length === 0)}
+                              size="sm"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
+                            >
+                              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+                              {isSubmitting ? "Sending..." : "Send"}
+                            </Button>
+                          </div>
+                          <div className="mt-1 text-[10px] sm:text-xs text-gray-500">
+                            <span className="hidden sm:inline">Press Enter to send, Shift + Enter for new line</span>
+                            <span className="sm:hidden">Enter to send</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1 text-[10px] sm:text-xs text-gray-500">
-                        <span className="hidden sm:inline">Press Enter to send, Shift + Enter for new line</span>
-                        <span className="sm:hidden">Enter to send</span>
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
             {isTLAssignedToParent && (
-            <Card className="shadow-sm border-gray-200">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Subtasks</CardTitle>
-                  {canCreateSubtask && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowCreateSubtask(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
-                    >
-                      Create Subtask
-                    </Button>
-                  )}
-                </div>
-                <CardDescription className="text-xs sm:text-sm">Manage subtasks for this task</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {subtasks.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="text-xs sm:text-sm">No subtasks yet.</p>
+              <Card className="shadow-sm border-gray-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">Subtasks</CardTitle>
+                    {canCreateSubtask && (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowCreateSubtask(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs sm:text-sm"
+                      >
+                        Create Subtask
+                      </Button>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {subtasks.map((st) => (
-                      <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
-                          <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
+                  <CardDescription className="text-xs sm:text-sm">Manage subtasks for this task</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {subtasks.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-xs sm:text-sm">No subtasks yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subtasks.map((st) => (
+                        <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
+                            <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
+                          </div>
+                          <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
                         </div>
-                        <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>

@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
     name: "Chat",
     href: "/chat",
     icon: "/assets/chat.svg", // ✅ Icon path
+    badgeKey: "messages",
   },
   {
     name: "Administration",
@@ -56,7 +57,7 @@ const VerticalSidebar = () => {
   const { user } = useAuth();
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-  
+
   const effectiveNavItems = navItems.map((item) => {
     if (item.name === "Workspace") {
       return { ...item, name: "Workspace" };
@@ -154,12 +155,11 @@ const VerticalSidebar = () => {
                       w-[200px] flex items-center justify-between
                       rounded-[5px] pl-[12px] pr-0 py-[10px]
                       transition-colors
-                      ${
-                        active
-                          ? "bg-[#f2761b] text-white"
-                          : isExpanded
-                            ? "bg-[#e6e8ec] text-[#717182]"
-                            : "text-[#717182] hover:bg-[#e6e8ec]"
+                      ${active
+                        ? "bg-[#f2761b] text-white"
+                        : isExpanded
+                          ? "bg-[#e6e8ec] text-[#717182]"
+                          : "text-[#717182] hover:bg-[#e6e8ec]"
                       }
                     `}
                   >
@@ -174,9 +174,8 @@ const VerticalSidebar = () => {
                       </span>
                     </div>
                     <ChevronDown
-                      className={`w-[24px] h-[24px] transition-transform ${
-                        isExpanded ? "rotate-180" : ""
-                      }`}
+                      className={`w-[24px] h-[24px] transition-transform ${isExpanded ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -192,10 +191,9 @@ const VerticalSidebar = () => {
                               w-[200px] flex items-center
                               rounded-[5px] pl-[44px] pr-[12px] py-[10px]
                               transition-colors
-                              ${
-                                subActive
-                                  ? "bg-[#f2761b] text-white"
-                                  : "text-[#717182] hover:bg-[#e6e8ec]"
+                              ${subActive
+                                ? "bg-[#f2761b] text-white"
+                                : "text-[#717182] hover:bg-[#e6e8ec]"
                               }
                             `}
                           >
@@ -215,10 +213,9 @@ const VerticalSidebar = () => {
                     w-[200px] flex items-center gap-[12px]
                     rounded-[5px] pl-[12px] pr-0 py-[12px]
                     transition-colors
-                    ${
-                      active
-                        ? "bg-[#f2761b] text-white"
-                        : "text-[#717182] hover:bg-[#e6e8ec]"
+                    ${active
+                      ? "bg-[#f2761b] text-white"
+                      : "text-[#717182] hover:bg-[#e6e8ec]"
                     }
                   `}
                 >
@@ -231,22 +228,9 @@ const VerticalSidebar = () => {
                     {item.name}
                   </span>
                   {item.badgeKey && badgeCounts[item.badgeKey] > 0 && (
-                    <div className="relative w-[20px] h-[20px] shrink-0">
-                      <div
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                        style={{
-                          transform: "translate(-50%, -50%) rotate(90deg)",
-                        }}
-                      >
-                        <div className="bg-[#f2761b] rounded-[10px] p-[3px] flex items-center justify-center">
-                          <span
-                            className="font-['Inter:Regular',sans-serif] text-[10px] text-white leading-[7px]"
-                            style={{ transform: "rotate(-90deg)" }}
-                          >
-                            {badgeCounts[item.badgeKey]}
-                          </span>
-                        </div>
-                      </div>
+                    <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center ${active ? 'bg-white text-[#F2761B]' : 'bg-[#F2761B] text-white'
+                      }`}>
+                      {badgeCounts[item.badgeKey] > 9 ? '9+' : badgeCounts[item.badgeKey]}
                     </div>
                   )}
                 </Link>

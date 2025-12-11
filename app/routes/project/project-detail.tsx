@@ -2822,40 +2822,40 @@ const ProjectDetail = () => {
                   </div>
 
                   <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : (isAdmin || isProjectLead || projectRole === "owner") ? "md:grid-cols-4" : "md:grid-cols-3")}>
-                        {/* Show all columns on desktop, only selected status on mobile */}
-                        {(!isMobile || mobileKanbanStatus === "to-do") && (
-                          <DroppableColumn
-                            id="to-do"
-                            title="To Do"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-blue-500"
+                    <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : (isAdmin || isProjectLead || projectRole === "owner") ? "md:grid-cols-4" : "md:grid-cols-3")}>
+                      {/* Show all columns on desktop, only selected status on mobile */}
+                      {(!isMobile || mobileKanbanStatus === "to-do") && (
+                        <DroppableColumn
+                          id="to-do"
+                          title="To Do"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-blue-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "to-do").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "to-do").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "to-do")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
-                        )}
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "to-do")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
 
-                        {(!isMobile || mobileKanbanStatus === "in-progress") && (
-                          <DroppableColumn
+                      {(!isMobile || mobileKanbanStatus === "in-progress") && (
+                        <DroppableColumn
                           id="in-progress"
                           title="In Progress"
                           count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
@@ -2882,69 +2882,69 @@ const ProjectDetail = () => {
                               ))}
                           </SortableContext>
                         </DroppableColumn>
-                        )}
+                      )}
 
-                        {/* ✅ NEW: On Hold Column - Only visible to admins, project leads, and owners */}
-                        {(isAdmin || isProjectLead || projectRole === "owner") && (!isMobile || mobileKanbanStatus === "on-hold") && (
-                          <DroppableColumn
-                            id="on-hold"
-                            title="On Hold"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "on-hold").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-yellow-500"
+                      {/* ✅ NEW: On Hold Column - Only visible to admins, project leads, and owners */}
+                      {(isAdmin || isProjectLead || projectRole === "owner") && (!isMobile || mobileKanbanStatus === "on-hold") && (
+                        <DroppableColumn
+                          id="on-hold"
+                          title="On Hold"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "on-hold").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-yellow-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "on-hold").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "on-hold").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "on-hold")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
-                        )}
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "on-hold")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
 
-                        {(!isMobile || mobileKanbanStatus === "done") && (
-                          <DroppableColumn
-                            id="done"
-                            title="Done"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-green-500"
+                      {(!isMobile || mobileKanbanStatus === "done") && (
+                        <DroppableColumn
+                          id="done"
+                          title="Done"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-green-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "done").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "done").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "done")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
-                        )}
-                      </div>
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "done")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
+                    </div>
 
                     <DragOverlay>
                       {activeTask && (
@@ -3119,13 +3119,15 @@ const ProjectDetail = () => {
                           }
                         }}
                         disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
                           const d = new Date(date);
                           d.setHours(0, 0, 0, 0);
-                          return Boolean(d < projStart || (projEnd && d > projEnd));
+                          return Boolean(d < today || d < projStart || (projEnd && d > projEnd));
                         }}
                         initialFocus
                       />
@@ -3174,17 +3176,17 @@ const ProjectDetail = () => {
                           setNewTask({ ...newTask, dueDate: format(selected, "yyyy-MM-dd") });
                         }}
                         disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
                           const startBaseline = startDateObj ? new Date(startDateObj) : projStart;
                           startBaseline.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
-                          const projEndPlusOne = projEnd ? new Date(projEnd) : undefined;
-                          if (projEndPlusOne) projEndPlusOne.setDate(projEndPlusOne.getDate() + 1);
                           const d = new Date(date);
                           d.setHours(0, 0, 0, 0);
-                          return Boolean(d < startBaseline || (projEndPlusOne && d >= projEndPlusOne));
+                          return Boolean(d < startBaseline || d < today || (projEnd && d > projEnd));
                         }}
                         initialFocus
                       />
@@ -3195,7 +3197,7 @@ const ProjectDetail = () => {
 
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <button
+                  {/* <button
                     type="button"
                     role="checkbox"
                     aria-checked={isRecurring}
@@ -3205,7 +3207,7 @@ const ProjectDetail = () => {
                   >
                     {isRecurring && (
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check size-4">
-                        <path d="M20 6 9 17l-5-5"/>
+                        <path d="M20 6 9 17l-5-5" />
                       </svg>
                     )}
                   </button>
@@ -3215,9 +3217,9 @@ const ProjectDetail = () => {
                     onClick={() => setIsRecurring(!isRecurring)}
                   >
                     Recurring Task
-                  </label>
+                  </label> */}
                 </div>
-                
+
                 {isRecurring && (
                   <div className="space-y-1 ml-6">
                     <Label className="text-sm">Frequency</Label>
@@ -3321,41 +3323,41 @@ const ProjectDetail = () => {
                       }}
                     />
                   </div>
-                {taskAttachments.length > 0 && (
-                  <div className="space-y-[6px] mt-[8px]">
-                    <div className="flex justify-between items-center mb-[4px]">
-                      <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTaskAttachments([]);
-                          if (taskFileInputRef.current) {
-                            taskFileInputRef.current.value = '';
-                          }
-                        }}
-                        className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                    {taskAttachments.map((file, index) => (
-                      <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
-                        <span className="flex-1 truncate">{file.name}</span>
-                        <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
+                  {taskAttachments.length > 0 && (
+                    <div className="space-y-[6px] mt-[8px]">
+                      <div className="flex justify-between items-center mb-[4px]">
+                        <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
                         <button
                           type="button"
-                          onClick={() => removeTaskAttachment(index)}
-                          className="text-[#cd2818] hover:text-[#a01f10]"
+                          onClick={() => {
+                            setTaskAttachments([]);
+                            if (taskFileInputRef.current) {
+                              taskFileInputRef.current.value = '';
+                            }
+                          }}
+                          className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" aria-hidden="true">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
+                          Clear All
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {taskAttachments.map((file, index) => (
+                        <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
+                          <span className="flex-1 truncate">{file.name}</span>
+                          <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTaskAttachment(index)}
+                            className="text-[#cd2818] hover:text-[#a01f10]"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" aria-hidden="true">
+                              <path d="M18 6 6 18"></path>
+                              <path d="m6 6 12 12"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Link Input Section */}
                   <div className="space-y-2">

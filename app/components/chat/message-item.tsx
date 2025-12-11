@@ -181,7 +181,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           </div>
         )}
 
-        {/* Reply Button */}
+        {/* Reply Button - Temporarily disabled
         {showActions && !isOwnMessage && (
           <button
             onClick={() => onReply(message)}
@@ -193,11 +193,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
             </span>
           </button>
         )}
+        */}
       </div>
 
       {/* Message Content Row */}
       <div className={cn(
-       "flex items-center w-full",
+        "flex items-center w-full",
         isOwnMessage ? "justify-end pr-[0px] sm:pr-[35px]" : "justify-start pl-[0px] sm:pl-[35px]"
       )}>
         <div className={cn(

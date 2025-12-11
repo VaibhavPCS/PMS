@@ -6,6 +6,28 @@ type Project = { _id: string; title: string }
 type Task = { _id: string; title: string }
 type Workspace = { _id: string; name: string }
 
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-3">
+        <p className="text-sm font-semibold mb-1">{data.date}</p>
+        <p className="text-xs text-gray-600 mb-2">Time: {data.time}</p>
+        <div className="space-y-1">
+          {payload.map((entry: any, index: number) => (
+            entry.value > 0 && (
+              <p key={index} className="text-xs" style={{ color: entry.color }}>
+                {entry.name}: {entry.value}
+              </p>
+            )
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
 const TaskLifecyclePage = () => {
   const [workspaceId, setWorkspaceId] = useState<string>('')
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -113,14 +135,23 @@ const TaskLifecyclePage = () => {
 
   const chartData = [...timeline]
     .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map((e: any) => ({
-      date: new Date(e.timestamp).toLocaleString(),
-      Approved: e.eventType === 'approved' ? 1 : 0,
-      Completed: e.eventType === 'completed' ? 1 : 0,
-      Assigned: e.eventType === 'assigned' ? 1 : 0,
-      Created: e.eventType === 'created' ? 1 : 0,
-      Reassigned: e.eventType === 'reassigned' ? 1 : 0,
-    }))
+    .map((e: any) => {
+      const dateObj = new Date(e.timestamp)
+      const isOnHold = e.eventType === 'status_changed' && e.changes?.newValue === 'on-hold'
+      const isInProgress = e.eventType === 'started' || (e.eventType === 'status_changed' && e.changes?.newValue === 'in-progress')
+      return {
+        date: dateObj.toLocaleDateString(),
+        time: dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        fullTimestamp: dateObj.toLocaleString(),
+        Approved: e.eventType === 'approved' ? 1 : 0,
+        Completed: e.eventType === 'completed' ? 1 : 0,
+        Assigned: e.eventType === 'assigned' ? 1 : 0,
+        Created: e.eventType === 'created' ? 1 : 0,
+        Reassigned: e.eventType === 'reassigned' ? 1 : 0,
+        OnHold: isOnHold ? 1 : 0,
+        InProgress: isInProgress ? 1 : 0,
+      }
+    })
 
   return (
     <div className="p-6">
@@ -160,7 +191,7 @@ const TaskLifecyclePage = () => {
         <div className="bg-white rounded-[8px] border border-[#e6e8ec] p-4 mt-6">
           <div className="mb-2">
             <div className="leading-none font-semibold">Task Timeline Chart</div>
-            <p className="text-sm text-gray-600">Events over time (Created, Assigned, Completed, Approved, Reassigned)</p>
+            <p className="text-sm text-gray-600">Events over time (Created, Assigned, In Progress, Completed, Approved, Reassigned, On-Hold)</p>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -168,13 +199,15 @@ const TaskLifecyclePage = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" label={{ value: 'Timestamp', position: 'insideBottom', offset: -5 }} />
                 <YAxis label={{ value: 'Event Occurrence', angle: -90, position: 'insideLeft' }} />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Line type="monotone" dataKey="Created" stroke="#3b82f6" strokeWidth={2} />
                 <Line type="monotone" dataKey="Assigned" stroke="#f59e0b" strokeWidth={2} />
+                <Line type="monotone" dataKey="InProgress" stroke="#14b8a6" strokeWidth={2} />
                 <Line type="monotone" dataKey="Completed" stroke="#10b981" strokeWidth={2} />
                 <Line type="monotone" dataKey="Approved" stroke="#6366f1" strokeWidth={2} />
                 <Line type="monotone" dataKey="Reassigned" stroke="#ef4444" strokeWidth={2} />
+                <Line type="monotone" dataKey="OnHold" stroke="#9333ea" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>

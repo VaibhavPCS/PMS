@@ -90,10 +90,22 @@ const Chat: React.FC = () => {
   const activeChatRef = useRef<Chat | null>(null);
   const pendingChatJoinRef = useRef<string | null>(null);
 
-  // Keep activeChatRef in sync with activeChat state
+  // Keep activeChatRef in sync with activeChat state and notify listeners
   useEffect(() => {
     activeChatRef.current = activeChat;
+    window.dispatchEvent(new CustomEvent('chat:active-change', {
+      detail: { chatId: activeChat?._id || null }
+    }));
   }, [activeChat]);
+
+  // Cleanup active chat status on unmount
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('chat:active-change', {
+        detail: { chatId: null }
+      }));
+    };
+  }, []);
 
   // Listen for custom new-message events from chat window
   useEffect(() => {
@@ -205,13 +217,20 @@ const Chat: React.FC = () => {
       }
     };
 
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     newSocket.on('new-message', (data: { message: Message; chatId: string; senderId: string }) => {
       const { message } = data;
       // Use ref to get the latest activeChat value
       const currentActiveChat = activeChatRef.current;
+      const isChatActive = currentActiveChat && message.chat === currentActiveChat._id;
+      const isWindowHidden = document.hidden;
 
       // Update active chat messages if matched
-      if (currentActiveChat && message.chat === currentActiveChat._id) {
+      if (isChatActive) {
         setMessages(prev => {
           const messageExists = prev.some(m => m._id === message._id);
           if (messageExists) {
@@ -221,16 +240,39 @@ const Chat: React.FC = () => {
         });
       }
 
+      // Browser Notification Logic
+      if (!isChatActive || isWindowHidden) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const senderName = message.sender.name || 'Someone';
+          const notificationTitle = `New message from ${senderName}`;
+          const notificationOptions = {
+            body: message.content || 'Sent an attachment',
+            icon: '/favicon.ico', // Adjust provided icon path if needed
+            tag: message.chat // Group notifications by chat
+          };
+
+          const notification = new Notification(notificationTitle, notificationOptions);
+
+          notification.onclick = () => {
+            window.focus();
+            // Optional: You could allow navigating to the chat here
+          };
+        }
+      }
+
       // Update chat list with new last message OR add if missing
       setChats(prev => {
         const chatIndex = prev.findIndex(c => c._id === message.chat);
+
+        // Determine if we should increment unread count
+        // Increment if chat is NOT active OR window is hidden
+        const shouldIncrementUnread = !isChatActive || isWindowHidden;
 
         if (chatIndex === -1) {
           // Chat doesn't exist in sidebar - fetch full details in background
           fetchMissingChat(message.chat);
 
           // Immediately create a temporary chat object to show in sidebar
-          // This ensures the chat appears instantly while we fetch full details
           const tempChat: Chat = {
             _id: message.chat,
             type: 'direct', // Will be updated when full chat is fetched
@@ -247,6 +289,7 @@ const Chat: React.FC = () => {
               sender: message.sender,
               createdAt: message.createdAt
             },
+            unreadCount: shouldIncrementUnread ? 1 : 0,
             createdAt: message.createdAt,
             updatedAt: message.createdAt
           };
@@ -255,14 +298,19 @@ const Chat: React.FC = () => {
         }
 
         // Chat exists - just update last message and move to top
+        const existingChat = prev[chatIndex];
+        const currentUnread = existingChat.unreadCount || 0;
+
         const updatedChat = {
-          ...prev[chatIndex],
+          ...existingChat,
           lastMessage: {
             _id: message._id,
             content: message.content,
             sender: message.sender,
             createdAt: message.createdAt
           },
+          // Increment unread count if needed
+          unreadCount: shouldIncrementUnread ? currentUnread + 1 : currentUnread,
           updatedAt: message.createdAt
         };
 
@@ -372,6 +420,8 @@ const Chat: React.FC = () => {
     try {
       const response = await fetchData(`/messages/chat/${chatId}`);
       setMessages(response.messages || response.data || []);
+      // Refresh global unread count
+      window.dispatchEvent(new Event('chat:refresh-unread'));
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
@@ -382,12 +432,24 @@ const Chat: React.FC = () => {
     fetchMessages(chat._id);
 
     // Add chat to local state if not already there (for newly created chats)
+    // Also clear unread count since we remain opening it
     setChats(prev => {
-      const exists = prev.some(c => c._id === chat._id);
-      if (!exists) {
-        return [chat, ...prev];
+      const index = prev.findIndex(c => c._id === chat._id);
+
+      if (index === -1) {
+        return [{ ...chat, unreadCount: 0 }, ...prev];
       }
-      return prev;
+
+      // Optimistic update for global sidebar: dispatch even how many were read
+      const currentUnread = prev[index].unreadCount || 0;
+      if (currentUnread > 0) {
+        window.dispatchEvent(new CustomEvent('chat:read', { detail: { count: currentUnread } }));
+      }
+
+      // Update existing chat to clear unread count
+      const newChats = [...prev];
+      newChats[index] = { ...newChats[index], unreadCount: 0 };
+      return newChats;
     });
 
     // Join chat room for real-time updates
