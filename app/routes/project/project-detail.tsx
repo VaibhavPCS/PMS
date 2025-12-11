@@ -32,6 +32,7 @@ import {
   EyeOff,
   Users,
   UserPlus,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +124,7 @@ interface Task {
   _id: string;
   title: string;
   description: string;
-  status: "to-do" | "in-progress" | "done";
+  status: "to-do" | "in-progress" | "on-hold" | "done";
   priority: "low" | "medium" | "high" | "urgent";
   assignee?: { _id: string; name: string; email: string } | null;
   creator: { _id: string; name: string; email: string };
@@ -170,7 +171,7 @@ interface AssignableMember {
 
 interface FilterType {
   search: string;
-  status: "all" | "to-do" | "in-progress" | "done";
+  status: "all" | "to-do" | "in-progress" | "on-hold" | "done";
   priority: "all" | "low" | "medium" | "high" | "urgent";
   assignee: string; // "all" or user ID
 }
@@ -212,6 +213,7 @@ const getStatusColor = (status: string) => {
   const colors = {
     done: "bg-green-50 text-green-700 border-green-200",
     "in-progress": "bg-blue-50 text-blue-700 border-blue-200",
+    "on-hold": "bg-yellow-50 text-yellow-700 border-yellow-200",
     "to-do": "bg-gray-50 text-gray-700 border-gray-200",
   };
   return (
@@ -409,6 +411,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const baseColors: Record<string, string> = {
         "to-do": "bg-gray-100 text-gray-800",
         "in-progress": "bg-blue-100 text-blue-800",
+        "on-hold": "bg-yellow-100 text-yellow-800",
         done: "bg-green-100 text-green-800",
       };
 
@@ -422,6 +425,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const borderColors: Record<string, string> = {
         "to-do": "border-l-gray-500 border-r-gray-500",
         "in-progress": "border-l-blue-500 border-r-blue-500",
+        "on-hold": "border-l-yellow-500 border-r-yellow-500",
         done: "border-l-green-500 border-r-green-500",
       };
 
@@ -1542,7 +1546,7 @@ const ProjectDetail = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [submittingTask, setSubmittingTask] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileKanbanStatus, setMobileKanbanStatus] = useState<"to-do" | "in-progress" | "done">("to-do");
+  const [mobileKanbanStatus, setMobileKanbanStatus] = useState<"to-do" | "in-progress" | "on-hold" | "done">("to-do");
   const [showMembersModal, setShowMembersModal] = useState(false);
 
   // Attachment state
@@ -1564,11 +1568,17 @@ const ProjectDetail = () => {
     assigneeId: "",
     startDate: "",
     dueDate: "",
+    rejectionAttachmentType: "either", // ✅ NEW: Default to 'either'
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [dueDateObj, setDueDateObj] = useState<Date | undefined>(undefined);
   const [taskAttachments, setTaskAttachments] = useState<File[]>([]);
+  const [taskReferenceLink, setTaskReferenceLink] = useState("");
   const taskFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Recurring task state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
 
   // Function to remove a specific attachment
   const removeTaskAttachment = (index: number) => {
@@ -1988,11 +1998,20 @@ const ProjectDetail = () => {
         return toast.error("Due date cannot be after project end date");
       }
 
+      // Validate reference link if provided (must be Figma or GitHub)
+      if (taskReferenceLink.trim()) {
+        const figmaPattern = /^https?:\/\/(www\.)?figma\.com\//i;
+        const githubPattern = /^https?:\/\/(www\.)?github\.com\//i;
+        if (!figmaPattern.test(taskReferenceLink) && !githubPattern.test(taskReferenceLink)) {
+          return toast.error("Only Figma and GitHub links are allowed");
+        }
+      }
+
       try {
         setSubmittingTask(true);
 
-        // Use FormData if there are attachments, otherwise use JSON
-        if (taskAttachments.length > 0) {
+        // Use FormData if there are attachments or reference link, otherwise use JSON
+        if (taskAttachments.length > 0 || taskReferenceLink.trim()) {
           const formData = new FormData();
           formData.append("title", newTask.title);
           formData.append("description", newTask.description);
@@ -2004,6 +2023,19 @@ const ProjectDetail = () => {
           formData.append("startDate", newTask.startDate);
           formData.append("dueDate", newTask.dueDate);
           formData.append("projectId", projectId || "");
+          formData.append("rejectionAttachmentType", newTask.rejectionAttachmentType); // ✅ NEW
+
+          // Add reference link as array if provided
+          if (taskReferenceLink.trim()) {
+            formData.append("referenceLinks", JSON.stringify([taskReferenceLink.trim()]));
+          }
+
+          // Add recurring task data
+          formData.append("isRecurring", isRecurring.toString());
+          if (isRecurring) {
+            formData.append("recurringFrequency", recurringFrequency);
+            formData.append("recurringEndDate", project?.endDate || "");
+          }
 
           taskAttachments.forEach((file) => {
             formData.append("attachments", file);
@@ -2014,6 +2046,16 @@ const ProjectDetail = () => {
           const payload: any = { ...newTask, projectId };
           if (!newTask.assigneeId) {
             delete payload.assigneeId;
+          }
+          // Add reference link as array if provided
+          if (taskReferenceLink.trim()) {
+            payload.referenceLinks = [taskReferenceLink.trim()];
+          }
+          // Add recurring task data
+          payload.isRecurring = isRecurring;
+          if (isRecurring) {
+            payload.recurringFrequency = recurringFrequency;
+            payload.recurringEndDate = project?.endDate || "";
           }
           await postData("/task", payload);
         }
@@ -2027,10 +2069,14 @@ const ProjectDetail = () => {
           assigneeId: "",
           startDate: "",
           dueDate: "",
+          rejectionAttachmentType: "either", // ✅ NEW
         });
         setStartDateObj(undefined);
         setDueDateObj(undefined);
         setTaskAttachments([]);
+        setTaskReferenceLink("");
+        setIsRecurring(false);
+        setRecurringFrequency("daily");
         // Clear the file input
         if (taskFileInputRef.current) {
           taskFileInputRef.current.value = '';
@@ -2052,7 +2098,7 @@ const ProjectDetail = () => {
         setSubmittingTask(false);
       }
     },
-    [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments]
+    [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments, taskReferenceLink, isRecurring, recurringFrequency]
   );
 
   useEffect(() => {
@@ -2067,6 +2113,15 @@ const ProjectDetail = () => {
       ]);
     }
   }, [isAuthenticated, projectId]);
+
+  // Auto-set due date to project end date when recurring is checked
+  useEffect(() => {
+    if (isRecurring && project?.endDate) {
+      const projectEndDate = new Date(project.endDate);
+      setDueDateObj(projectEndDate);
+      setNewTask(prev => ({ ...prev, dueDate: projectEndDate.toISOString() }));
+    }
+  }, [isRecurring, project?.endDate]);
 
   // Loading and error states (unchanged)
   if (loading) {
@@ -2749,13 +2804,16 @@ const ProjectDetail = () => {
                     {isMobile && (
                       <div className="mb-3">
                         <label className="text-xs font-medium text-gray-700 mb-1.5 block">View Status</label>
-                        <Select value={mobileKanbanStatus} onValueChange={(value: "to-do" | "in-progress" | "done") => setMobileKanbanStatus(value)}>
+                        <Select value={mobileKanbanStatus} onValueChange={(value: "to-do" | "in-progress" | "on-hold" | "done") => setMobileKanbanStatus(value)}>
                           <SelectTrigger className="h-9 text-sm">
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="to-do">To Do</SelectItem>
                             <SelectItem value="in-progress">In Progress</SelectItem>
+                            {(isAdmin || isProjectLead || projectRole === "owner") && (
+                              <SelectItem value="on-hold">On Hold</SelectItem>
+                            )}
                             <SelectItem value="done">Done</SelectItem>
                           </SelectContent>
                         </Select>
@@ -2764,40 +2822,40 @@ const ProjectDetail = () => {
                   </div>
 
                   <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                      <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : "md:grid-cols-3")}>
-                        {/* Show all columns on desktop, only selected status on mobile */}
-                        {(!isMobile || mobileKanbanStatus === "to-do") && (
-                          <DroppableColumn
-                            id="to-do"
-                            title="To Do"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-blue-500"
+                    <div className={cn("grid gap-4 pb-4", isMobile ? "grid-cols-1" : (isAdmin || isProjectLead || projectRole === "owner") ? "md:grid-cols-4" : "md:grid-cols-3")}>
+                      {/* Show all columns on desktop, only selected status on mobile */}
+                      {(!isMobile || mobileKanbanStatus === "to-do") && (
+                        <DroppableColumn
+                          id="to-do"
+                          title="To Do"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "to-do").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-blue-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "to-do").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "to-do").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "to-do")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
-                        )}
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "to-do")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
 
-                        {(!isMobile || mobileKanbanStatus === "in-progress") && (
-                          <DroppableColumn
+                      {(!isMobile || mobileKanbanStatus === "in-progress") && (
+                        <DroppableColumn
                           id="in-progress"
                           title="In Progress"
                           count={kanbanFilteredTasks.filter((t) => t.status === "in-progress").length}
@@ -2824,38 +2882,69 @@ const ProjectDetail = () => {
                               ))}
                           </SortableContext>
                         </DroppableColumn>
-                        )}
+                      )}
 
-                        {(!isMobile || mobileKanbanStatus === "done") && (
-                          <DroppableColumn
-                            id="done"
-                            title="Done"
-                            count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
-                            total={kanbanFilteredTasks.length}
-                            color="bg-green-500"
+                      {/* ✅ NEW: On Hold Column - Only visible to admins, project leads, and owners */}
+                      {(isAdmin || isProjectLead || projectRole === "owner") && (!isMobile || mobileKanbanStatus === "on-hold") && (
+                        <DroppableColumn
+                          id="on-hold"
+                          title="On Hold"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "on-hold").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-yellow-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "on-hold").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <SortableContext
-                              items={kanbanFilteredTasks.filter((t) => t.status === "done").map((t) => t._id)}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {kanbanFilteredTasks
-                                .filter((t) => t.status === "done")
-                                .map((task) => (
-                                  <SortableTaskCard
-                                    key={task._id}
-                                    task={task}
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
-                                    assignableMembers={filteredAssignableMembers}
-                                    canAssignVisible={isAdmin || isProjectLead}
-                                    project={project}
-                                  />
-                                ))}
-                            </SortableContext>
-                          </DroppableColumn>
-                        )}
-                      </div>
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "on-hold")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
+
+                      {(!isMobile || mobileKanbanStatus === "done") && (
+                        <DroppableColumn
+                          id="done"
+                          title="Done"
+                          count={kanbanFilteredTasks.filter((t) => t.status === "done").length}
+                          total={kanbanFilteredTasks.length}
+                          color="bg-green-500"
+                        >
+                          <SortableContext
+                            items={kanbanFilteredTasks.filter((t) => t.status === "done").map((t) => t._id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {kanbanFilteredTasks
+                              .filter((t) => t.status === "done")
+                              .map((task) => (
+                                <SortableTaskCard
+                                  key={task._id}
+                                  task={task}
+                                  currentUser={currentUser}
+                                  userRole={userRole}
+                                  onTaskUpdate={() => Promise.all([fetchAllTasks(), fetchUserTasks()])}
+                                  assignableMembers={filteredAssignableMembers}
+                                  canAssignVisible={isAdmin || isProjectLead}
+                                  project={project}
+                                />
+                              ))}
+                          </SortableContext>
+                        </DroppableColumn>
+                      )}
+                    </div>
 
                     <DragOverlay>
                       {activeTask && (
@@ -3030,13 +3119,15 @@ const ProjectDetail = () => {
                           }
                         }}
                         disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
                           const d = new Date(date);
                           d.setHours(0, 0, 0, 0);
-                          return Boolean(d < projStart || (projEnd && d > projEnd));
+                          return Boolean(d < today || d < projStart || (projEnd && d > projEnd));
                         }}
                         initialFocus
                       />
@@ -3085,23 +3176,71 @@ const ProjectDetail = () => {
                           setNewTask({ ...newTask, dueDate: format(selected, "yyyy-MM-dd") });
                         }}
                         disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
                           const projStart = project ? new Date(project.startDate) : new Date();
                           projStart.setHours(0, 0, 0, 0);
                           const startBaseline = startDateObj ? new Date(startDateObj) : projStart;
                           startBaseline.setHours(0, 0, 0, 0);
                           const projEnd = project ? new Date(project.endDate) : undefined;
                           if (projEnd) projEnd.setHours(0, 0, 0, 0);
-                          const projEndPlusOne = projEnd ? new Date(projEnd) : undefined;
-                          if (projEndPlusOne) projEndPlusOne.setDate(projEndPlusOne.getDate() + 1);
                           const d = new Date(date);
                           d.setHours(0, 0, 0, 0);
-                          return Boolean(d < startBaseline || (projEndPlusOne && d >= projEndPlusOne));
+                          return Boolean(d < startBaseline || d < today || (projEnd && d > projEnd));
                         }}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isRecurring}
+                    data-state={isRecurring ? "checked" : "unchecked"}
+                    onClick={() => setIsRecurring(!isRecurring)}
+                    className="peer h-4 w-4 shrink-0 rounded-sm border border-input shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                  >
+                    {isRecurring && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check size-4">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                  <label
+                    htmlFor="isRecurring"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 cursor-pointer"
+                    onClick={() => setIsRecurring(!isRecurring)}
+                  >
+                    Recurring Task
+                  </label>
+                </div>
+
+                {isRecurring && (
+                  <div className="space-y-1 ml-6">
+                    <Label className="text-sm">Frequency</Label>
+                    <Select
+                      value={recurringFrequency}
+                      onValueChange={(value: "daily" | "weekly" | "monthly") => setRecurringFrequency(value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-600">
+                      Task will recur {recurringFrequency} until project ends
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -3115,86 +3254,130 @@ const ProjectDetail = () => {
                 />
               </div>
 
+              {/* ✅ NEW: Rejection Attachment Type Selector */}
+              {/* <div className="space-y-1">
+                <Label className="text-sm">Rejection Attachment Requirement</Label>
+                <Select
+                  value={newTask.rejectionAttachmentType}
+                  onValueChange={(value: string) => setNewTask({ ...newTask, rejectionAttachmentType: value })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="either">File or Link (Either)</SelectItem>
+                    <SelectItem value="file">File Required</SelectItem>
+                    <SelectItem value="link">Link Required (Figma/GitHub)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Specify what type of attachment is required when rejecting this task
+                </p>
+              </div> */}
+
+
+
               <div className="space-y-1">
                 <Label className="text-sm">Attachments (optional)</Label>
-                <div className="border border-[#d5d7da] rounded-[8px]">
-                  <label htmlFor="attachments" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
-                    <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">Upload</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-upload text-[#717680]" aria-hidden="true">
-                      <path d="M12 3v12"></path>
-                      <path d="m17 8-5-5-5 5"></path>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    </svg>
-                  </label>
-                  <input
-                    ref={taskFileInputRef}
-                    id="attachments"
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept="image/*,.pdf,.docx"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const files = e.target.files;
-                      if (files && files.length > 0) {
-                        const newFiles = Array.from(files) as File[];
 
-                        // Check total files limit (3 files max)
-                        const totalFiles = taskAttachments.length + newFiles.length;
-                        if (totalFiles > 3) {
-                          toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
-                          return;
-                        }
+                {/* File Upload Section */}
+                <div className="space-y-2">
+                  <div className="border border-[#d5d7da] rounded-[8px]">
+                    <label htmlFor="attachments" className="flex items-center gap-[8px] px-[14px] py-[10px] cursor-pointer hover:bg-gray-50">
+                      <Upload className="w-4 h-4 text-[#717680]" />
+                      <span className="flex-1 text-[14px] font-normal font-['Inter'] text-[#717680]">
+                        {taskAttachments.length > 0 ? `${taskAttachments.length} file(s) selected` : 'Upload file(s)'}
+                      </span>
+                    </label>
+                    <input
+                      ref={taskFileInputRef}
+                      id="attachments"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept="image/*,.pdf,.docx"
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          const newFiles = Array.from(files) as File[];
 
-                        // Check file sizes (5MB limit)
-                        const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
-                        const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
-                        if (oversizedFiles.length > 0) {
-                          const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
-                          toast.error(`${fileNames}: File too large (max 5MB per file)`);
-                          return;
-                        }
-
-                        // Append new files to existing ones
-                        setTaskAttachments(prev => [...prev, ...newFiles]);
-                      }
-                    }}
-                  />
-                </div>
-                {taskAttachments.length > 0 && (
-                  <div className="space-y-[6px] mt-[8px]">
-                    <div className="flex justify-between items-center mb-[4px]">
-                      <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTaskAttachments([]);
-                          if (taskFileInputRef.current) {
-                            taskFileInputRef.current.value = '';
+                          // Check total files limit (3 files max)
+                          const totalFiles = taskAttachments.length + newFiles.length;
+                          if (totalFiles > 3) {
+                            toast.error(`Maximum 3 files allowed. You currently have ${taskAttachments.length} file(s) and tried to add ${newFiles.length} more.`);
+                            return;
                           }
-                        }}
-                        className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                    {taskAttachments.map((file, index) => (
-                      <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
-                        <span className="flex-1 truncate">{file.name}</span>
-                        <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
+
+                          // Check file sizes (5MB limit)
+                          const maxFileSize = 5 * 1024 * 1024; // 5MB in bytes
+                          const oversizedFiles = newFiles.filter(file => file.size > maxFileSize);
+                          if (oversizedFiles.length > 0) {
+                            const fileNames = oversizedFiles.map(file => `"${file.name}"`).join(', ');
+                            toast.error(`${fileNames}: File too large (max 5MB per file)`);
+                            return;
+                          }
+
+                          // Append new files to existing ones
+                          setTaskAttachments(prev => [...prev, ...newFiles]);
+                        }
+                      }}
+                    />
+                  </div>
+                  {taskAttachments.length > 0 && (
+                    <div className="space-y-[6px] mt-[8px]">
+                      <div className="flex justify-between items-center mb-[4px]">
+                        <span className="text-[10px] text-gray-500">{taskAttachments.length} of 3 files</span>
                         <button
                           type="button"
-                          onClick={() => removeTaskAttachment(index)}
-                          className="text-[#cd2818] hover:text-[#a01f10]"
+                          onClick={() => {
+                            setTaskAttachments([]);
+                            if (taskFileInputRef.current) {
+                              taskFileInputRef.current.value = '';
+                            }
+                          }}
+                          className="text-[10px] text-[#cd2818] hover:text-[#a01f10] font-medium"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" aria-hidden="true">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
+                          Clear All
                         </button>
                       </div>
-                    ))}
+                      {taskAttachments.map((file, index) => (
+                        <div key={index} className="flex items-center gap-[8px] text-[12px] font-['Inter'] text-[#414651]">
+                          <span className="flex-1 truncate">{file.name}</span>
+                          <span className="text-[10px] text-gray-500">{formatFileSize(file.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTaskAttachment(index)}
+                            className="text-[#cd2818] hover:text-[#a01f10]"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x" aria-hidden="true">
+                              <path d="M18 6 6 18"></path>
+                              <path d="m6 6 12 12"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Link Input Section */}
+                  <div className="space-y-2">
+                    {taskAttachments.length > 0 && (
+                      <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
+                        And/or provide a reference link:
+                      </p>
+                    )}
+                    <Input
+                      type="url"
+                      value={taskReferenceLink}
+                      onChange={(e) => setTaskReferenceLink(e.target.value)}
+                      placeholder="Figma or GitHub link (e.g., https://figma.com/...)"
+                      className="border-[#d5d7da] rounded-[8px] px-[14px] py-[10px] text-[14px] font-['Inter'] placeholder:text-[#717680]"
+                    />
+                    <p className="text-[12px] font-normal font-['Inter'] text-[#717680]">
+                      Reference links help provide context for the task. Only Figma and GitHub links are allowed.
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="flex gap-2 pt-3 border-t">

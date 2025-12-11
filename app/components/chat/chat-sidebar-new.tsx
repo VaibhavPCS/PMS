@@ -322,14 +322,21 @@ const ChatSidebarNew: React.FC<ChatSidebarNewProps> = ({
                   <div className="flex-1 min-w-0 px-[5px]">
                     <div className="flex items-start justify-between mb-[6px]">
                       <h3 className={cn(
-                        "text-[14px] font-medium text-neutral-700 truncate",
+                        "text-[14px] font-medium text-neutral-700 truncate pr-2",
                         hasUnread && "font-semibold"
                       )}>
                         {getChatName(chat)}
                       </h3>
-                      <span className="text-[12px] font-normal text-[#717182] whitespace-nowrap ml-2">
-                        {chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : formatTime(chat.createdAt)}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[12px] font-normal text-[#717182] whitespace-nowrap">
+                          {chat.lastMessage ? formatTime(chat.lastMessage.createdAt) : formatTime(chat.createdAt)}
+                        </span>
+                        {chat.unreadCount !== undefined && chat.unreadCount > 0 && (
+                          <div className="bg-[#F2761B] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center">
+                            {chat.unreadCount > 4 ? '4+' : chat.unreadCount}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Last message preview - commented out as per user request */}

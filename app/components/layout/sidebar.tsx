@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../provider/auth-context';
 import { fetchData, patchData, postData } from '@/lib/fetch-util';
@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   MessageCircle,
 } from 'lucide-react';
+import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -62,6 +63,7 @@ const Sidebar = () => {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [totalChatUnread, setTotalChatUnread] = useState(0); // Chat unread count
   const [showNotifications, setShowNotifications] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -69,20 +71,109 @@ const Sidebar = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [showMobileUserMenu, setShowMobileUserMenu] = useState(false); // ✅ New state
 
+  const activeChatIdRef = useRef<string | null>(null);
+
+  // Track active chat ID from Chat component
+  useEffect(() => {
+    const handleActiveChange = (e: CustomEvent) => {
+      activeChatIdRef.current = e.detail.chatId;
+    };
+    window.addEventListener('chat:active-change', handleActiveChange as EventListener);
+    return () => window.removeEventListener('chat:active-change', handleActiveChange as EventListener);
+  }, []);
+
+  // Socket for global updates (chat notifications)
   useEffect(() => {
     fetchUserInfo();
     fetchNotifications();
+    fetchChatUnreadCount();
+
+    // Setup global socket for notifications
+    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+      withCredentials: true, // Important for cookies
+      transports: ['websocket', 'polling'],
+    });
+
+    newSocket.on('connect', () => {
+      console.log('Sidebar socket connected:', newSocket.id);
+      // Re-fetch count on connect to ensure sync
+      fetchChatUnreadCount();
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Sidebar socket connection error:', err);
+    });
+
+    // Listen for new chat messages globally
+    newSocket.on('new-message', async (data: { message: any; chatId: string }) => {
+      console.log('Sidebar received new-message:', data);
+      const isChatOpen = activeChatIdRef.current === data.chatId;
+      const isWindowFocused = document.hasFocus();
+
+      // If the chat window is NOT open for this specific chat, OR the window is not focused
+      if (!isChatOpen || !isWindowFocused) {
+        // Increment global count
+        setTotalChatUnread(prev => prev + 1);
+
+        // Show browser notification
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            try {
+              const senderName = data.message.sender?.name || 'Someone';
+              new Notification(`New message from ${senderName}`, {
+                body: data.message.content || 'Sent an attachment',
+                icon: '/favicon.ico', // Ensure this file exists
+                tag: data.chatId // Group by chat
+              });
+            } catch (e) {
+              console.error('Notification error:', e);
+            }
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission();
+          }
+        }
+      }
+    });
+
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(err => console.error('Permission request failed', err));
+    }
 
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      // ✅ Don't auto-collapse on mobile anymore
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Listen for events to refreshing counts
+    window.addEventListener('focus', fetchChatUnreadCount);
+    window.addEventListener('chat:refresh-unread', fetchChatUnreadCount);
+
+    const handleChatRead = (e: CustomEvent) => {
+      setTotalChatUnread((prev) => Math.max(0, prev - (e.detail?.count || 0)));
+    };
+    window.addEventListener('chat:read', handleChatRead as EventListener);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('focus', fetchChatUnreadCount);
+      window.removeEventListener('chat:refresh-unread', fetchChatUnreadCount);
+      window.removeEventListener('chat:read', handleChatRead as EventListener);
+      newSocket.disconnect();
+    };
   }, []);
+
+  const fetchChatUnreadCount = async () => {
+    try {
+      const response = await fetchData('/chats/unread/count');
+      setTotalChatUnread(response.count || 0);
+    } catch (error) {
+      console.error('Failed to fetch chat unread count:', error);
+    }
+  };
 
   // ✅ Lock/unlock body scroll when notifications are open
   useEffect(() => {
@@ -111,7 +202,7 @@ const Sidebar = () => {
       setLoadingNotifications(true);
       const response = await fetchData('/notification');
       setNotifications(response.notifications || []);
-      
+
       const unreadNotifications = response.notifications?.filter((n: Notification) => !n.isRead) || [];
       setUnreadCount(unreadNotifications.length);
     } catch (error) {
@@ -126,11 +217,11 @@ const Sidebar = () => {
   const markAsRead = async (notificationId: string) => {
     try {
       await patchData(`/notification/${notificationId}/read`, {});
-      
-      setNotifications(prev => prev.map(n => 
+
+      setNotifications(prev => prev.map(n =>
         n._id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
       ));
-      
+
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
@@ -140,7 +231,7 @@ const Sidebar = () => {
   const markAllAsRead = async () => {
     try {
       await patchData('/notification/read-all', {});
-      
+
       setNotifications(prev => prev.map(n => ({
         ...n,
         isRead: true,
@@ -156,16 +247,16 @@ const Sidebar = () => {
     const now = new Date();
     const date = new Date(dateString);
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
-    
+
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
@@ -188,17 +279,17 @@ const Sidebar = () => {
   // Generate href for notification navigation
   const getNotificationHref = (notification: Notification): string => {
     const { data, relatedTask, type } = notification;
-    
+
     // Handle comment notifications that use relatedTask field
     if (type === 'task_comment' && relatedTask) {
       return `/task/${relatedTask}`;
     }
-    
+
     // Handle cases where data might be undefined or null
     if (!data) {
       return '/dashboard';
     }
-    
+
     // Decide the most specific target route first
     if (data.taskId) {
       return `/task/${data.taskId}`;
@@ -211,7 +302,7 @@ const Sidebar = () => {
     } else if (data.inviteId) {
       return `/workspace`;
     }
-    
+
     return '/dashboard';
   };
 
@@ -225,7 +316,7 @@ const Sidebar = () => {
       setShowNotifications(false);
 
       const { data } = notification;
-      
+
       // Handle comment notifications that don't have data field but have relatedTask
       if (notification.type === 'task_comment' && notification.relatedTask) {
         // Don't navigate to dashboard yet, let the navigation logic handle it
@@ -234,7 +325,7 @@ const Sidebar = () => {
         navigate('/dashboard');
         return;
       }
-      
+
       // Check resource existence before navigation
       try {
         const taskId = data.taskId || (notification.type === 'task_comment' && notification.relatedTask);
@@ -271,7 +362,7 @@ const Sidebar = () => {
             }
           }
         }
-        
+
         // Check workspace existence if provided
         if (data?.workspaceId) {
           const existsResponse = await fetch(buildApiUrl(`/workspace/${data.workspaceId}/exists`), { credentials: 'include' });
@@ -289,11 +380,11 @@ const Sidebar = () => {
               return;
             }
           }
-          
+
           // Persist and switch workspace on backend if provided
           try {
             localStorage.setItem('currentWorkspaceId', data.workspaceId);
-          } catch {}
+          } catch { }
           try {
             await postData('/workspace/switch', { workspaceId: data.workspaceId });
           } catch (err) {
@@ -308,7 +399,7 @@ const Sidebar = () => {
 
       // Choose the most specific route first
       let targetPath = '/dashboard';
-      
+
       // Handle comment notifications that use relatedTask field
       if (notification.type === 'task_comment' && notification.relatedTask) {
         targetPath = `/task/${notification.relatedTask}`;
@@ -409,11 +500,10 @@ const Sidebar = () => {
                 <a
                   key={notification._id}
                   href={getNotificationHref(notification)}
-                  className={`block p-3 rounded-lg cursor-pointer transition-colors no-underline ${
-                    !notification.isRead 
-                      ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
-                      : 'hover:bg-gray-50'
-                  }`}
+                  className={`block p-3 rounded-lg cursor-pointer transition-colors no-underline ${!notification.isRead
+                    ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100'
+                    : 'hover:bg-gray-50'
+                    }`}
                   onClick={(e) => {
                     e.preventDefault();
                     handleNotificationClick(notification);
@@ -504,11 +594,10 @@ const Sidebar = () => {
               <a
                 key={notification._id}
                 href={getNotificationHref(notification)}
-                className={`block p-3 mb-2 rounded-md cursor-pointer transition-colors no-underline ${
-                  !notification.isRead 
-                    ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100' 
-                    : 'hover:bg-gray-50'
-                }`}
+                className={`block p-3 mb-2 rounded-md cursor-pointer transition-colors no-underline ${!notification.isRead
+                  ? 'bg-blue-50 border-l-4 border-l-blue-500 hover:bg-blue-100'
+                  : 'hover:bg-gray-50'
+                  }`}
                 onClick={(e) => {
                   e.preventDefault();
                   handleNotificationClick(notification);
@@ -555,19 +644,18 @@ const Sidebar = () => {
   return (
     <>
       {/* ✅ Sidebar - NO Z-INDEX, same axis */}
-      <div className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-300 ${
-        isCollapsed ? 'w-[74px]' : 'w-64'
-      }`}>
-        
+      <div className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-300 ${isCollapsed ? 'w-[74px]' : 'w-64'
+        }`}>
+
         {/* ✅ Logo with Toggle Arrow */}
         <div className="flex items-center h-16 border-b border-gray-200 relative mt-5">
           {isCollapsed ? (
             /* ✅ Collapsed State */
             <div className="w-full flex flex-col items-center justify-center space-y-2 px-4">
               <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gray-100">
-                <img 
-                  src="/pcs_logo.jpg" 
-                  alt="PCS Logo" 
+                <img
+                  src="/pcs_logo.jpg"
+                  alt="PCS Logo"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
@@ -576,7 +664,7 @@ const Sidebar = () => {
                 />
                 <span className="text-blue-600 font-bold text-sm hidden">P</span>
               </div>
-              
+
               {/* ✅ Mobile: 5px white space around toggle */}
               <div className={isMobile ? 'bg-white rounded-md p-1' : ''}>
                 <Button
@@ -594,9 +682,9 @@ const Sidebar = () => {
             <>
               <div className="flex items-center space-x-3 flex-1 px-6">
                 <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gray-100">
-                  <img 
-                    src="/assets/a8ebdf5975d6d9ab7f5064a60b7a388fe436a8bb.png" 
-                    alt="PCS Logo" 
+                  <img
+                    src="/assets/a8ebdf5975d6d9ab7f5064a60b7a388fe436a8bb.png"
+                    alt="PCS Logo"
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
@@ -607,7 +695,7 @@ const Sidebar = () => {
                 </div>
                 <span className="text-xl font-semibold text-gray-900">PMS</span>
               </div>
-              
+
               <div className="px-4">
                 <Button
                   variant="ghost"
@@ -632,14 +720,23 @@ const Sidebar = () => {
                   <Link
                     key={item.href}
                     to={item.href}
-                    className={`flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors group ${
-                      isActive(item.href)
-                        ? 'bg-[#FF6B2C] text-white'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors group ${isActive(item.href)
+                      ? 'bg-[#FF6B2C] text-white'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="ml-3">{item.name}</span>
+                    <span className="ml-3 flex-1 flex items-center justify-between">
+                      {item.name}
+                      {item.name === 'Chat' && totalChatUnread > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center ml-2 border ${isActive(item.href)
+                          ? 'bg-white text-[#F2761B] border-white'
+                          : 'bg-[#F2761B] text-white border-[#F2761B]'
+                          }`}>
+                          {totalChatUnread > 9 ? '9+' : totalChatUnread}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}
@@ -650,16 +747,15 @@ const Sidebar = () => {
               <div className="relative">
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start px-3 py-3 h-auto group ${
-                    showNotifications ? 'bg-gray-100' : ''
-                  }`}
+                  className={`w-full justify-start px-3 py-3 h-auto group ${showNotifications ? 'bg-gray-100' : ''
+                    }`}
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
                   <Bell className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-medium ml-3">Notifications</span>
                   {unreadCount > 0 && (
-                    <Badge 
-                      variant="destructive" 
+                    <Badge
+                      variant="destructive"
                       className="text-xs px-1.5 py-0.5 min-w-[20px] h-5 ml-auto"
                     >
                       {unreadCount > 9 ? '9+' : unreadCount}
@@ -686,16 +782,25 @@ const Sidebar = () => {
                   <Link
                     key={item.href}
                     to={item.href}
-                    className={`p-3 rounded-md transition-colors group relative ${
-                      isActive(item.href)
-                        ? 'bg-[#FF6B2C] text-white'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                    className={`p-3 rounded-md transition-colors group relative ${isActive(item.href)
+                      ? 'bg-[#FF6B2C] text-white'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
                     title={item.name}
                   >
                     <Icon className="w-5 h-5" />
                     {isActive(item.href) && (
                       <div className="absolute -right-[1px] top-0 bottom-0 w-[2px] bg-[#FF6B2C] rounded-l"></div>
+                    )}
+                    {item.name === 'Chat' && totalChatUnread > 0 && (
+                      <div className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center border ${isActive(item.href)
+                        ? 'bg-white text-[#F2761B] border-white'
+                        : 'bg-[#F2761B] text-white border-white'
+                        }`}>
+                        <span className="text-[9px] font-bold">
+                          {totalChatUnread > 9 ? '9' : totalChatUnread}
+                        </span>
+                      </div>
                     )}
                   </Link>
                 );
@@ -707,9 +812,8 @@ const Sidebar = () => {
               <div className="relative">
                 <Button
                   variant="ghost"
-                  className={`p-3 rounded-md transition-colors relative ${
-                    showNotifications ? 'bg-gray-100' : 'hover:bg-gray-50'
-                  }`}
+                  className={`p-3 rounded-md transition-colors relative ${showNotifications ? 'bg-gray-100' : 'hover:bg-gray-50'
+                    }`}
                   onClick={() => setShowNotifications(!showNotifications)}
                   title="Notifications"
                 >
@@ -751,7 +855,7 @@ const Sidebar = () => {
                   </p>
                 </div>
               </div>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -769,7 +873,7 @@ const Sidebar = () => {
         {isCollapsed && (
           <div className="p-4 border-t border-gray-200 flex justify-center">
             <div className="relative">
-              <Avatar 
+              <Avatar
                 className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
                 onClick={() => setShowMobileUserMenu(!showMobileUserMenu)}
               >

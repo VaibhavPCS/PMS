@@ -36,9 +36,9 @@ export function ProjectOverviewPanel({
   // Format date to match Figma (DD/MM/YYYY)
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
     return `${day}/${month}/${year}`;
   };
 
@@ -53,7 +53,7 @@ export function ProjectOverviewPanel({
     </div>
   );
 
-  
+
 
   return (
     <div className="bg-[#E5EFFF] rounded-[10px] p-[20px] w-full">
@@ -68,7 +68,7 @@ export function ProjectOverviewPanel({
         <FieldGroup
           label="Description"
           value={
-            <TruncatedTextModal 
+            <TruncatedTextModal
               text={description}
               lines={3}
               ellipsisClassName="text-[#040110] bg-[#E5EFFF]"
