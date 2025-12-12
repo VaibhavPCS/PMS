@@ -1077,7 +1077,7 @@ const TaskCard = React.memo<{
                   {canDeleteTask && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={handleSelectDelete} className="text-red-600 focus:text-red-600">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSelectDelete(); }} className="text-red-600 focus:text-red-600">
                         <Trash2 className="w-3 h-3 mr-2" /> Delete Task
                       </DropdownMenuItem>
                     </>

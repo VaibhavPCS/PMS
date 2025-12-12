@@ -981,19 +981,20 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-[15px]">
-                        {/* Workspace Dropdown (visible to all users) */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                            >
-                              <Building2 className="w-4 h-4" />
-                              {currentWorkspace?.name || "Workspace"}
-                              <ChevronDown className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                        {/* Workspace Dropdown (visible only when workspace exists) */}
+                        {currentWorkspace && workspaces.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                              >
+                                <Building2 className="w-4 h-4" />
+                                {currentWorkspace.name}
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-[200px]">
                             {workspaces.map((workspace) => (
                               <DropdownMenuItem
@@ -1012,6 +1013,7 @@ const Dashboard = () => {
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        )}
 
                         {/* Project Type Filter - HIDDEN */}
                         {/* <DropdownMenu>
