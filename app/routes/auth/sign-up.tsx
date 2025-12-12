@@ -118,9 +118,8 @@ const SignUp = () => {
   const handleOnSubmit = (values: SignupFormData) => {
     mutate(values, {
       onSuccess: (data: any) => {
-        toast.success("Registration Initiated", {
-          description:
-            "Please check your email for a 6-digit OTP to complete your registration.",
+        toast.success("Registration successful!", {
+          description: "Welcome! Redirecting to dashboard...",
         });
 
         form.reset();

@@ -95,7 +95,7 @@ const Sidebar = () => {
     });
 
     newSocket.on('connect', () => {
-      console.log('Sidebar socket connected:', newSocket.id);
+      // console.log('Sidebar socket connected:', newSocket.id);
       // Re-fetch count on connect to ensure sync
       fetchChatUnreadCount();
     });
@@ -106,7 +106,7 @@ const Sidebar = () => {
 
     // Listen for new chat messages globally
     newSocket.on('new-message', async (data: { message: any; chatId: string }) => {
-      console.log('Sidebar received new-message:', data);
+      // console.log('Sidebar received new-message:', data);
       const isChatOpen = activeChatIdRef.current === data.chatId;
       const isWindowFocused = document.hasFocus();
 

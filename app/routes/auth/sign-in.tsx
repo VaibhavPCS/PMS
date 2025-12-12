@@ -42,51 +42,21 @@ const SignIn = () => {
   const handleOnSubmit = (values: SigninFormData) => {
     mutate(values, {
       onSuccess: (data: any) => {
-        if (data.requiresOTP) {
-          toast.success("OTP Sent", {
-            description:
-              "Please check your email for a 6-digit OTP to complete login.",
-          });
-          navigate("/verify-otp", {
-            state: {
-              userId: data.userId,
-              email: values.email,
-              type: "login",
-              message:
-                "Please enter the 6-digit OTP sent to your email to complete login.",
-            },
-          });
-        } else {
-          toast.success("Login successful!");
+        // BYPASS OTP: Direct login without OTP verification
+        toast.success("Login successful!");
 
-          // Force auth check to update context with HTTP-only cookie
-          forceAuthCheck().then(() => {
-            navigate("/dashboard");
-          }).catch(() => {
-            // Even if force check fails, try to navigate
-            navigate("/dashboard");
-          });
-        }
+        // Force auth check to update context with HTTP-only cookie
+        forceAuthCheck().then(() => {
+          navigate("/dashboard");
+        }).catch(() => {
+          // Even if force check fails, try to navigate
+          navigate("/dashboard");
+        });
       },
       onError: (error: any) => {
         const errorMessage =
           error.response?.data?.message || "An error occurred";
-
-        if (error.response?.data?.needsVerification) {
-          toast.error("Email verification required", {
-            description: "Please verify your email first.",
-          });
-          navigate("/verify-otp", {
-            state: {
-              userId: error.response.data.userId,
-              email: values.email,
-              type: "registration",
-              message: "Please complete your email verification first.",
-            },
-          });
-        } else {
-          toast.error(errorMessage);
-        }
+        toast.error(errorMessage);
       },
     });
   };

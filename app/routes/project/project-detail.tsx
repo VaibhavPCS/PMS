@@ -934,10 +934,10 @@ const TaskCard = React.memo<{
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
     try {
-      console.log('Deleting task:', task._id);
+      // console.log('Deleting task:', task._id);
       setIsDeleting(true);
       const response = await deleteData(`/task/${task._id}`);
-      console.log('Delete response:', response);
+      // console.log('Delete response:', response);
       toast.success("Task deleted successfully");
       setShowDeleteDialog(false);
       if (onTaskUpdate) {
