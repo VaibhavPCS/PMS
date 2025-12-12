@@ -116,26 +116,36 @@ const SignUp = () => {
   const handleOnSubmit = (values: SignupFormData) => {
     mutate(values, {
       onSuccess: (data: any) => {
-        toast.success("Registration Initiated", {
-          description:
-            "Please check your email for a 6-digit OTP to complete your registration.",
+        // BYPASS OTP: Direct registration and auto-login
+        toast.success("Registration successful!", {
+          description: "Welcome! Redirecting to dashboard...",
         });
 
         form.reset();
 
-        navigate("/verify-otp", {
-          state: {
-            userId: data.userId,
-            email: values.email,
-            type: 'registration',
-            message: 'Please enter the 6-digit OTP sent to your email to complete registration.'
-          }
-        });
+        // Navigate to dashboard (user is auto-logged in)
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1000);
+
+        // ORIGINAL OTP CODE (commented out):
+        // toast.success("Registration Initiated", {
+        //   description:
+        //     "Please check your email for a 6-digit OTP to complete your registration.",
+        // });
+        //
+        // navigate("/verify-otp", {
+        //   state: {
+        //     userId: data.userId,
+        //     email: values.email,
+        //     type: 'registration',
+        //     message: 'Please enter the 6-digit OTP sent to your email to complete registration.'
+        //   }
+        // });
       },
       onError: (error: any) => {
         const errorMessage =
           error.response?.data?.message || "An error occurred";
-        // console.log(error);
         toast.error(errorMessage);
       },
     });
