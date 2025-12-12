@@ -44,6 +44,8 @@ const SignIn = () => {
       onSuccess: (data: any) => {
         // BYPASS OTP: Direct login without OTP verification
         toast.success("Login successful!");
+        // BYPASS OTP: Direct login without OTP verification
+        toast.success("Login successful!");
 
         // Force auth check to update context with HTTP-only cookie
         forceAuthCheck().then(() => {

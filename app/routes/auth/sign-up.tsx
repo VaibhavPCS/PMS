@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate } from "react-router";
 import { useSignUpMutation } from "@/hooks/use-auth";
+import { useAuth } from "../../provider/auth-context";
 import { toast } from "sonner";
 import AuthPanelLayout from "@/components/layout/auth-panel-layout";
 
@@ -24,6 +25,7 @@ export type SignupFormData = z.infer<typeof signUpSchema>;
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { forceAuthCheck } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -271,7 +273,7 @@ const SignUp = () => {
               />
 
               {/* Remember Me Checkbox */}
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <Checkbox
                   id="remember-signup"
                   checked={rememberMe}
@@ -284,7 +286,7 @@ const SignUp = () => {
                 >
                   Remember me
                 </label>
-              </div>
+              </div> */}
 
               {/* Create Account Button */}
               <Button

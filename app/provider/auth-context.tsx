@@ -102,7 +102,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
             setUser(null);
             setIsAuthenticated(false);
             setIsLoading(false);
-            toast.error('Your session has expired. Redirecting to home.');
+            toast.error('Your session has expired. Redirecting to home.', { duration: 10000 });
 
             // Avoid redirecting away from public routes (like '/')
             const publicRoutes = ['/', '/sign-in', '/sign-up', '/verify-otp', '/forgot-password', '/reset-password'];
@@ -116,7 +116,7 @@ export const AuthProvider = ({children}: {children: React.ReactNode}) => {
         // Show feedback on network-level errors
         const handleNetworkError = (e: any) => {
             const message = e?.detail?.message ?? 'A network error occurred';
-            toast.error(`Network error: ${message}`);
+            toast.error(`Network error: ${message}`, { duration: 10000 });
         };
 
         window.addEventListener('storage', handleStorageChange);

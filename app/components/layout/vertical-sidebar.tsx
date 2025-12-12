@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   {
     name: "Analytics",
     href: "/analytics",
-    icon: "/assets/analytics-icon.svg", // ✅ Icon path
+    icon: "/assets/analytics-icon-1.svg", // ✅ Icon path
   },
   {
     name: "Chat",

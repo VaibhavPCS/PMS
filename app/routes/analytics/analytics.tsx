@@ -110,7 +110,7 @@ function AnalyticsContent() {
           <div className="p-[10px] md:p-4">
             <div className="flex items-center gap-[10px] border-b-[0.5px] border-[#949291] overflow-x-auto scrollbar-visible">
               {/* Performance Tab */}
-              {showPerformanceTab && (
+              {/* {showPerformanceTab && (
                 <button
                   onClick={() => handleTabChange("performance")}
                   className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "performance"
@@ -120,10 +120,10 @@ function AnalyticsContent() {
                 >
                   Performance
                 </button>
-              )}
+              )} */}
 
               {/* Workspace Tab */}
-              {showWorkspaceTab && (
+              {/* {showWorkspaceTab && (
                 <button
                   onClick={() => handleTabChange("workspace")}
                   className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "workspace"
@@ -133,10 +133,10 @@ function AnalyticsContent() {
                 >
                   Workspace
                 </button>
-              )}
+              )} */}
 
               {/* Leaderboard Tab */}
-              {showLeaderboardTab && (
+              {/* {showLeaderboardTab && (
                 <button
                   onClick={() => handleTabChange("leaderboard")}
                   className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap ${activeTab === "leaderboard"
@@ -146,7 +146,7 @@ function AnalyticsContent() {
                 >
                   Leaderboard
                 </button>
-              )}
+              )} */}
 
               {/* Personal Tab */}
               {showPersonalTab && (

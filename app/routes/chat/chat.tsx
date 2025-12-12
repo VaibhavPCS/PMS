@@ -151,11 +151,11 @@ const Chat: React.FC = () => {
 
     // Initialize socket when user is available (authenticated via HTTP-only cookie)
     if (!user) {
-      console.log('🔄 No user yet, waiting for authentication...');
+      // console.log('🔄 No user yet, waiting for authentication...');
       return;
     }
 
-    console.log('🔌 Initializing socket connection for user:', user.name);
+    // console.log('🔌 Initializing socket connection for user:', user.name);
     isConnectingRef.current = true;
 
     // Track if this effect instance is still mounted
@@ -175,12 +175,12 @@ const Chat: React.FC = () => {
         newSocket.disconnect();
         return;
       }
-      console.log('✅ Socket connected successfully!', newSocket.id);
+      // console.log('✅ Socket connected successfully!', newSocket.id);
       isConnectingRef.current = false;
 
       // Join pending chat room if any
       if (pendingChatJoinRef.current) {
-        console.log('📤 Joining pending chat:', pendingChatJoinRef.current);
+        // console.log('📤 Joining pending chat:', pendingChatJoinRef.current);
         newSocket.emit('join-chat', pendingChatJoinRef.current);
         pendingChatJoinRef.current = null;
       }
@@ -188,11 +188,11 @@ const Chat: React.FC = () => {
 
     // Debug: Log all incoming events
     newSocket.onAny((eventName, ...args) => {
-      console.log('🔔 Socket event received:', eventName, args);
+      // console.log('🔔 Socket event received:', eventName, args);
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error.message);
+      // console.error('❌ Socket connection error:', error.message);
       isConnectingRef.current = false;
       // If auth error, don't keep retrying
       if (error.message.includes('Authentication')) {
@@ -322,7 +322,7 @@ const Chat: React.FC = () => {
     });
 
     newSocket.on('joined-chat', (data: { chatId: string }) => {
-      console.log('✅ Successfully joined chat room:', data.chatId);
+      // console.log('✅ Successfully joined chat room:', data.chatId);
     });
 
     newSocket.on('message-updated', (updatedMessage: Message) => {
@@ -346,7 +346,7 @@ const Chat: React.FC = () => {
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
+      // console.log('🔌 Socket disconnected:', reason);
     });
 
     socketRef.current = newSocket;
@@ -389,8 +389,8 @@ const Chat: React.FC = () => {
       setLoading(true);
       // Use organization-based endpoint instead of workspace
       const response = await fetchData('/chats/organization');
-      console.log('Chat API response:', response);
-      console.log('Chats data:', response.chats || response.data || []);
+      // console.log('Chat API response:', response);
+      // console.log('Chats data:', response.chats || response.data || []);
       setChats(response.chats || response.data || []);
     } catch (error) {
       console.error('Failed to fetch chats:', error);
@@ -498,7 +498,7 @@ const Chat: React.FC = () => {
           setMessages(prev => {
             const messageExists = prev.some(m => m._id === sentMessage._id);
             if (messageExists) {
-              console.log('Sent message already exists via socket, skipping:', sentMessage._id);
+              // console.log('Sent message already exists via socket, skipping:', sentMessage._id);
               return prev;
             }
             return [...prev, sentMessage];

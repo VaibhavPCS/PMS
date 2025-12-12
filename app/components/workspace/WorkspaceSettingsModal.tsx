@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { fetchData, postData, deleteData, patchData, putData } from '@/lib/fetch-util';
-import { Settings, UserPlus, Users, Trash2, Loader2 } from 'lucide-react';
+import { Settings, UserPlus, Users, Trash2, Loader2, Check } from 'lucide-react';
 import { useAuth } from '../../provider/auth-context';
+import { cn } from '@/lib/utils';
 
 interface WorkspaceSettingsModalProps {
   open: boolean;
@@ -57,6 +59,34 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
   // but the viewer option is intentionally not presented to users.
   const [inviteRole, setInviteRole] = useState<'member' | 'admin' | 'lead' | 'viewer' | 'head'>('member');
   const [inviting, setInviting] = useState(false);
+
+  // User search state
+  const [openUserSelect, setOpenUserSelect] = useState(false);
+  const [foundUsers, setFoundUsers] = useState<any[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (inviteEmail.length > 1 && openUserSelect) {
+        setIsSearchingUsers(true);
+        try {
+          const res = await fetchData(`/workspace/users/search?query=${inviteEmail}`);
+          // Filter out users already in the workspace
+          const existingMemberIds = new Set(members.map(m => m._id));
+          const filteredUsers = (res.users || []).filter((u: any) => !existingMemberIds.has(u._id));
+          setFoundUsers(filteredUsers);
+        } catch (error) {
+          console.error("Failed to search users", error);
+        } finally {
+          setIsSearchingUsers(false);
+        }
+      } else {
+        setFoundUsers([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [inviteEmail, openUserSelect, members]);
 
   const [deleting, setDeleting] = useState(false);
 
@@ -418,14 +448,54 @@ export function WorkspaceSettingsModal({ open, onClose, workspace, onWorkspaceUp
                   <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">
                     Employee email <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    aria-required="true"
-                    className="h-[40px]"
-                  />
+                  <Popover open={openUserSelect} onOpenChange={setOpenUserSelect}>
+                    <PopoverAnchor asChild>
+                      <Input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => {
+                          setInviteEmail(e.target.value);
+                          setOpenUserSelect(true);
+                        }}
+                        onFocus={() => setOpenUserSelect(true)}
+                        placeholder="name@example.com or search user"
+                        aria-required="true"
+                        className="h-[40px]"
+                        autoComplete="off"
+                      />
+                    </PopoverAnchor>
+                    <PopoverContent 
+                      className="p-0 w-[var(--radix-popover-anchor-width)]" 
+                      align="start"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <div className="max-h-[200px] overflow-y-auto p-1">
+                        {isSearchingUsers && (
+                          <div className="p-2 text-sm text-gray-500 flex items-center justify-center">
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Searching...
+                          </div>
+                        )}
+                        {!isSearchingUsers && foundUsers.length === 0 && inviteEmail.length > 1 && (
+                          <div className="p-2 text-sm text-gray-500 text-center">
+                            No registered users found. You can still invite via email.
+                          </div>
+                        )}
+                        {foundUsers.map((user) => (
+                          <div
+                            key={user._id}
+                            className="flex flex-col px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#f5f4f9]"
+                            onClick={() => {
+                              setInviteEmail(user.email);
+                              setOpenUserSelect(false);
+                            }}
+                          >
+                            <span className="font-medium text-[#040110]">{user.name}</span>
+                            <span className="text-xs text-[#717182]">{user.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[14px] font-medium font-['Inter'] text-[#040110]">

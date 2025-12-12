@@ -3,6 +3,7 @@ import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
 import { fetchData, postData } from "@/lib/fetch-util";
 import { buildApiUrl } from "@/lib/config";
+import { formatDateDDMMYYYY, calculateDaysBetween } from "@/lib/date-utils";
 import {
   Calendar,
   Clock,
@@ -465,18 +466,7 @@ const Dashboard = () => {
 
   // ==================== HELPER FUNCTIONS ====================
 
-  const calculateDaysBetween = (startDate: string, endDate: string): number => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return Math.max(1, diffDays);
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
+  // Using utility functions from date-utils.ts for consistent date handling
 
   const handleViewProject = (projectId: string) => {
     navigate(`/project/${projectId}`);
@@ -981,19 +971,20 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-[15px]">
-                        {/* Workspace Dropdown (visible to all users) */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
-                            >
-                              <Building2 className="w-4 h-4" />
-                              {currentWorkspace?.name || "Workspace"}
-                              <ChevronDown className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                        {/* Workspace Dropdown (visible only when workspace exists) */}
+                        {currentWorkspace && workspaces.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto rounded-[6px] bg-[#f5f4f9] text-[#777777] text-[12px] font-['Inter'] hover:bg-[#e5e4e9] px-[5px] py-[5px] flex items-center gap-[5px]"
+                              >
+                                <Building2 className="w-4 h-4" />
+                                {currentWorkspace.name}
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-[200px]">
                             {workspaces.map((workspace) => (
                               <DropdownMenuItem
@@ -1012,6 +1003,7 @@ const Dashboard = () => {
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        )}
 
                         {/* Project Type Filter - HIDDEN */}
                         {/* <DropdownMenu>
@@ -1205,10 +1197,10 @@ const Dashboard = () => {
                               <td className="px-[8px] sm:px-[16px] py-[10px] sm:py-[14px]">
                                 <div className="flex flex-col gap-1">
                                   <div className="text-[11px] sm:text-[12px] font-['Inter'] font-normal text-[#1a932e] tracking-[0.5px] whitespace-nowrap">
-                                    {formatDate(project.startDate)}
+                                    {formatDateDDMMYYYY(project.startDate)}
                                   </div>
                                   <div className="text-[11px] sm:text-[12px] font-['Inter'] font-normal text-[#cd2812] tracking-[0.5px] whitespace-nowrap">
-                                    {formatDate(project.endDate)}
+                                    {formatDateDDMMYYYY(project.endDate)}
                                   </div>
                                 </div>
                               </td>

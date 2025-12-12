@@ -913,10 +913,10 @@ const TaskCard = React.memo<{
     return isAssigneeOrCreator || isAdmin || isProjectLead;
   }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
 
-  // Delete allowed for assignee, creator, admin, or project lead (backend: deleteTask)
+  // Delete allowed ONLY for admin or project lead (owner)
   const canDeleteTask = useMemo(() => {
-    return isAssigneeOrCreator || isAdmin || isProjectLead;
-  }, [isAssigneeOrCreator, isAdmin, isProjectLead]);
+    return isAdmin || isProjectLead;
+  }, [isAdmin, isProjectLead]);
 
   const [hasBlockingSubtasks, setHasBlockingSubtasks] = useState(false);
   const handleMenuOpenChange = async (open: boolean) => {
@@ -934,13 +934,20 @@ const TaskCard = React.memo<{
   // ✅ NEW: Handle task deletion using proper DELETE API
   const handleDeleteTask = async () => {
     try {
+      // console.log('Deleting task:', task._id);
       setIsDeleting(true);
-      await deleteData(`/task/${task._id}`);
+      const response = await deleteData(`/task/${task._id}`);
+      // console.log('Delete response:', response);
       toast.success("Task deleted successfully");
       setShowDeleteDialog(false);
-      onTaskUpdate?.();
+      if (onTaskUpdate) {
+        await onTaskUpdate();
+      }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to delete task");
+      console.error('Delete task error:', error);
+      console.error('Error response:', error.response);
+      const errorMessage = error.response?.data?.message || error.message || "Failed to delete task";
+      toast.error(errorMessage);
     } finally {
       setIsDeleting(false);
     }
@@ -1067,10 +1074,10 @@ const TaskCard = React.memo<{
                       <CheckCircle2 className="w-3 h-3 mr-2" /> Mark as Done
                     </DropdownMenuItem>
                   )}
-                  {(!isApproved && canDeleteTask) && (
+                  {canDeleteTask && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={handleSelectDelete} className="text-red-600 focus:text-red-600">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleSelectDelete(); }} className="text-red-600 focus:text-red-600">
                         <Trash2 className="w-3 h-3 mr-2" /> Delete Task
                       </DropdownMenuItem>
                     </>
@@ -2290,9 +2297,9 @@ const ProjectDetail = () => {
             <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
               {(() => {
                 const date = new Date(project.startDate);
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const year = date.getUTCFullYear();
                 return `${day}/${month}/${year}`;
               })()}
             </div>
@@ -2306,9 +2313,9 @@ const ProjectDetail = () => {
             <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
               {(() => {
                 const date = new Date(project.endDate);
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const year = date.getUTCFullYear();
                 return `${day}/${month}/${year}`;
               })()}
             </div>
