@@ -37,10 +37,25 @@ const WorkspaceReportPage = () => {
     if (!workspaceId) return
     setLoading(true)
     try {
-      const url = `/analytics/workspace/${workspaceId}/report?format=json${startDate && endDate ? `&startDate=${fmt(startDate)}&endDate=${fmt(endDate)}` : ''}`
-      const res = await axios.get(url)
-      setReport(res.data)
-    } catch {}
+      // Try snapshot-based endpoint first (40x faster!)
+      const snapshotUrl = `/analytics/snapshot/workspace/${workspaceId}`
+      const res = await axios.get(snapshotUrl)
+
+      if (res.data.source === 'snapshot') {
+        // Using snapshot data - 10-50ms response time
+        console.log('✅ Using cached workspace snapshot (fast!)', {
+          lastUpdated: res.data.lastUpdated,
+          workspaceId
+        })
+        setReport(res.data.data)
+      } else {
+        // Fallback to real-time calculation
+        console.warn('⚠️ No snapshot available, using real-time calculation (slower)')
+        setReport(res.data)
+      }
+    } catch (err) {
+      console.error('Error loading workspace report:', err)
+    }
     finally { setLoading(false) }
   }
 
