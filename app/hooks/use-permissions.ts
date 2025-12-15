@@ -57,8 +57,8 @@ export const usePermissions = (): PermissionConfig => {
     // ✅ GET REAL USER ROLE FROM API RESPONSE
     const userRole = userData.role || 'user';
     const currentWorkspaceId = userData.currentWorkspace;
-    const workspaceRole = userData.workspaces?.find((w: any) => 
-      w.workspaceId._id === currentWorkspaceId
+    const workspaceRole = userData.workspaces?.find((w: any) =>
+      w?.workspaceId?._id === currentWorkspaceId
     )?.role || 'member';
 
     const isAdmin = ['admin', 'super_admin'].includes(userRole);
