@@ -213,7 +213,7 @@ const getStatusColor = (status: string) => {
   const colors = {
     done: "bg-green-50 text-green-700 border-green-200",
     "in-progress": "bg-blue-50 text-blue-700 border-blue-200",
-    "on-hold": "bg-yellow-50 text-yellow-700 border-yellow-200",
+    "on-hold": "bg-red-50 text-red-700 border-red-200",
     "to-do": "bg-gray-50 text-gray-700 border-gray-200",
   };
   return (
@@ -411,7 +411,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const baseColors: Record<string, string> = {
         "to-do": "bg-gray-100 text-gray-800",
         "in-progress": "bg-blue-100 text-blue-800",
-        "on-hold": "bg-yellow-100 text-yellow-800",
+        "on-hold": "bg-red-100 text-red-800",
         done: "bg-green-100 text-green-800",
       };
 
@@ -425,7 +425,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
       const borderColors: Record<string, string> = {
         "to-do": "border-l-gray-500 border-r-gray-500",
         "in-progress": "border-l-blue-500 border-r-blue-500",
-        "on-hold": "border-l-yellow-500 border-r-yellow-500",
+        "on-hold": "border-l-red-500 border-r-red-500",
         done: "border-l-green-500 border-r-green-500",
       };
 

@@ -401,7 +401,7 @@ const TaskLifecyclePage = () => {
                                 <td className="p-3 text-[13px]">
                                   <span className={`px-2 py-1 rounded-[4px] text-[11px] font-medium ${currStatus === 'done' ? 'bg-green-100 text-green-700' :
                                       currStatus === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                                        currStatus === 'on-hold' ? 'bg-yellow-100 text-yellow-700' :
+                                        currStatus === 'on-hold' ? 'bg-red-100 text-red-700' :
                                           'bg-gray-100 text-gray-700'
                                     }`}>
                                     {currStatus}
