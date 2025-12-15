@@ -121,7 +121,7 @@ interface Task {
   _id: string;
   title: string;
   description?: string;
-  status: "to-do" | "in-progress" | "done";
+  status: "to-do" | "in-progress" | "done" | "on-hold";
   priority: "low" | "medium" | "high" | "urgent";
   startDate?: string;
   dueDate: string;
@@ -513,6 +513,25 @@ const Dashboard = () => {
 
     try {
       setIsUpdating(true);
+
+      // Check for status transitions related to on-hold
+      const isPuttingOnHold = updateForm.status === 'on-hold' && selectedTask.status !== 'on-hold';
+      const isResuming = selectedTask.status === 'on-hold' && updateForm.status !== 'on-hold';
+
+      // 1. Update task details (excluding status if hold/resume involved)
+      const payload: any = {
+        title: updateForm.title,
+        description: updateForm.description,
+        priority: updateForm.priority,
+        startDate: updateForm.startDate,
+        dueDate: updateForm.dueDate,
+      };
+
+      // Only include status if we are NOT doing a hold/resume transition
+      if (!isPuttingOnHold && !isResuming) {
+        payload.status = updateForm.status;
+      }
+
       const response = await fetch(buildApiUrl(`/task/${selectedTask._id}`), {
         method: "PUT",
         credentials: "include",
@@ -520,14 +539,7 @@ const Dashboard = () => {
           "Content-Type": "application/json",
           "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
         },
-        body: JSON.stringify({
-          title: updateForm.title,
-          description: updateForm.description,
-          priority: updateForm.priority,
-          status: updateForm.status,
-          startDate: updateForm.startDate,
-          dueDate: updateForm.dueDate,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -535,18 +547,51 @@ const Dashboard = () => {
         throw new Error(error.message || "Failed to update task");
       }
 
+      // 2. Handle Hold/Resume transitions
+      if (isPuttingOnHold) {
+        const holdResponse = await fetch(buildApiUrl(`/task/${selectedTask._id}/hold`), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+          body: JSON.stringify({ reason: "Updated via dashboard" }),
+        });
+
+        if (!holdResponse.ok) {
+          const error = await holdResponse.json();
+          throw new Error(error.message || "Failed to put task on hold");
+        }
+      } else if (isResuming) {
+        const resumeResponse = await fetch(buildApiUrl(`/task/${selectedTask._id}/resume`), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!resumeResponse.ok) {
+          const error = await resumeResponse.json();
+          throw new Error(error.message || "Failed to resume task");
+        }
+        
+        // Note: resumeTask sets status to 'in-progress'. 
+        // If user wanted 'done', they might need to update again, but we'll leave it as in-progress for safety.
+      }
+
       toast.success("Task updated successfully");
       setShowUpdateModal(false);
       setSelectedTask(null);
-      setTasks(prev => prev.map(t => t._id === (selectedTask as Task)._id ? {
-        ...t,
-        title: updateForm.title,
-        description: updateForm.description,
-        priority: updateForm.priority as any,
-        status: updateForm.status as any,
-        startDate: updateForm.startDate,
-        dueDate: updateForm.dueDate,
-      } : t));
+      
+      // Refetch tasks to ensure all state (hold history, status flags) is synced
+      fetchTasks();
+      // Also update project stats as status might have changed
+      fetchProjectStatistics();
+      
     } catch (error: any) {
       console.error("Failed to update task:", error);
       toast.error(error.message || "Failed to update task");
@@ -629,7 +674,7 @@ const Dashboard = () => {
     {
       name: "On Hold",
       value: monthlyProjectStats.onHold,
-      fill: "#ff6b6b",
+      fill: "#CD2812",
     },
   ];
 
@@ -1298,6 +1343,17 @@ const Dashboard = () => {
                         In Progress
                       </button>
                       <button
+                        onClick={() => setTaskStatusFilter("on-hold")}
+                        className={cn(
+                          "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
+                          taskStatusFilter === "on-hold"
+                            ? "border-b-[1px] border-[#f2761b] opacity-100"
+                            : "opacity-60"
+                        )}
+                      >
+                        On Hold
+                      </button>
+                      <button
                         onClick={() => setTaskStatusFilter("done")}
                         className={cn(
                           "px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap",
@@ -1338,7 +1394,8 @@ const Dashboard = () => {
                                   "w-1 min-h-[40px] rounded-full shrink-0 mt-1 self-stretch",
                                   task.status === "to-do" && "bg-blue-500",
                                   task.status === "in-progress" && "bg-amber-500",
-                                  task.status === "done" && "bg-green-500"
+                                  task.status === "done" && "bg-green-500",
+                                  task.status === "on-hold" && "bg-[#CD2812]"
                                 )}
                               />
 
@@ -1376,10 +1433,12 @@ const Dashboard = () => {
                                       "px-2 py-1 rounded-full text-xs font-medium",
                                       task.status === "to-do" && "bg-blue-100 text-blue-700",
                                       task.status === "in-progress" && "bg-amber-100 text-amber-700",
-                                      task.status === "done" && "bg-green-100 text-green-700"
+                                      task.status === "done" && "bg-green-100 text-green-700",
+                                      task.status === "on-hold" && "bg-red-100 text-red-700"
                                     )}>
                                       {task.status === "to-do" ? "To Do" :
-                                        task.status === "in-progress" ? "In Progress" : "Done"}
+                                        task.status === "in-progress" ? "In Progress" :
+                                        task.status === "on-hold" ? "On Hold" : "Done"}
                                     </div>
 
                                     {/* 3-dot menu - Admin only */}
@@ -1507,6 +1566,7 @@ const Dashboard = () => {
                   <SelectContent>
                     <SelectItem value="to-do">To Do</SelectItem>
                     <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="on-hold">On Hold</SelectItem>
                     <SelectItem value="done">Done</SelectItem>
                   </SelectContent>
                 </Select>
