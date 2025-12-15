@@ -1156,7 +1156,7 @@ const TaskCard = React.memo<{
               </SelectTrigger>
               <SelectContent>
                 {/* <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem> */}
-                {assignableMembers.map((m) => (
+                {assignableMembers.filter(m => m).map((m) => (
                   <SelectItem key={m._id} value={m._id}>
                     {m.name || m.email}
                   </SelectItem>
@@ -1276,7 +1276,7 @@ const QuickEditTaskForm: React.FC<{
             <SelectValue placeholder="Select" />
           </SelectTrigger>
           <SelectContent>
-            {assignableMembers.map((member) => (
+            {assignableMembers.filter(member => member).map((member) => (
               <SelectItem key={member._id} value={member._id}>
                 <div className="flex items-center gap-2">
                   <Avatar className="w-4 h-4">
@@ -1756,7 +1756,7 @@ const ProjectDetail = () => {
   }, [project]);
 
   const filteredAssignableMembers = useMemo(() => {
-    return assignableMembers.filter((m) => projectMemberIds.has(m._id?.toString() || ""));
+    return assignableMembers.filter((m) => m && projectMemberIds.has(m._id?.toString() || ""));
   }, [assignableMembers, projectMemberIds]);
 
   const updateFilter = useCallback((key: keyof FilterType, value: string) => {
@@ -1967,7 +1967,7 @@ const ProjectDetail = () => {
   const fetchAssignableMembers = useCallback(async () => {
     try {
       const response = await fetchData(`/task/project/${projectId}/members`);
-      setAssignableMembers(response.members || []);
+      setAssignableMembers((response.members || []).filter((m: any) => m));
     } catch {
       toast.error("Failed to load employees");
     }
