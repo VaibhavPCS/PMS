@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
 import { fetchData, postData } from "@/lib/fetch-util";
@@ -171,6 +171,15 @@ const Dashboard = () => {
     approved: 0
   });
 
+  // Approval tasks for TL/Lead
+  const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
+  const [approvalTasksLoading, setApprovalTasksLoading] = useState(false);
+
+  // Height synchronization refs
+  const projectsTableRef = useRef<HTMLDivElement>(null);
+  const taskOverviewRef = useRef<HTMLDivElement>(null);
+  const [syncedHeight, setSyncedHeight] = useState<number | null>(null);
+
   // Task update/delete modals
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -190,6 +199,18 @@ const Dashboard = () => {
   const userRole = (user as any)?.role || "";
   const isAdmin = ["admin", "super_admin", "super-admin"].includes(userRole);
   const isLead = userRole === "lead";
+
+  // Get user's role in current workspace
+  const getUserWorkspaceRole = useCallback(() => {
+    if (!user || !currentWorkspace) return null;
+    const workspaceData = (user as any)?.workspaces?.find(
+      (w: any) => w.workspaceId?._id === currentWorkspace._id || w.workspaceId === currentWorkspace._id
+    );
+    return workspaceData?.role || null;
+  }, [user, currentWorkspace]);
+
+  const workspaceRole = getUserWorkspaceRole();
+  const canSeeApprovalTable = ["lead", "head", "admin", "owner"].includes(workspaceRole || "");
 
   // ==================== DATA FETCHING ====================
 
@@ -314,6 +335,24 @@ const Dashboard = () => {
       console.error("Error fetching approval stats:", error);
     }
   }, [currentWorkspace]);
+
+  // Fetch approval tasks for TL/Lead
+  const fetchApprovalTasks = useCallback(async () => {
+    if (!canSeeApprovalTable) return;
+
+    try {
+      setApprovalTasksLoading(true);
+      const workspaceId = currentWorkspace?._id || localStorage.getItem("currentWorkspaceId");
+      const query = workspaceId ? `?workspaceId=${workspaceId}` : "";
+      const response = await fetchData(`/analytics/approval-tasks${query}`);
+      setApprovalTasks(response.tasks || []);
+    } catch (error) {
+      console.error("Error fetching approval tasks:", error);
+      toast.error("Failed to load approval tasks");
+    } finally {
+      setApprovalTasksLoading(false);
+    }
+  }, [currentWorkspace, canSeeApprovalTable]);
 
   // Fetch monthly project statistics for pie chart
   const fetchMonthlyProjectStats = useCallback(async (month: number, year: number, projects?: Project[]) => {
@@ -480,6 +519,43 @@ const Dashboard = () => {
     fetchProjectStatistics();
     fetchMonthlyProjectStats(selectedMonth, selectedYear);
   }, [accessibleProjects, selectedMonth, selectedYear]);
+
+  // Load approval tasks for TL/Lead
+  useEffect(() => {
+    if (isAuthenticated && canSeeApprovalTable) {
+      fetchApprovalTasks();
+    }
+  }, [isAuthenticated, canSeeApprovalTable, currentWorkspace, fetchApprovalTasks]);
+
+  // Height synchronization between Projects Table and Task Overview
+  useEffect(() => {
+    const calculateSyncedHeight = () => {
+      if (!projectsTableRef.current || !taskOverviewRef.current) return;
+
+      // Get natural heights
+      const projectsHeight = projectsTableRef.current.scrollHeight;
+      const taskOverviewHeight = taskOverviewRef.current.scrollHeight;
+
+      // Calculate 5 rows table height (approximate)
+      // Header ~52px + (5 rows * ~50px) + padding ~30px = ~332px
+      const maxTableHeight = 332;
+
+      // Use the smaller of: projects table (max 5 rows), task overview height
+      const finalHeight = Math.min(
+        Math.min(projectsHeight, maxTableHeight),
+        taskOverviewHeight
+      );
+
+      setSyncedHeight(finalHeight);
+    };
+
+    // Calculate on mount and when data changes
+    calculateSyncedHeight();
+
+    // Recalculate on window resize
+    window.addEventListener('resize', calculateSyncedHeight);
+    return () => window.removeEventListener('resize', calculateSyncedHeight);
+  }, [recentProjects, filteredTasks]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -650,6 +726,59 @@ const Dashboard = () => {
       toast.error(error.message || "Failed to delete task");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Handle task approval
+  const handleApproveTask = async (taskId: string) => {
+    try {
+      const response = await fetch(buildApiUrl(`/task/${taskId}/approve`), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to approve task");
+      }
+
+      toast.success("Task approved successfully");
+      fetchApprovalTasks(); // Refresh approval tasks
+      fetchApprovalStats(); // Refresh approval stats
+    } catch (error: any) {
+      console.error("Failed to approve task:", error);
+      toast.error(error.message || "Failed to approve task");
+    }
+  };
+
+  // Handle task rejection
+  const handleRejectTask = async (taskId: string, reason?: string) => {
+    try {
+      const response = await fetch(buildApiUrl(`/task/${taskId}/reject`), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to reject task");
+      }
+
+      toast.success("Task rejected successfully");
+      fetchApprovalTasks(); // Refresh approval tasks
+      fetchApprovalStats(); // Refresh approval stats
+    } catch (error: any) {
+      console.error("Failed to reject task:", error);
+      toast.error(error.message || "Failed to reject task");
     }
   };
 
@@ -1219,7 +1348,14 @@ const Dashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="px-2 sm:px-[20px] pb-[15px]">
-                  <div className="border border-[#cccccc] rounded-[10px] overflow-x-auto">
+                  <div
+                    ref={projectsTableRef}
+                    className="border border-[#cccccc] rounded-[10px] overflow-auto"
+                    style={{
+                      maxHeight: syncedHeight ? `${syncedHeight}px` : 'auto',
+                      overflowY: syncedHeight ? 'auto' : 'visible'
+                    }}
+                  >
                     <table className="w-full min-w-[800px]">
                       <thead>
                         <tr className="bg-[#d5e5ff]">
@@ -1424,8 +1560,14 @@ const Dashboard = () => {
                   </div>
 
                   {/* Task List */}
-                  <ScrollArea className="h-[600px] scrollbar-visible">
-                    <div className="space-y-[10px]">
+                  <div ref={taskOverviewRef}>
+                    <ScrollArea
+                      className="scrollbar-visible"
+                      style={{
+                        height: syncedHeight ? `${syncedHeight}px` : '600px'
+                      }}
+                    >
+                      <div className="space-y-[10px]">
                       {filteredTasks.length === 0 ? (
                         <div className="text-center py-8 text-[#717182] text-[14px] font-['Inter']">
                           {taskSearchQuery ? "No tasks match your search" : "No tasks found"}
@@ -1539,10 +1681,145 @@ const Dashboard = () => {
                       )}
                     </div>
                   </ScrollArea>
+                  </div>
                 </div>
               </Card>
             </div>
           </div>
+
+          {/* Approval Tasks Table - Only for TL/Lead/Admin/Owner */}
+          {canSeeApprovalTable && (
+            <div className="mt-6">
+              <Card className="shadow-[0px_1px_0px_0px_rgba(0,0,0,0.1)]">
+                <CardHeader className="px-[20px] py-[15px]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-['Inter'] font-medium text-[18px] text-black leading-[22px]">
+                        Task Approval Management
+                      </h3>
+                      <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px] mt-2">
+                        Review and approve or reject task submissions
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-gray-600">
+                        Pending: <span className="font-semibold text-orange-600">{approvalTasks.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-2 sm:px-[20px] pb-[15px]">
+                  {approvalTasksLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
+                      <span className="text-gray-600">Loading approval tasks...</span>
+                    </div>
+                  ) : approvalTasks.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <p className="text-lg font-medium mb-2">No tasks pending approval</p>
+                      <p className="text-sm">All submitted tasks have been reviewed</p>
+                    </div>
+                  ) : (
+                    <div className="border border-[#cccccc] rounded-[10px] overflow-x-auto">
+                      <table className="w-full min-w-[1000px]">
+                        <thead>
+                          <tr className="bg-[#fef3c7]">
+                            <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Task Title
+                            </th>
+                            <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Project
+                            </th>
+                            <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Assignee
+                            </th>
+                            <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Submitted
+                            </th>
+                            <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Priority
+                            </th>
+                            <th className="text-center px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {approvalTasks.map((task, index) => (
+                            <tr
+                              key={task._id}
+                              className={cn(
+                                "transition-colors hover:bg-[#fffbeb]",
+                                index % 2 === 1 ? "bg-[#fefce8]" : "bg-white"
+                              )}
+                            >
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] text-black">
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-medium">{task.title}</span>
+                                  {task.description && (
+                                    <span className="text-[11px] text-gray-600 line-clamp-1">
+                                      {task.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] text-black">
+                                {task.project?.title || "N/A"}
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] text-black">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                                    {task.assignedTo?.name?.charAt(0).toUpperCase() || "?"}
+                                  </div>
+                                  <span>{task.assignedTo?.name || "Unassigned"}</span>
+                                </div>
+                              </td>
+                              <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] text-gray-600">
+                                {(task as any).submittedForApprovalAt
+                                  ? formatDateDDMMYYYY((task as any).submittedForApprovalAt)
+                                  : "N/A"}
+                              </td>
+                              <td className="px-[16px] py-[14px]">
+                                <Badge
+                                  className={cn(
+                                    "text-xs",
+                                    task.priority === "high" && "bg-red-100 text-red-700",
+                                    task.priority === "medium" && "bg-yellow-100 text-yellow-700",
+                                    task.priority === "low" && "bg-green-100 text-green-700"
+                                  )}
+                                >
+                                  {task.priority || "N/A"}
+                                </Badge>
+                              </td>
+                              <td className="px-[16px] py-[14px]">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApproveTask(task._id)}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs h-auto"
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleRejectTask(task._id)}
+                                    className="px-3 py-1 text-xs h-auto"
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
 

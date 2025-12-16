@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Navigate } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { fetchData, postData, putData } from "@/lib/fetch-util";
 import { buildApiUrl, buildBackendUrl } from "@/lib/config";
@@ -779,7 +779,7 @@ const TaskDetail = () => {
   };
   const { id: taskId } = useParams();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [task, setTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -1886,6 +1886,11 @@ const TaskDetail = () => {
         </div>
       </div>
     );
+  }
+
+  // ✅ Authentication Guard - Redirect to sign-in if not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return <Navigate to="/sign-in" replace />;
   }
 
   if (!task) {
