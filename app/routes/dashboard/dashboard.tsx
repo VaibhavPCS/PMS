@@ -166,6 +166,10 @@ const Dashboard = () => {
   });
   const [accessibleProjects, setAccessibleProjects] = useState<Project[]>([]);
   const [accessibleProjectIds, setAccessibleProjectIds] = useState<Set<string>>(new Set());
+  const [approvalStats, setApprovalStats] = useState({
+    pendingApproval: 0,
+    approved: 0
+  });
 
   // Task update/delete modals
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -224,7 +228,8 @@ const Dashboard = () => {
       const [_, projects] = await Promise.all([
         fetchRecentProjects(),
         fetchAccessibleProjects(),
-        fetchTasks()
+        fetchTasks(),
+        fetchApprovalStats()
       ]);
 
       // Update stats immediately with the new projects
@@ -298,6 +303,17 @@ const Dashboard = () => {
       return [];
     }
   }, [isAdmin, currentUserId]);
+
+  const fetchApprovalStats = useCallback(async () => {
+    try {
+      const workspaceId = currentWorkspace?._id || localStorage.getItem("currentWorkspaceId");
+      const query = workspaceId ? `?workspaceId=${workspaceId}` : "";
+      const response = await fetchData(`/analytics/approval-stats${query}`);
+      setApprovalStats(response);
+    } catch (error) {
+      console.error("Error fetching approval stats:", error);
+    }
+  }, [currentWorkspace]);
 
   // Fetch monthly project statistics for pie chart
   const fetchMonthlyProjectStats = useCallback(async (month: number, year: number, projects?: Project[]) => {
@@ -453,6 +469,7 @@ const Dashboard = () => {
         await fetchRecentProjects();
         await fetchMonthlyProjectStats(selectedMonth, selectedYear, projects);
         await fetchTasks();
+        await fetchApprovalStats();
         setLoading(false);
       };
       loadData();
@@ -826,6 +843,42 @@ const Dashboard = () => {
                     </p>
                     <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                       {projectStats.proposedProjects}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pending Approval Card */}
+                <div className="bg-[#f59e0b] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
+                  {/* Decorative Circle - Top Right */}
+                  <div className="absolute right-[-20px] top-[-20px] w-[100px] h-[100px] rounded-full bg-[#fbbf24] opacity-40"></div>
+                  {/* Decorative Circle - Bottom Left */}
+                  <div className="absolute left-[-10px] bottom-[-10px] w-[60px] h-[60px] rounded-full bg-[#fbbf24] opacity-30"></div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      Pending Approval
+                    </p>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {approvalStats.pendingApproval}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Approved Tasks Card */}
+                <div className="bg-[#10b981] h-[100px] sm:h-[120px] rounded-[10px] overflow-hidden relative">
+                   {/* Decorative Square - Top Left */}
+                  <div className="absolute left-[10px] top-[10px] w-[40px] h-[40px] rotate-45 bg-[#34d399] opacity-30"></div>
+                   {/* Decorative Circle - Right */}
+                  <div className="absolute right-[-30px] top-[20px] w-[120px] h-[120px] rounded-full bg-[#34d399] opacity-30"></div>
+
+                  {/* Content */}
+                  <div className="relative z-10 p-3 sm:p-[15px]">
+                    <p className="font-medium text-[14px] sm:text-[18px] text-white leading-normal mb-1 sm:mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      Approved Tasks
+                    </p>
+                    <p className="font-medium text-[22px] sm:text-[28px] text-white leading-normal" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                      {approvalStats.approved}
                     </p>
                   </div>
                 </div>
