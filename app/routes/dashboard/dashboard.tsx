@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
 import { fetchData, postData } from "@/lib/fetch-util";
@@ -153,6 +153,7 @@ const Dashboard = () => {
   const [dateRangeFilter, setDateRangeFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
   const [taskSearchQuery, setTaskSearchQuery] = useState<string>("");
+  const [projectSearchQuery, setProjectSearchQuery] = useState<string>("");
   // Calendar state for pie chart filtering
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // 0-11
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -174,6 +175,8 @@ const Dashboard = () => {
   // Approval tasks for TL/Lead
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [approvalTasksLoading, setApprovalTasksLoading] = useState(false);
+  const [approvalSearchQuery, setApprovalSearchQuery] = useState("");
+  const [approvalProjectFilter, setApprovalProjectFilter] = useState("all");
 
   // Height synchronization refs
   const projectsTableRef = useRef<HTMLDivElement>(null);
@@ -194,6 +197,16 @@ const Dashboard = () => {
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Filter projects based on search query
+  const filteredProjects = useMemo(() => {
+    if (!projectSearchQuery) return recentProjects;
+    return recentProjects.filter(project =>
+      project.title.toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
+      (project.description && project.description.toLowerCase().includes(projectSearchQuery.toLowerCase()))
+    );
+  }, [recentProjects, projectSearchQuery]);
+
 
   const currentUserId = (user as any)?.id || (user as any)?._id || "";
   const userRole = (user as any)?.role || "";
@@ -555,7 +568,7 @@ const Dashboard = () => {
     // Recalculate on window resize
     window.addEventListener('resize', calculateSyncedHeight);
     return () => window.removeEventListener('resize', calculateSyncedHeight);
-  }, [recentProjects, filteredTasks]);
+  }, [recentProjects, filteredTasks, filteredProjects]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -1345,6 +1358,18 @@ const Dashboard = () => {
                     <p className="font-['Inter'] font-normal text-[12px] text-[#717182] leading-[12px] tracking-[0.5px]">
                       Complete project profile including milestones and task details
                     </p>
+                    <div className="mt-4 mb-2">
+                      <div className="relative bg-[#f5f4f9] rounded-[8px] h-[37px] px-[10px] flex items-center w-full sm:w-[300px]">
+                        <Search className="w-[15px] h-[15px] text-[#040110] opacity-60 mr-2" />
+                        <input
+                          type="text"
+                          placeholder="Search projects..."
+                          value={projectSearchQuery}
+                          onChange={(e) => setProjectSearchQuery(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[14px] font-['Inter'] text-[#040110] opacity-60 placeholder:text-[#040110] placeholder:opacity-60 w-full"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="px-2 sm:px-[20px] pb-[15px]">
@@ -1400,14 +1425,14 @@ const Dashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {recentProjects.length === 0 ? (
+                        {filteredProjects.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="px-[16px] py-[14px] text-center text-[12px] font-['Inter'] text-black">
                               No projects found
                             </td>
                           </tr>
                         ) : (
-                          recentProjects.map((project, index) => (
+                          filteredProjects.map((project, index) => (
                             <tr
                               key={project._id}
                               onClick={() => handleViewProject(project._id)}
@@ -1723,7 +1748,7 @@ const Dashboard = () => {
                     <div className="border border-[#cccccc] rounded-[10px] overflow-x-auto">
                       <table className="w-full min-w-[1000px]">
                         <thead>
-                          <tr className="bg-[#fef3c7]">
+                          <tr className="bg-[#d5e5ff]">
                             <th className="text-left px-[16px] py-[12px] text-[12px] font-['Inter'] font-medium text-[rgba(0,0,0,0.8)]">
                               Task Title
                             </th>
@@ -1748,9 +1773,10 @@ const Dashboard = () => {
                           {approvalTasks.map((task, index) => (
                             <tr
                               key={task._id}
+                              onClick={() => navigate(`/task/${task._id}`)}
                               className={cn(
-                                "transition-colors hover:bg-[#fffbeb]",
-                                index % 2 === 1 ? "bg-[#fefce8]" : "bg-white"
+                                "transition-colors hover:bg-[#e6f2ff] cursor-pointer",
+                                index % 2 === 1 ? "bg-[#f2f7ff]" : "bg-white"
                               )}
                             >
                               <td className="px-[16px] py-[14px] text-[12px] font-['Inter'] text-black">
@@ -1795,7 +1821,10 @@ const Dashboard = () => {
                                 <div className="flex items-center justify-center gap-2">
                                   <Button
                                     size="sm"
-                                    onClick={() => handleApproveTask(task._id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleApproveTask(task._id);
+                                    }}
                                     className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs h-auto"
                                   >
                                     Approve
@@ -1803,7 +1832,10 @@ const Dashboard = () => {
                                   <Button
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleRejectTask(task._id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRejectTask(task._id);
+                                    }}
                                     className="px-3 py-1 text-xs h-auto"
                                   >
                                     Reject
