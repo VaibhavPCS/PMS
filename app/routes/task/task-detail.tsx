@@ -991,6 +991,7 @@ const TaskDetail = () => {
     const interval = setInterval(() => {
       if (task?._id) {
         fetchComments();
+        fetchSubtasks(); // Poll subtasks to keep status/approval up to date
       }
     }, 10000);
 
@@ -1118,8 +1119,17 @@ const TaskDetail = () => {
       if (res.ok) {
         const data = await res.json();
         setSubtasks(data.subtasks || []);
+      } else {
+        console.error("Failed to fetch subtasks:", res.status);
+        const errorData = await res.json().catch(() => ({}));
+        if (errorData.message) {
+            toast.error(`Failed to load subtasks: ${errorData.message}`);
+        }
       }
-    } catch (e) { }
+    } catch (e) {
+      console.error("Error fetching subtasks:", e);
+      toast.error("Failed to load subtasks");
+    }
   };
 
   const handleCreateSubtask = async () => {
@@ -1232,9 +1242,9 @@ const TaskDetail = () => {
 
     // Check if all subtasks are done before allowing parent task to be marked as done
     if (newStatus === "done" && subtasks.length > 0) {
-      const allSubtasksDone = subtasks.every(subtask => subtask.status === "done");
+      const allSubtasksDone = subtasks.every(subtask => subtask.status === "done" && subtask.approvalStatus === "approved");
       if (!allSubtasksDone) {
-        toast.error("All subtasks must be completed before marking this task as done");
+        toast.error("All subtasks must be completed and approved before marking this task as done");
         return;
       }
     }
@@ -1245,9 +1255,10 @@ const TaskDetail = () => {
       // Refresh task details to get latest state (including approval status side-effects)
       await fetchTaskDetails();
       toast.success("Task status updated");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update task status:", error);
-      toast.error("Failed to update task status");
+      const errorMessage = error.response?.data?.message || "Failed to update task status";
+      toast.error(errorMessage);
     } finally {
       setIsChangingStatus(false);
     }
