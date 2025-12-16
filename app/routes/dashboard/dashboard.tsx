@@ -568,7 +568,7 @@ const Dashboard = () => {
     // Recalculate on window resize
     window.addEventListener('resize', calculateSyncedHeight);
     return () => window.removeEventListener('resize', calculateSyncedHeight);
-  }, [recentProjects, filteredTasks, filteredProjects]);
+  }, [recentProjects, filteredTasks]);
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -1377,7 +1377,7 @@ const Dashboard = () => {
                     ref={projectsTableRef}
                     className="border border-[#cccccc] rounded-[10px] overflow-auto"
                     style={{
-                      maxHeight: syncedHeight ? `${syncedHeight}px` : 'auto',
+                      height: syncedHeight ? `${syncedHeight}px` : 'auto',
                       overflowY: syncedHeight ? 'auto' : 'visible'
                     }}
                   >
