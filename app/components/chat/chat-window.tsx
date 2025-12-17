@@ -86,6 +86,8 @@ interface ChatWindowProps {
   onSendMessage: (content: string, attachments?: File[], replyTo?: string) => void;
   socket: Socket | null;
   onBack?: () => void;
+  isUploading?: boolean;
+  uploadProgress?: number;
 }
 
 // Helper function to strip HTML tags and get plain text
@@ -103,7 +105,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUser,
   onSendMessage,
   socket,
-  onBack
+  onBack,
+  isUploading = false,
+  uploadProgress = 0
 }) => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -112,7 +116,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const MAX_FILE_SIZE = 512 * 1024 * 1024; // 512 MB
+  const MAX_MESSAGE_LENGTH = 5000;
+  const [characterCount, setCharacterCount] = useState(0);
 
   // TipTap Editor Configuration
   const editor = useEditor({
@@ -151,6 +157,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       const text = editor.getText();
       handleTyping(text);
       setHasContent(!!text.trim() || selectedFiles.length > 0);
+      setCharacterCount(text.trim().length);
     },
   });
 
@@ -264,6 +271,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       return;
     }
 
+    // Validate message length
+    if (textContent.length > MAX_MESSAGE_LENGTH) {
+      toast.error(`Message is too long. Maximum ${MAX_MESSAGE_LENGTH.toLocaleString()} characters allowed. Current: ${textContent.length.toLocaleString()} characters.`);
+      return;
+    }
+
     // Use HTML content if there's formatting, otherwise use plain text
     const content = textContent ? htmlContent : 'File attachment';
     onSendMessage(content, selectedFiles.length ? selectedFiles : undefined, replyTo?._id);
@@ -272,11 +285,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     editor.commands.clearContent();
     setSelectedFiles([]);
     setReplyTo(null);
+    setCharacterCount(0);
 
     if (socket) {
       socket.emit('stopTyping', { chatId: chat._id });
     }
-  }, [editor, selectedFiles, replyTo, onSendMessage, socket, chat._id]);
+  }, [editor, selectedFiles, replyTo, onSendMessage, socket, chat._id, MAX_MESSAGE_LENGTH]);
 
   const handleTyping = (value: string) => {
     if (socket) {
@@ -314,7 +328,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     });
 
     if (rejectedNames.length) {
-      toast.error(`File size exceeds 10 MB`, { description: rejectedNames.join(', ') });
+      toast.error(`File size exceeds 512 MB`, { description: rejectedNames.join(', ') });
     }
 
     if (validFiles.length) {
@@ -435,23 +449,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
           {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
-            <div className="mt-[8px] sm:mt-[10px] flex flex-wrap gap-[6px] sm:gap-[8px]">
-              {selectedFiles.map((file, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-[4px] sm:gap-[6px] px-[8px] sm:px-[10px] py-[4px] sm:py-[6px] rounded-[6px] bg-[#f1f2f7] border border-[#e4e9ea]"
-                >
-                  <span className="text-[10px] sm:text-[11px] md:text-[12px] text-neutral-700 font-['Inter'] truncate max-w-[80px] sm:max-w-[120px] md:max-w-[180px]">
-                    {file.name}
-                  </span>
-                  <button
-                    onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                    className="text-gray-400 hover:text-gray-600 text-[12px] sm:text-[14px]"
+            <div className="mt-[8px] sm:mt-[10px]">
+              <div className="flex flex-wrap gap-[6px] sm:gap-[8px]">
+                {selectedFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-[4px] sm:gap-[6px] px-[8px] sm:px-[10px] py-[4px] sm:py-[6px] rounded-[6px] bg-[#f1f2f7] border border-[#e4e9ea]"
                   >
-                    ×
-                  </button>
+                    <span className="text-[10px] sm:text-[11px] md:text-[12px] text-neutral-700 font-['Inter'] truncate max-w-[80px] sm:max-w-[120px] md:max-w-[180px]">
+                      {file.name}
+                    </span>
+                    <button
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-gray-400 hover:text-gray-600 text-[12px] sm:text-[14px]"
+                      disabled={isUploading}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Upload Progress Bar */}
+              {isUploading && (
+                <div className="mt-[8px] sm:mt-[10px]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 font-['Inter']">
+                      Uploading files...
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 font-['Inter'] font-medium">
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-[4px] overflow-hidden">
+                    <div
+                      className="bg-[#FF6B2C] h-full transition-all duration-300 ease-out rounded-full"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -518,7 +555,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               id="chat-attach"
               ref={fileInputRef}
               multiple
-              accept="image/*,.pdf,.docx,.doc,.txt"
+              accept="image/*,.pdf,.docx,.doc,.xlsx,.xls,.txt,.apk"
               className="hidden"
               type="file"
               onChange={handleFileChange}
@@ -528,20 +565,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           {/* Spacer */}
           <div className="flex-1" />
 
+          {/* Character Counter - Shows when approaching limit */}
+          {characterCount > MAX_MESSAGE_LENGTH * 0.8 && (
+            <div className={cn(
+              "text-[10px] sm:text-[11px] font-['Inter'] shrink-0",
+              characterCount > MAX_MESSAGE_LENGTH
+                ? "text-red-500 font-semibold"
+                : characterCount > MAX_MESSAGE_LENGTH * 0.9
+                  ? "text-orange-500 font-medium"
+                  : "text-gray-500"
+            )}>
+              {characterCount.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()}
+            </div>
+          )}
+
           {/* Send Button - Responsive */}
           <button
             onClick={handleSendMessage}
-            disabled={!hasContent}
+            disabled={!hasContent || isUploading}
             className={cn(
               "flex items-center justify-center gap-[4px] sm:gap-[6px] md:gap-[8px] px-[10px] sm:px-[14px] md:px-[18px] py-[6px] sm:py-[7px] md:py-[8px] rounded-md transition-all shrink-0",
-              hasContent
+              hasContent && !isUploading
                 ? "bg-[#FF6B2C] hover:bg-[#FF5A1A] cursor-pointer"
                 : "bg-gray-300 cursor-not-allowed opacity-50"
             )}
           >
             <Send className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] text-white" />
             <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
-              Send
+              {isUploading ? 'Uploading...' : 'Send'}
             </span>
           </button>
         </div>
@@ -554,7 +605,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         multiple
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,.pdf,.doc,.docx,.txt"
+        accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt,.apk"
       />
     </div>
   );

@@ -74,6 +74,7 @@ import Breadcrumb from "@/components/layout/Breadcrumb";
 import { AvatarGroup } from "@/components/ui/avatar-group";
 import { ImagePreviewModal } from "@/components/ui/image-preview-modal";
 import { cn } from "@/lib/utils";
+import { io, Socket } from "socket.io-client";
 
 interface Task {
   _id: string;
@@ -804,6 +805,7 @@ const TaskDetail = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [replies, setReplies] = useState<Record<string, Comment[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   // Approval workflow states
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -942,6 +944,69 @@ const TaskDetail = () => {
     }
   };
 
+  // Initialize Socket connection
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+      path: '/socket.io/'
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  // Join task room and listen for updates
+  useEffect(() => {
+    if (!socket || !taskId) return;
+
+    // Join the task room
+    socket.emit('join-task', taskId);
+
+    // Listen for new comments
+    const handleNewComment = (data: { comment: Comment, taskId: string }) => {
+      if (data.taskId === taskId) {
+        setComments(prev => {
+          // Check for duplicates
+          if (prev.some(c => c._id === data.comment._id)) return prev;
+          return [...prev, data.comment];
+        });
+      }
+    };
+
+    // Listen for comment updates
+    const handleUpdateComment = (data: { comment: Comment, taskId: string }) => {
+      if (data.taskId === taskId) {
+        setComments(prev => prev.map(c => 
+          c._id === data.comment._id ? data.comment : c
+        ));
+      }
+    };
+
+    // Listen for deleted comments
+    const handleDeleteComment = (data: { commentId: string, taskId: string }) => {
+      if (data.taskId === taskId) {
+        setComments(prev => prev.filter(c => c._id !== data.commentId));
+      }
+    };
+
+    socket.on('comment:new', handleNewComment);
+    socket.on('comment:update', handleUpdateComment);
+    socket.on('comment:delete', handleDeleteComment);
+
+    return () => {
+      socket.emit('leave-task', taskId);
+      socket.off('comment:new', handleNewComment);
+      socket.off('comment:update', handleUpdateComment);
+      socket.off('comment:delete', handleDeleteComment);
+    };
+  }, [socket, taskId]);
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -986,17 +1051,17 @@ const TaskDetail = () => {
   }, [task?.project?._id]);
 
 
-  // Real-time polling
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (task?._id) {
-        fetchComments();
-        fetchSubtasks(); // Poll subtasks to keep status/approval up to date
-      }
-    }, 10000);
+  // Real-time polling - REMOVED in favor of Socket.IO
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     if (task?._id) {
+  //       fetchComments();
+  //     }
+  //   }, 10000);
+  //
+  //   return () => clearInterval(interval);
+  // }, [task?._id]);
 
-    return () => clearInterval(interval);
-  }, [task?._id]);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 

@@ -85,6 +85,8 @@ const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const isConnectingRef = useRef(false);
   const activeChatRef = useRef<Chat | null>(null);
@@ -474,6 +476,10 @@ const Chat: React.FC = () => {
 
         // If there are attachments, create FormData
         if (attachments && attachments.length > 0) {
+          // Set uploading state
+          setIsUploading(true);
+          setUploadProgress(0);
+
           const formData = new FormData();
           formData.append('content', content || '');
           if (replyTo) {
@@ -483,9 +489,32 @@ const Chat: React.FC = () => {
             formData.append('attachments', file);
           });
 
-          // Send message with attachments via REST API
-          const response = await postMultipart(`/messages/chat/${activeChat._id}`, formData);
-          sentMessage = response.data;
+          // Simulate progress (since we can't track actual upload progress easily with fetch)
+          const progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+              if (prev >= 90) return prev;
+              return prev + 10;
+            });
+          }, 200);
+
+          try {
+            // Send message with attachments via REST API
+            const response = await postMultipart(`/messages/chat/${activeChat._id}`, formData);
+            sentMessage = response.data;
+
+            // Complete progress
+            setUploadProgress(100);
+            clearInterval(progressInterval);
+          } catch (error) {
+            clearInterval(progressInterval);
+            throw error;
+          } finally {
+            // Reset upload state after a brief delay
+            setTimeout(() => {
+              setIsUploading(false);
+              setUploadProgress(0);
+            }, 500);
+          }
         } else {
           // Send text-only message via REST API
           const response = await postData(`/messages/chat/${activeChat._id}`, messageData);
@@ -530,9 +559,24 @@ const Chat: React.FC = () => {
           });
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to send message:', error);
-        toast.error('Failed to send message. Please try again.');
+
+        // Show specific error message from backend
+        const errorMessage = error?.response?.data?.message ||
+                           error?.response?.data?.error ||
+                           'Failed to send message. Please try again.';
+
+        // Log detailed error for debugging
+        if (error?.response?.data) {
+          console.error('Backend error details:', error.response.data);
+        }
+
+        toast.error(errorMessage);
+
+        // Reset upload state on error
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     }
   };
@@ -572,6 +616,8 @@ const Chat: React.FC = () => {
             onSendMessage={handleSendMessage}
             socket={socket}
             onBack={() => setActiveChat(null)}
+            isUploading={isUploading}
+            uploadProgress={uploadProgress}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center bg-gray-50">
