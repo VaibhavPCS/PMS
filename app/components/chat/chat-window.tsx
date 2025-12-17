@@ -112,7 +112,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const MAX_FILE_SIZE = 512 * 1024 * 1024; // 512 MB
+  const MAX_MESSAGE_LENGTH = 5000;
+  const [characterCount, setCharacterCount] = useState(0);
 
   // TipTap Editor Configuration
   const editor = useEditor({
@@ -151,6 +153,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       const text = editor.getText();
       handleTyping(text);
       setHasContent(!!text.trim() || selectedFiles.length > 0);
+      setCharacterCount(text.trim().length);
     },
   });
 
@@ -264,6 +267,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       return;
     }
 
+    // Validate message length
+    if (textContent.length > MAX_MESSAGE_LENGTH) {
+      toast.error(`Message is too long. Maximum ${MAX_MESSAGE_LENGTH.toLocaleString()} characters allowed. Current: ${textContent.length.toLocaleString()} characters.`);
+      return;
+    }
+
     // Use HTML content if there's formatting, otherwise use plain text
     const content = textContent ? htmlContent : 'File attachment';
     onSendMessage(content, selectedFiles.length ? selectedFiles : undefined, replyTo?._id);
@@ -272,11 +281,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     editor.commands.clearContent();
     setSelectedFiles([]);
     setReplyTo(null);
+    setCharacterCount(0);
 
     if (socket) {
       socket.emit('stopTyping', { chatId: chat._id });
     }
-  }, [editor, selectedFiles, replyTo, onSendMessage, socket, chat._id]);
+  }, [editor, selectedFiles, replyTo, onSendMessage, socket, chat._id, MAX_MESSAGE_LENGTH]);
 
   const handleTyping = (value: string) => {
     if (socket) {
@@ -314,7 +324,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     });
 
     if (rejectedNames.length) {
-      toast.error(`File size exceeds 10 MB`, { description: rejectedNames.join(', ') });
+      toast.error(`File size exceeds 512 MB`, { description: rejectedNames.join(', ') });
     }
 
     if (validFiles.length) {
@@ -518,7 +528,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               id="chat-attach"
               ref={fileInputRef}
               multiple
-              accept="image/*,.pdf,.docx,.doc,.txt"
+              accept="image/*,.pdf,.docx,.doc,.xlsx,.xls,.txt,.apk"
               className="hidden"
               type="file"
               onChange={handleFileChange}
@@ -527,6 +537,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Character Counter - Shows when approaching limit */}
+          {characterCount > MAX_MESSAGE_LENGTH * 0.8 && (
+            <div className={cn(
+              "text-[10px] sm:text-[11px] font-['Inter'] shrink-0",
+              characterCount > MAX_MESSAGE_LENGTH
+                ? "text-red-500 font-semibold"
+                : characterCount > MAX_MESSAGE_LENGTH * 0.9
+                  ? "text-orange-500 font-medium"
+                  : "text-gray-500"
+            )}>
+              {characterCount.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()}
+            </div>
+          )}
 
           {/* Send Button - Responsive */}
           <button
@@ -554,7 +578,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         multiple
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,.pdf,.doc,.docx,.txt"
+        accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt,.apk"
       />
     </div>
   );
