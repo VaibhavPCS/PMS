@@ -18,7 +18,7 @@ const RichTextEditor = ({ content, onChange, placeholder = 'Type here...', class
     const editor = useEditor({
         extensions: [
             StarterKit,
-            Underline,
+            // Underline, // Removed to fix duplicate extension warning
             Placeholder.configure({
                 placeholder,
                 emptyEditorClass: 'is-editor-empty before:content-[attr(data-placeholder)] before:text-muted-foreground before:float-left before:pointer-events-none before:h-0',

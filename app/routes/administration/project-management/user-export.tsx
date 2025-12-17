@@ -283,17 +283,17 @@ const UserExportPage = () => {
             <div className="bg-white rounded-[12px] border border-[#e6e8ec] p-4 md:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#F2761B] text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0">
-                  {reportData.user.name.charAt(0).toUpperCase()}
+                  {reportData.user?.name?.charAt(0).toUpperCase() || '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user.name}</h2>
-                  <p className="text-[13px] text-[#717182] truncate">{reportData.user.email}</p>
-                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user.role}</p>
+                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user?.name || 'Unknown User'}</h2>
+                  <p className="text-[13px] text-[#717182] truncate">{reportData.user?.email || 'No email'}</p>
+                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user?.role || 'No role'}</p>
                 </div>
                 <div className="w-full sm:w-auto sm:text-right">
                   <p className="text-[13px] text-[#717182]">Selected Period</p>
-                  <p className="text-[14px] font-medium text-[#111827]">{reportData.dateRange.displayText}</p>
-                  <p className="text-[13px] text-[#717182]">{reportData.dateRange.days} days</p>
+                  <p className="text-[14px] font-medium text-[#111827]">{reportData.dateRange?.displayText}</p>
+                  <p className="text-[13px] text-[#717182]">{reportData.dateRange?.days} days</p>
                 </div>
               </div>
             </div>
