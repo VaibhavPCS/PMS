@@ -559,9 +559,24 @@ const Chat: React.FC = () => {
           });
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to send message:', error);
-        toast.error('Failed to send message. Please try again.');
+
+        // Show specific error message from backend
+        const errorMessage = error?.response?.data?.message ||
+                           error?.response?.data?.error ||
+                           'Failed to send message. Please try again.';
+
+        // Log detailed error for debugging
+        if (error?.response?.data) {
+          console.error('Backend error details:', error.response.data);
+        }
+
+        toast.error(errorMessage);
+
+        // Reset upload state on error
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     }
   };

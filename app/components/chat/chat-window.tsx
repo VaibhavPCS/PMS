@@ -590,21 +590,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 : "bg-gray-300 cursor-not-allowed opacity-50"
             )}
           >
-            {isUploading ? (
-              <>
-                <div className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
-                  {uploadProgress}%
-                </span>
-              </>
-            ) : (
-              <>
-                <Send className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] text-white" />
-                <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
-                  Send
-                </span>
-              </>
-            )}
+            <Send className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] text-white" />
+            <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
+              {isUploading ? 'Uploading...' : 'Send'}
+            </span>
           </button>
         </div>
       </div>
