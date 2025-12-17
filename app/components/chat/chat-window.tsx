@@ -86,6 +86,8 @@ interface ChatWindowProps {
   onSendMessage: (content: string, attachments?: File[], replyTo?: string) => void;
   socket: Socket | null;
   onBack?: () => void;
+  isUploading?: boolean;
+  uploadProgress?: number;
 }
 
 // Helper function to strip HTML tags and get plain text
@@ -103,7 +105,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUser,
   onSendMessage,
   socket,
-  onBack
+  onBack,
+  isUploading = false,
+  uploadProgress = 0
 }) => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -445,23 +449,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
           {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
-            <div className="mt-[8px] sm:mt-[10px] flex flex-wrap gap-[6px] sm:gap-[8px]">
-              {selectedFiles.map((file, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-[4px] sm:gap-[6px] px-[8px] sm:px-[10px] py-[4px] sm:py-[6px] rounded-[6px] bg-[#f1f2f7] border border-[#e4e9ea]"
-                >
-                  <span className="text-[10px] sm:text-[11px] md:text-[12px] text-neutral-700 font-['Inter'] truncate max-w-[80px] sm:max-w-[120px] md:max-w-[180px]">
-                    {file.name}
-                  </span>
-                  <button
-                    onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                    className="text-gray-400 hover:text-gray-600 text-[12px] sm:text-[14px]"
+            <div className="mt-[8px] sm:mt-[10px]">
+              <div className="flex flex-wrap gap-[6px] sm:gap-[8px]">
+                {selectedFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-[4px] sm:gap-[6px] px-[8px] sm:px-[10px] py-[4px] sm:py-[6px] rounded-[6px] bg-[#f1f2f7] border border-[#e4e9ea]"
                   >
-                    ×
-                  </button>
+                    <span className="text-[10px] sm:text-[11px] md:text-[12px] text-neutral-700 font-['Inter'] truncate max-w-[80px] sm:max-w-[120px] md:max-w-[180px]">
+                      {file.name}
+                    </span>
+                    <button
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-gray-400 hover:text-gray-600 text-[12px] sm:text-[14px]"
+                      disabled={isUploading}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Upload Progress Bar */}
+              {isUploading && (
+                <div className="mt-[8px] sm:mt-[10px]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 font-['Inter']">
+                      Uploading files...
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 font-['Inter'] font-medium">
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-[4px] overflow-hidden">
+                    <div
+                      className="bg-[#FF6B2C] h-full transition-all duration-300 ease-out rounded-full"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -555,18 +582,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           {/* Send Button - Responsive */}
           <button
             onClick={handleSendMessage}
-            disabled={!hasContent}
+            disabled={!hasContent || isUploading}
             className={cn(
               "flex items-center justify-center gap-[4px] sm:gap-[6px] md:gap-[8px] px-[10px] sm:px-[14px] md:px-[18px] py-[6px] sm:py-[7px] md:py-[8px] rounded-md transition-all shrink-0",
-              hasContent
+              hasContent && !isUploading
                 ? "bg-[#FF6B2C] hover:bg-[#FF5A1A] cursor-pointer"
                 : "bg-gray-300 cursor-not-allowed opacity-50"
             )}
           >
-            <Send className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] text-white" />
-            <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
-              Send
-            </span>
+            {isUploading ? (
+              <>
+                <div className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
+                  {uploadProgress}%
+                </span>
+              </>
+            ) : (
+              <>
+                <Send className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px] text-white" />
+                <span className="font-['Inter'] font-medium text-[11px] sm:text-[12px] md:text-[13px] text-white leading-normal">
+                  Send
+                </span>
+              </>
+            )}
           </button>
         </div>
       </div>
