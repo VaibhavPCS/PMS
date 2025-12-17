@@ -77,6 +77,7 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       : null;
 
     if (newSocket) {
+      // Listen for new messages
       newSocket.on('new-message', (data: { message: any; chatId: string }) => {
         const isChatOpen = activeChatIdRef.current === data.chatId;
         const isWindowFocused = document.hasFocus();
@@ -85,10 +86,38 @@ export const BadgeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setBadgeCounts(prev => ({ ...prev, messages: prev.messages + 1 }));
         }
       });
+
+      // Listen for new notifications via socket
+      newSocket.on('notification', (notification: any) => {
+        // Increment notification count
+        setBadgeCounts(prev => ({ ...prev, notifications: prev.notifications + 1 }));
+
+        // Dispatch custom event for notification center to update
+        window.dispatchEvent(new CustomEvent('notification:new', { detail: notification }));
+      });
+
+      // Listen for notification marked as read
+      newSocket.on('notification-read', (data: { notificationId: string }) => {
+        // Decrement notification count
+        setBadgeCounts(prev => ({ ...prev, notifications: Math.max(0, prev.notifications - 1) }));
+
+        // Dispatch custom event for notification center to update
+        window.dispatchEvent(new CustomEvent('notification:read', { detail: data }));
+      });
+
+      // Listen for all notifications marked as read
+      newSocket.on('notifications-all-read', () => {
+        // Reset notification count
+        setBadgeCounts(prev => ({ ...prev, notifications: 0 }));
+
+        // Dispatch custom event for notification center to update
+        window.dispatchEvent(new CustomEvent('notifications:all-read'));
+      });
     }
 
-    // Refresh badge counts every 30 seconds
-    const interval = isAuthenticated ? setInterval(refreshBadgeCounts, 30000) : undefined;
+    // Refresh badge counts every 5 minutes (fallback only) - reduced from 30 seconds
+    // Socket events handle real-time updates, polling is just a safety net
+    const interval = isAuthenticated ? setInterval(refreshBadgeCounts, 300000) : undefined;
 
     return () => {
       window.removeEventListener('chat:read', handleChatRead as EventListener);

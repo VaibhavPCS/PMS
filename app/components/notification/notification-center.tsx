@@ -51,6 +51,55 @@ const NotificationCenter = () => {
 
   useEffect(() => {
     fetchNotifications();
+
+    // Listen for real-time notifications via socket
+    const handleNewNotification = (event: CustomEvent) => {
+      const newNotification = event.detail;
+
+      // Add new notification to the top of the list
+      setNotifications(prev => [newNotification, ...prev]);
+
+      // Increment unread count
+      setUnreadCount(prev => prev + 1);
+
+      // Show toast notification
+      toast.info(newNotification.title, {
+        description: newNotification.message,
+        duration: 5000,
+      });
+    };
+
+    // Listen for notification marked as read
+    const handleNotificationRead = (event: CustomEvent) => {
+      const { notificationId } = event.detail;
+
+      // Update notification in list
+      setNotifications(prev =>
+        prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+      );
+
+      // Decrement unread count
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    };
+
+    // Listen for all notifications marked as read
+    const handleAllNotificationsRead = () => {
+      // Mark all as read
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+
+      // Reset unread count
+      setUnreadCount(0);
+    };
+
+    window.addEventListener('notification:new', handleNewNotification as EventListener);
+    window.addEventListener('notification:read', handleNotificationRead as EventListener);
+    window.addEventListener('notifications:all-read', handleAllNotificationsRead as EventListener);
+
+    return () => {
+      window.removeEventListener('notification:new', handleNewNotification as EventListener);
+      window.removeEventListener('notification:read', handleNotificationRead as EventListener);
+      window.removeEventListener('notifications:all-read', handleAllNotificationsRead as EventListener);
+    };
   }, []);
 
   // ✅ SOLUTION: Add proper typing for the response
