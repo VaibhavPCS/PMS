@@ -1527,7 +1527,13 @@ const DroppableColumn = ({
           />
         </div>
       </div>
-      <div ref={setNodeRef} className="space-y-2 min-h-[20rem]">
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "space-y-2 min-h-[20rem]",
+          count > 4 && "max-h-[600px] overflow-y-auto pr-2"
+        )}
+      >
         {children}
       </div>
     </div>
