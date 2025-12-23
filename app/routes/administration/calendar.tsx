@@ -225,10 +225,20 @@ export default function Calendar() {
   const getTasksForDay = (date: Date) => {
     console.log('Filtering tasks for day:', format(date, 'yyyy-MM-dd'), 'Total tasks:', tasks.length);
     const dayTasks = tasks.filter(task => {
-      const taskDate = new Date(task.dueDate);
-      const isSame = isSameDay(taskDate, date);
-      console.log('Task dueDate:', task.dueDate, 'isSameDay:', isSame);
-      return isSame;
+      const taskStartDate = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
+      const taskEndDate = new Date(task.dueDate);
+      
+      // Check if the current date falls within the task duration (inclusive)
+      const isWithinDuration = date >= taskStartDate && date <= taskEndDate;
+      
+      console.log('Task dates:', {
+        start: task.startDate,
+        end: task.dueDate,
+        current: format(date, 'yyyy-MM-dd'),
+        isWithinDuration
+      });
+      
+      return isWithinDuration;
     });
     console.log('Found tasks for day:', dayTasks.length);
     return dayTasks;
