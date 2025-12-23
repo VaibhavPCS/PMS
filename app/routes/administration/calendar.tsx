@@ -377,7 +377,7 @@ export default function Calendar() {
                   >
                     month
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => setViewMode('week')}
                     className={`h-8 px-4 text-xs font-medium capitalize rounded-md transition-all ${
                       viewMode === 'week'
@@ -396,7 +396,7 @@ export default function Calendar() {
                     }`}
                   >
                     day
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
