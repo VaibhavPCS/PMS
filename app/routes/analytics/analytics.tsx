@@ -52,11 +52,17 @@ function AnalyticsContent() {
   useEffect(() => {
     if (!isAdmin) {
       const path = location.pathname;
+      
+      // Allow access to restricted analytics if user has permission
+      if (path.includes('/analytics/restricted') && hasRestrictedAccess) {
+        return;
+      }
+
       if (!path.includes('/analytics/personal')) {
         navigate('/analytics/personal', { replace: true });
       }
     }
-  }, [isAdmin, location.pathname, navigate]);
+  }, [isAdmin, hasRestrictedAccess, location.pathname, navigate]);
 
   // Handle tab navigation
   const handleTabChange = (tab: string) => {
