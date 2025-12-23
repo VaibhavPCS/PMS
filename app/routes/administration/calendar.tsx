@@ -223,24 +223,22 @@ export default function Calendar() {
 
   // Filter tasks for a specific day
   const getTasksForDay = (date: Date) => {
-    console.log('Filtering tasks for day:', format(date, 'yyyy-MM-dd'), 'Total tasks:', tasks.length);
+    // Normalize the check date to start of day
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
     const dayTasks = tasks.filter(task => {
+      // Normalize start date
       const taskStartDate = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
+      taskStartDate.setHours(0, 0, 0, 0);
+
+      // Normalize end date to end of day
       const taskEndDate = new Date(task.dueDate);
+      taskEndDate.setHours(23, 59, 59, 999);
       
-      // Check if the current date falls within the task duration (inclusive)
-      const isWithinDuration = date >= taskStartDate && date <= taskEndDate;
-      
-      console.log('Task dates:', {
-        start: task.startDate,
-        end: task.dueDate,
-        current: format(date, 'yyyy-MM-dd'),
-        isWithinDuration
-      });
-      
-      return isWithinDuration;
+      // Check if the check date falls within the task duration
+      return checkDate >= taskStartDate && checkDate <= taskEndDate;
     });
-    console.log('Found tasks for day:', dayTasks.length);
     return dayTasks;
   };
 
@@ -337,8 +335,10 @@ export default function Calendar() {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    <h2 className="sm:hidden text-base font-bold text-gray-900">
-                      {format(currentDate, 'dd/MM/yyyy')}
+                    <h2 className="text-base font-bold text-gray-900 min-w-[150px] text-center">
+                      {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
+                      {viewMode === 'week' && `Week ${format(currentDate, 'w')}, ${format(currentDate, 'yyyy')}`}
+                      {viewMode === 'day' && format(currentDate, 'EEEE, dd MMMM yyyy')}
                     </h2>
                     <button
                       onClick={handleToday}
@@ -377,7 +377,7 @@ export default function Calendar() {
                   >
                     month
                   </button>
-                  {/* <button
+                  <button
                     onClick={() => setViewMode('week')}
                     className={`h-8 px-4 text-xs font-medium capitalize rounded-md transition-all ${
                       viewMode === 'week'
@@ -396,7 +396,7 @@ export default function Calendar() {
                     }`}
                   >
                     day
-                  </button> */}
+                  </button>
                 </div>
               </div>
             </div>
@@ -407,72 +407,140 @@ export default function Calendar() {
         <Card className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm">
           <CardContent className="p-0">
             <div className="p-4">
-              {/* Week Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-600 py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, index) => {
-                  const dayTasks = getTasksForDay(day);
-                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                  const isTodayDate = isToday(day);
-
-                  return (
-                    <div
-                      key={index}
-                      className={`min-h-[100px] p-1 border rounded-lg hover:bg-gray-50 transition-colors ${
-                        isTodayDate
-                          ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200'
-                          : isCurrentMonth
-                          ? 'border-gray-100'
-                          : 'bg-gray-50/50 text-gray-400 border-gray-100'
-                      }`}
-                    >
-                      <div
-                        className={`text-sm mb-1 px-1 ${
-                          isTodayDate
-                            ? 'text-blue-600 font-bold'
-                            : isCurrentMonth
-                            ? 'font-medium'
-                            : 'text-gray-400'
-                        }`}
+              {viewMode === 'day' ? (
+                <div className="flex flex-col gap-3">
+                  {getTasksForDay(currentDate).length > 0 ? (
+                    getTasksForDay(currentDate).map((task) => (
+                      <div 
+                        key={task._id}
+                        onClick={() => setSelectedTask(task)}
+                        className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group"
                       >
-                        {format(day, 'd')}
-                      </div>
-
-                      <div className="space-y-0.5 max-h-20 overflow-y-auto">
-                        {dayTasks.map((task) => {
-                          const multiDayIndicator = isMultiDayTask(task)
-                            ? getMultiDayIndicator(task, day)
-                            : null;
-
-                          return (
-                            <div
-                              key={task._id}
-                              className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
-                                statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'
-                              } text-white font-medium cursor-pointer hover:opacity-80`}
-                              title={`${task.title} - ${task.project?.name || 'No Project'}`}
-                              onClick={() => setSelectedTask(task)}
-                            >
-                              {multiDayIndicator && (
-                                <span className="mr-0.5">{multiDayIndicator.symbol}</span>
-                              )}
+                        <div className="flex items-center gap-4">
+                          <div className={`w-1 h-12 rounded-full ${statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'}`} />
+                          
+                          <div>
+                            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-lg">
                               {task.title}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                              <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.name || 'No Project'}</span>
+                              <span>•</span>
+                              <span className="capitalize">{task.status.replace('-', ' ')}</span>
                             </div>
-                          );
-                        })}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-8">
+                          {/* Assignee */}
+                          {task.assignee && (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                                {task.assignee.name ? task.assignee.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '??'}
+                              </div>
+                              <div className="hidden md:block text-gray-700">
+                                <div className="font-medium text-xs text-gray-500">Assigned to</div>
+                                <div className="text-sm font-medium">{task.assignee.name}</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Priority & Due Date */}
+                          <div className="text-right min-w-[100px]">
+                            <Badge variant="outline" className={`mb-1 ${
+                              task.priority === 'urgent' ? 'text-red-600 border-red-200 bg-red-50' :
+                              task.priority === 'high' ? 'text-orange-600 border-orange-200 bg-orange-50' :
+                              'text-gray-600'
+                            }`}>
+                              {task.priority.toUpperCase()}
+                            </Badge>
+                            <div className="text-xs text-gray-500 font-medium mt-1">
+                              Due: {format(new Date(task.dueDate), 'MMM dd')}
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                      <div className="bg-gray-100 p-4 rounded-full mb-4">
+                        <CalendarIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900">No tasks scheduled</h3>
+                      <p className="text-gray-500 mt-1">There are no tasks for this day.</p>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Week Day Headers */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <div key={day} className="text-center text-sm font-medium text-gray-600 py-2">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar Days */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((day, index) => {
+                      const dayTasks = getTasksForDay(day);
+                      const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                      const isTodayDate = isToday(day);
+
+                      return (
+                        <div
+                          key={index}
+                          className={`min-h-[100px] p-1 border rounded-lg hover:bg-gray-50 transition-colors ${
+                            isTodayDate
+                              ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200'
+                              : isCurrentMonth
+                              ? 'border-gray-100'
+                              : 'bg-gray-50/50 text-gray-400 border-gray-100'
+                          }`}
+                        >
+                          <div
+                            className={`text-sm mb-1 px-1 ${
+                              isTodayDate
+                                ? 'text-blue-600 font-bold'
+                                : isCurrentMonth
+                                ? 'font-medium'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {format(day, 'd')}
+                          </div>
+
+                          <div className="space-y-0.5 max-h-20 overflow-y-auto">
+                            {dayTasks.map((task) => {
+                              const multiDayIndicator = isMultiDayTask(task)
+                                ? getMultiDayIndicator(task, day)
+                                : null;
+
+                              return (
+                                <div
+                                  key={task._id}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
+                                    statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'
+                                  } text-white font-medium cursor-pointer hover:opacity-80`}
+                                  title={`${task.title} - ${task.project?.name || 'No Project'}`}
+                                  onClick={() => setSelectedTask(task)}
+                                >
+                                  {multiDayIndicator && (
+                                    <span className="mr-0.5">{multiDayIndicator.symbol}</span>
+                                  )}
+                                  {task.title}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
