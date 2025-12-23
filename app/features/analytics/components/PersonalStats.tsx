@@ -346,14 +346,14 @@ export function PersonalStats() {
             >
               {reportLoading ? 'Generating...' : 'Generate Report'}
             </button>
-            {/* <button
+            <button
               onClick={() => download('excel')}
               disabled={!canDownload || loading}
               className="justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[18px] py-[11px] h-auto rounded-[8px] text-[14px] font-medium flex items-center gap-[10px]"
             >
               Download Excel
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => { setStartDate(''); setEndDate(''); setReportData(null); }}
               className="justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 outline-none border border-[#F2761B] text-[#F2761B] hover:bg-[#fff7ed] px-[18px] py-[11px] h-auto rounded-[8px] text-[14px] font-medium"
@@ -438,7 +438,6 @@ export function PersonalStats() {
                 </div>
               </div>
             </div>
-
             {/* Section 3 & 4: Tables stacked vertically */}
             <div className="grid grid-cols-1 gap-6">
               {/* Section 3: Completed Tasks Table */}
@@ -469,11 +468,19 @@ export function PersonalStats() {
                           <tr key={task.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-gray-50/50' : ''}`}>
                             <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
                             <td className="py-2 px-2 text-[#111827]">
-                              <Link to={task.projectId ? `/administration/project-management/board/${task.projectId}?taskId=${task.id}` : '#'} className="hover:text-blue-600 hover:underline">
+                              <Link to={`/task/${task.id}`} className="hover:text-blue-600 hover:underline">
                                 {task.title}
                               </Link>
                             </td>
-                            <td className="py-2 px-2 text-[#717182]">{task.project}</td>
+                            <td className="py-2 px-2 text-[#717182]">
+                              {task.projectId ? (
+                                <Link to={`/project/${task.projectId}`} className="hover:text-blue-600 hover:underline">
+                                  {task.project}
+                                </Link>
+                              ) : (
+                                task.project
+                              )}
+                            </td>
                             <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.completedAt}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.daysToComplete} days</td>
@@ -518,11 +525,19 @@ export function PersonalStats() {
                           <tr key={task.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-gray-50/50' : ''} ${task.isOverdue ? 'bg-red-50' : ''}`}>
                             <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
                             <td className="py-2 px-2 text-[#111827]">
-                              <Link to={task.projectId ? `/administration/project-management/board/${task.projectId}?taskId=${task.id}` : '#'} className="hover:text-blue-600 hover:underline">
+                              <Link to={`/task/${task.id}`} className="hover:text-blue-600 hover:underline">
                                 {task.title}
                               </Link>
                             </td>
-                            <td className="py-2 px-2 text-[#717182]">{task.project}</td>
+                            <td className="py-2 px-2 text-[#717182]">
+                              {task.projectId ? (
+                                <Link to={`/project/${task.projectId}`} className="hover:text-blue-600 hover:underline">
+                                  {task.project}
+                                </Link>
+                              ) : (
+                                task.project
+                              )}
+                            </td>
                             <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.dueDate}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.age} days</td>
