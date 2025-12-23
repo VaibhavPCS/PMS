@@ -414,7 +414,21 @@ export function RestrictedAnalytics() {
                     <Calendar
                       mode="single"
                       selected={startDate ? new Date(startDate) : undefined}
-                      onSelect={(d) => { setStartDate(d ? format(new Date(d), 'yyyy-MM-dd') : ''); setReportData(null); }}
+                      onSelect={(d) => {
+                        if (d) {
+                          const newStart = format(d, 'yyyy-mm-dd');
+                          if (endDate && new Date(newStart) > new Date(endDate)) {
+                            setError('Start date cannot be after end date');
+                            return;
+                          }
+                          setError('');
+                          setStartDate(newStart);
+                          setReportData(null);
+                        } else {
+                          setStartDate('');
+                          setReportData(null);
+                        }
+                      }}
                     />
                   </PopoverContent>
                 </Popover>
@@ -431,7 +445,21 @@ export function RestrictedAnalytics() {
                     <Calendar
                       mode="single"
                       selected={endDate ? new Date(endDate) : undefined}
-                      onSelect={(d) => { setEndDate(d ? format(new Date(d), 'yyyy-MM-dd') : ''); setReportData(null); }}
+                      onSelect={(d) => {
+                        if (d) {
+                          const newEnd = format(d, 'yyyy-MM-dd');
+                          if (startDate && new Date(startDate) > new Date(newEnd)) {
+                            setError('End date cannot be before start date');
+                            return;
+                          }
+                          setError('');
+                          setEndDate(newEnd);
+                          setReportData(null);
+                        } else {
+                          setEndDate('');
+                          setReportData(null);
+                        }
+                      }}
                     />
                   </PopoverContent>
                 </Popover>
