@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/provider/auth-context';
+import { Link } from "react-router";
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Shield } from 'lucide-react';
 import { format } from 'date-fns';
@@ -63,6 +64,8 @@ interface ReportData {
     id: string;
     title: string;
     project: string;
+    projectId?: string;
+    startDate: string;
     completedAt: string;
     priority: string;
     daysToComplete: number;
@@ -71,11 +74,14 @@ interface ReportData {
     id: string;
     title: string;
     project: string;
+    projectId?: string;
+    startDate: string;
     dueDate: string;
     priority: string;
     status: string;
     daysUntilDue: number;
     isOverdue: boolean;
+    age: number;
   }>;
   projects: Array<{
     projectName: string;
@@ -351,22 +357,22 @@ export function RestrictedAnalytics() {
                 Restricted Analytics Report
               </h1>
               <div className="flex items-center gap-2 mt-1">
-                <Shield className="w-4 h-4 text-[#F2761B]" />
-                <p className="text-[#717182] text-[14px]">
+                {/* <Shield className="w-4 h-4 text-[#F2761B]" /> */}
+                {/* <p className="text-[#717182] text-[14px]">
                   {isSystemAdmin ? 'Admin Access - All Users' : 'Workspace Lead Access - Workspace Members Only'}
-                </p>
+                </p> */}
               </div>
             </div>
-            {isCacheValid && (
+            {/* {isCacheValid && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                 Cache Active ({Math.floor((CACHE_TTL - (Date.now() - (employeeCache?.timestamp || 0))) / 1000 / 60)}m remaining)
               </Badge>
-            )}
+            )} */}
           </div>
 
-          <p className="text-[#717182] text-[14px] mb-6 no-print">
+          {/* <p className="text-[#717182] text-[14px] mb-6 no-print">
             Select a user and date range to generate productivity reports.
-          </p>
+          </p> */}
 
           {/* Filter Controls - Replicated from PersonalStats */}
           <div className="bg-white rounded-[8px] border border-[#e6e8ec] p-6 mb-6 space-y-4 no-print">
@@ -535,8 +541,122 @@ export function RestrictedAnalytics() {
                 </div>
               </div>
 
-              {/* Remaining sections same as PersonalStats */}
-              {/* For brevity, I'll include a subset - you can copy all sections from PersonalStats if needed */}
+              {/* Task Tables Stacked Vertically */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Completed Tasks Table */}
+                <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-5 shadow-sm">
+                  <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
+                    ✅ Completed Tasks ({reportData.completedTasks.length})
+                  </h3>
+                  <div className="overflow-x-auto max-h-[380px] overflow-y-auto relative">
+                    <table className="w-full text-[13px]">
+                      <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                        <tr className="border-b border-[#e6e8ec]">
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827] w-[50px]">S.No</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Task</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Project</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Start Date</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Completed</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Duration</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Priority</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.completedTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="text-center py-4 text-[#717182]">No completed tasks</td>
+                          </tr>
+                        ) : (
+                          reportData.completedTasks.map((task, idx) => (
+                            <tr key={task.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-gray-50/50' : ''}`}>
+                              <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
+                              <td className="py-2 px-2 text-[#111827]">
+                                <Link to={`/task/${task.id}`} className="hover:text-blue-600 hover:underline">
+                                  {task.title}
+                                </Link>
+                              </td>
+                              <td className="py-2 px-2 text-[#717182]">
+                                {task.projectId ? (
+                                  <Link to={`/project/${task.projectId}`} className="hover:text-blue-600 hover:underline">
+                                    {task.project}
+                                  </Link>
+                                ) : (
+                                  task.project
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
+                              <td className="py-2 px-2 text-[#717182]">{task.completedAt}</td>
+                              <td className="py-2 px-2 text-[#717182]">{task.daysToComplete} days</td>
+                              <td className="py-2 px-2">
+                                <span className={`px-2 py-1 rounded text-[11px] font-medium capitalize ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {task.priority}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Due Tasks Table */}
+                <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-5 shadow-sm">
+                  <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
+                    ⏰ Due in Range ({reportData.openTasks.length})
+                  </h3>
+                  <div className="overflow-x-auto max-h-[380px] overflow-y-auto relative">
+                    <table className="w-full text-[13px]">
+                      <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                        <tr className="border-b border-[#e6e8ec]">
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827] w-[50px]">S.No</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Task</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Project</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Start Date</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Due Date</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Duration</th>
+                          <th className="text-left py-2 px-2 font-semibold text-[#111827]">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.openTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="text-center py-4 text-[#717182]">No open tasks</td>
+                          </tr>
+                        ) : (
+                          reportData.openTasks.map((task, idx) => (
+                            <tr key={task.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-gray-50/50' : ''} ${task.isOverdue ? 'bg-red-50' : ''}`}>
+                              <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
+                              <td className="py-2 px-2 text-[#111827]">
+                                <Link to={`/task/${task.id}`} className="hover:text-blue-600 hover:underline">
+                                  {task.title}
+                                </Link>
+                              </td>
+                              <td className="py-2 px-2 text-[#717182]">
+                                {task.projectId ? (
+                                  <Link to={`/project/${task.projectId}`} className="hover:text-blue-600 hover:underline">
+                                    {task.project}
+                                  </Link>
+                                ) : (
+                                  task.project
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
+                              <td className="py-2 px-2 text-[#717182]">{task.dueDate}</td>
+                              <td className="py-2 px-2 text-[#717182]">{task.age} days</td>
+                              <td className="py-2 px-2">
+                                <span className={`px-2 py-1 rounded text-[11px] font-medium capitalize ${task.status === 'in-progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {task.status.replace('-', ' ')}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
 
               {/* Section 6: Performance Score Card */}
               <div className="bg-gradient-to-br from-[#667eea] to-[#764ba2] rounded-[12px] p-6 text-white shadow-lg">
