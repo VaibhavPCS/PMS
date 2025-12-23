@@ -137,20 +137,7 @@ export function PersonalStats() {
   const isAdmin = role === 'admin' || role === 'super_admin'
 
   useEffect(() => {
-    // 1. Set current month dates
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    const startStr = format(firstDay, 'yyyy-MM-dd')
-    const endStr = format(lastDay, 'yyyy-MM-dd')
-    
-    setStartDate(startStr)
-    setEndDate(endStr)
-
-    // 2. Fetch employees and then generate report automatically
-    const fetchEmployeesAndReport = async () => {
-      let targetUserId = currentUserId;
-
+    const fetchEmployees = async () => {
       if (isAdmin) {
         try {
           setLoading(true)
@@ -158,11 +145,11 @@ export function PersonalStats() {
           const res = await axios.get('/analytics/users')
           const list: Employee[] = (res.data?.users || []).map((e: any) => ({ userId: e.userId, userName: e.userName }))
           setEmployees(list)
-          
+          // Pre-select current user if in list, otherwise first user
           if (currentUserId) {
-             targetUserId = currentUserId;
+             setUserId(currentUserId);
           } else if (list.length > 0) {
-             targetUserId = list[0].userId;
+             setUserId(list[0].userId)
           }
         } catch (e: any) {
           setError('Failed to load employees')
@@ -170,42 +157,41 @@ export function PersonalStats() {
           setLoading(false)
         }
       } else {
+        // Non-admin: just set current user
         if (currentUserId && user) {
            setEmployees([{ userId: currentUserId, userName: user.name || 'Me' }])
-           targetUserId = currentUserId;
+           setUserId(currentUserId)
         }
       }
-
-      setUserId(targetUserId);
-
-      // Trigger report generation automatically if we have a user and dates
-      if (targetUserId && startStr && endStr) {
-        generateReportInternal(targetUserId, startStr, endStr);
-      }
     }
-
     if (user) {
-        fetchEmployeesAndReport()
+        fetchEmployees()
     }
   }, [user, currentUserId, isAdmin])
 
   const canDownload = !!userId && !!startDate && !!endDate
   const canGenerateReport = !!userId && !!startDate && !!endDate
 
-  const generateReportInternal = async (uid: string, start: string, end: string) => {
+  const generateReport = async () => {
+    if (!canGenerateReport) return
     try {
       setReportLoading(true)
       setError('')
 
-      const res = await axios.get(`/analytics/snapshot/user/${uid}/range?startDate=${start}&endDate=${end}`)
+      // Try snapshot-based endpoint first (40x faster!)
+      const res = await axios.get(`/analytics/snapshot/user/${userId}/range?startDate=${startDate}&endDate=${endDate}`)
+
+      // Transform snapshot data to match expected format
       const snapshotData = res.data
 
       if (snapshotData.source === 'snapshot_range') {
+        // Using snapshot data - 10-50ms response time
         console.log('✅ Using cached snapshot data (fast!)', {
           snapshotCount: snapshotData.snapshotCount,
           dateRange: snapshotData.dateRange
         })
       } else {
+        // Fallback to real-time calculation - 500-2000ms response time
         console.warn('⚠️ No snapshot available, using real-time calculation (slower)')
       }
 
@@ -217,8 +203,6 @@ export function PersonalStats() {
       setReportLoading(false)
     }
   }
-
-  const generateReport = () => generateReportInternal(userId, startDate, endDate)
 
   const download = async (format: 'excel' | 'pdf') => {
     if (!canDownload) return
@@ -299,13 +283,13 @@ export function PersonalStats() {
         }
       `}</style>
       <div className="max-w-7xl mx-auto p-6">
-        {/* <h1 className="text-[24px] font-semibold text-[#1f2937] mb-2 no-print">Productivity Report</h1>
+        <h1 className="text-[24px] font-semibold text-[#1f2937] mb-2 no-print">Productivity Report</h1>
         <p className="text-[#717182] text-[14px] mb-6 no-print">Select a date range to generate your productivity report.</p>
 
         <div className="bg-white rounded-[8px] border border-[#e6e8ec] p-6 mb-6 space-y-4 no-print">
           {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded">{error}</div>}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+            {/* <div>
               <label className="block text-[13px] font-medium text-[#111827] mb-2">User</label>
               <select 
                 className="w-full border border-[#e6e8ec] rounded-[6px] px-3 py-2.5 text-[14px] focus:border-[#F2761B] focus:ring-1 focus:ring-[#F2761B] outline-none disabled:bg-gray-100" 
@@ -315,7 +299,7 @@ export function PersonalStats() {
               >
                 {employees.map(e => (<option key={e.userId} value={e.userId}>{e.userName}</option>))}
               </select>
-            </div>
+            </div> */}
             <div>
               <label className="block text-[13px] font-medium text-[#111827] mb-2">Start Date</label>
               <Popover>
@@ -356,7 +340,7 @@ export function PersonalStats() {
             >
               {reportLoading ? 'Generating...' : 'Generate Report'}
             </button>
-            <button
+            {/* <button
               onClick={() => download('excel')}
               disabled={!canDownload || loading}
               className="justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[18px] py-[11px] h-auto rounded-[8px] text-[14px] font-medium flex items-center gap-[10px]"
@@ -369,9 +353,9 @@ export function PersonalStats() {
               className="justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50 outline-none border border-[#F2761B] text-[#F2761B] hover:bg-[#fff7ed] px-[18px] py-[11px] h-auto rounded-[8px] text-[14px] font-medium"
             >
               Clear Dates
-            </button>
+            </button> */}
           </div>
-        </div> */}
+        </div>
 
         {reportData && (
           <div id="printable-area" className="space-y-6">
