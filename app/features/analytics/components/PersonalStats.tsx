@@ -318,7 +318,7 @@ export function PersonalStats() {
                     selected={startDate ? new Date(startDate) : undefined}
                     onSelect={(d) => {
                       if (d) {
-                        const newStart = format(d, 'yyyy-mm-dd');
+                        const newStart = format(d, 'yyyy-MM-dd');
                         if (endDate && new Date(newStart) > new Date(endDate)) {
                           setError('Start date cannot be after end date');
                           return;
