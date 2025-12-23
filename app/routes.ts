@@ -42,7 +42,8 @@ export default [
       index("routes/analytics/performance.tsx"),
       route("workspace", "routes/analytics/workspace.tsx"),
       route("leaderboard", "routes/analytics/leaderboard.tsx"),
-      route("personal", "routes/analytics/personal.tsx"), // ✅ ADD THIS LINE
+      route("personal", "routes/analytics/personal.tsx"),
+      route("restricted", "routes/analytics/restricted.tsx"), // Restricted analytics for leads & admins
     ]),
   ]),
 
