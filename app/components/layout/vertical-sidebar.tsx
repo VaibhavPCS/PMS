@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Calendar } from "lucide-react";
 import { useBadges } from "../../provider/badge-context";
 import { useAuth } from "../../provider/auth-context";
 
@@ -9,6 +9,7 @@ interface NavItem {
   name: string;
   href: string;
   icon: string; // SVG path
+  iconComponent?: React.ElementType; // Optional component for icon
   badgeKey?: "notifications" | "messages"; // Key to identify which badge to show
   hasDropdown?: boolean; // For Administration item
   subItems?: { name: string; href: string }[]; // Submenu items for dropdown
@@ -38,6 +39,12 @@ const navItems: NavItem[] = [
     badgeKey: "messages",
   },
   {
+    name: "Calendar",
+    href: "/administration/calendar",
+    icon: "",
+    iconComponent: Calendar,
+  },
+  {
     name: "Administration",
     href: "/administration",
     icon: "/assets/b7b1ff15d3dbedec030add1434e807ef753068e4.svg",
@@ -46,7 +53,6 @@ const navItems: NavItem[] = [
       // { name: "Role Management", href: "/administration/role-management" },
       // { name: "User Management", href: "/administration/user-management" },
       { name: "Analytics", href: "/administration/project-management" },
-      { name: "Calendar", href: "/administration/calendar" },
     ],
   },
 ];
@@ -165,11 +171,15 @@ const VerticalSidebar = () => {
                     `}
                   >
                     <div className="flex items-center gap-[12px]">
-                      <img
-                        src={item.icon}
-                        alt={item.name}
-                        className="w-[20px] h-[20px]"
-                      />
+                      {item.iconComponent ? (
+                        <item.iconComponent className="w-[20px] h-[20px]" />
+                      ) : (
+                        <img
+                          src={item.icon}
+                          alt={item.name}
+                          className="w-[20px] h-[20px]"
+                        />
+                      )}
                       <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal]">
                         {item.name}
                       </span>
@@ -220,11 +230,15 @@ const VerticalSidebar = () => {
                     }
                   `}
                 >
-                  <img
-                    src={item.icon}
-                    alt={item.name}
-                    className="w-[20px] h-[20px] shrink-0"
-                  />
+                  {item.iconComponent ? (
+                    <item.iconComponent className="w-[20px] h-[20px] shrink-0" />
+                  ) : (
+                    <img
+                      src={item.icon}
+                      alt={item.name}
+                      className="w-[20px] h-[20px] shrink-0"
+                    />
+                  )}
                   <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal] grow">
                     {item.name}
                   </span>

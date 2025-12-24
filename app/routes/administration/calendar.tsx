@@ -98,6 +98,8 @@ export default function Calendar() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Access control - redirect if not admin
+  // Removed admin check to allow all users to access calendar
+  /* 
   if (!isAdmin) {
     return (
       <div className="p-8">
@@ -117,6 +119,7 @@ export default function Calendar() {
       </div>
     );
   }
+  */
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -136,19 +139,16 @@ export default function Calendar() {
       }
     };
 
-    if (isAdmin) {
-      fetchWorkspaces();
-    }
-  }, [isAdmin]);
+    fetchWorkspaces();
+  }, []);
 
   // Fetch tasks when workspace or date changes
   useEffect(() => {
     const fetchTasks = async () => {
-      if (!selectedWorkspace || !isAuthenticated || !isAdmin) {
+      if (!selectedWorkspace || !isAuthenticated) {
         console.log('Skipping task fetch - missing requirements:', {
           selectedWorkspace,
-          isAuthenticated,
-          isAdmin
+          isAuthenticated
         });
         return;
       }
@@ -161,7 +161,12 @@ export default function Calendar() {
           viewMode
         });
         
-        const response = await axios.get(`/task/calendar/${selectedWorkspace}`, {
+        // Use different endpoint based on role
+        const endpoint = isAdmin 
+          ? `/task/calendar/${selectedWorkspace}` 
+          : `/task/calendar/user/${selectedWorkspace}`;
+          
+        const response = await axios.get(endpoint, {
           params: {
             startDate: format(currentDate, 'yyyy-MM-dd'),
             viewMode
@@ -340,12 +345,12 @@ export default function Calendar() {
                       {viewMode === 'week' && `Week ${format(currentDate, 'w')}, ${format(currentDate, 'yyyy')}`}
                       {viewMode === 'day' && format(currentDate, 'EEEE, dd MMMM yyyy')}
                     </h2>
-                    <button
+                    {/* <button
                       onClick={handleToday}
                       className="hidden sm:inline-flex h-8 px-3 text-xs items-center justify-center font-medium border bg-background shadow-xs rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
                     >
                       Today
-                    </button>
+                    </button> */}
                   </div>
 
                   <button
@@ -356,12 +361,12 @@ export default function Calendar() {
                   </button>
                 </div>
 
-                <button
+                {/* <button
                   onClick={() => setShowWeekends(!showWeekends)}
                   className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-lg border bg-background shadow-xs hover:bg-blue-50 transition-colors"
                 >
                   <EyeOff className="w-3.5 h-3.5" />
-                </button>
+                </button> */}
               </div>
 
               {/* View Mode Selector */}
