@@ -256,6 +256,7 @@ const FileUpload: React.FC<{
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "text/plain",
+    "application/octet-stream", // For .aab files (Android App Bundle)
   ];
 
   const handleFileSelect = (newFiles: FileList | null) => {

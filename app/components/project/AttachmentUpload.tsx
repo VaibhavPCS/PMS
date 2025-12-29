@@ -150,7 +150,7 @@ export function AttachmentUpload({
           onChange={handleFileSelect}
           className="hidden"
           id="attachment-upload"
-          accept="image/*,.pdf,.docx"
+          accept="image/*,.pdf,.docx,.doc,.xlsx,.xls,.txt,.apk,.aab"
           disabled={uploading || remainingSlots === 0}
         />
         <label
