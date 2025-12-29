@@ -32,6 +32,11 @@ const navItems: NavItem[] = [
     icon: "/assets/analytics-icon-1.svg", // ✅ Icon path
   },
   {
+    name: "Excel Upload",
+    href: "/excel-upload",
+    icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
+  },
+  {
     name: "Chat",
     href: "/chat",
     icon: "/assets/chat.svg", // ✅ Icon path

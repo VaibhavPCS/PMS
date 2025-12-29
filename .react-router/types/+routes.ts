@@ -80,6 +80,12 @@ type Pages = {
   "/administration/project-management/workspace-report": {
     params: {};
   };
+  "/administration/calendar": {
+    params: {};
+  };
+  "/excel-upload": {
+    params: {};
+  };
   "/analytics": {
     params: {};
   };
@@ -102,7 +108,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/administration/project-management/task-lifecycle" | "/administration/project-management/workspace-report" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal" | "/*";
+    page: "/" | "/sign-in" | "/sign-up" | "/verify-otp" | "/forgot-password" | "/reset-password" | "/verify-email" | "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/administration/project-management/task-lifecycle" | "/administration/project-management/workspace-report" | "/administration/calendar" | "/excel-upload" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal" | "/analytics/restricted" | "/*";
   };
   "routes/root/redirect.tsx": {
     id: "routes/root/redirect";
@@ -138,7 +144,7 @@ type RouteFiles = {
   };
   "components/layout/responsive-dashboard-layout.tsx": {
     id: "components/layout/responsive-dashboard-layout";
-    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/administration/project-management/task-lifecycle" | "/administration/project-management/workspace-report" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal";
+    page: "/dashboard" | "/workspace" | "/tasks" | "/meetings" | "/members" | "/archived" | "/chat" | "/settings" | "/project/:id" | "/task/:id" | "/administration/project-management" | "/administration/project-management/user-export" | "/administration/project-management/employee-performance" | "/administration/project-management/task-lifecycle" | "/administration/project-management/workspace-report" | "/administration/calendar" | "/excel-upload" | "/analytics" | "/analytics/workspace" | "/analytics/leaderboard" | "/analytics/personal" | "/analytics/restricted";
   };
   "routes/dashboard/dashboard.tsx": {
     id: "routes/dashboard/dashboard";
@@ -199,6 +205,14 @@ type RouteFiles = {
   "routes/administration/project-management/workspace-report.tsx": {
     id: "routes/administration/project-management/workspace-report";
     page: "/administration/project-management/workspace-report";
+  };
+  "routes/administration/calendar.tsx": {
+    id: "routes/administration/calendar";
+    page: "/administration/calendar";
+  };
+  "routes/excel-upload/excel-upload.tsx": {
+    id: "routes/excel-upload/excel-upload";
+    page: "/excel-upload";
   };
   "routes/analytics/analytics.tsx": {
     id: "routes/analytics/analytics";
