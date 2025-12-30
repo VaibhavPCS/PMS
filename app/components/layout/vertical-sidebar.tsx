@@ -13,6 +13,7 @@ interface NavItem {
   badgeKey?: "notifications" | "messages"; // Key to identify which badge to show
   hasDropdown?: boolean; // For Administration item
   subItems?: { name: string; href: string }[]; // Submenu items for dropdown
+  adminOnly?: boolean; // Only show for admin users
 }
 
 // Define the navigation items matching Figma design
@@ -32,11 +33,12 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: "/assets/analytics-icon-1.svg", // ✅ Icon path
   },
-  // {
-  //   name: "Excel Upload",
-  //   href: "/excel-upload",
-  //   icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
-  // },
+  {
+    name: "Excel Upload",
+    href: "/excel-upload",
+    icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
+    adminOnly: true, // Only show for admins
+  },
   {
     name: "Chat",
     href: "/chat",
@@ -78,7 +80,13 @@ const VerticalSidebar = () => {
   });
 
   const visibleNavItems = effectiveNavItems.filter(
-    (item) => item.name !== "Administration" || isAdmin
+    (item) => {
+      // Hide Administration for non-admins
+      if (item.name === "Administration" && !isAdmin) return false;
+      // Hide admin-only items for non-admins
+      if (item.adminOnly && !isAdmin) return false;
+      return true;
+    }
   );
 
   const isActive = (
