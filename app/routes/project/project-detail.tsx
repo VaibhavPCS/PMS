@@ -6,6 +6,7 @@ import { buildApiUrl } from "@/lib/config"; // ✅ NEW: Added buildApiUrl import
 import {
   ArrowLeft,
   Plus,
+  ArrowRight,
   Settings,
   Calendar as CalendarIcon,
   KanbanSquare,
@@ -98,6 +99,8 @@ import { InviteMembersButton } from "@/components/project/InviteMembersButton";
 import { ProjectOverviewPanel } from "@/components/project/ProjectOverviewPanel";
 import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
 import { FilePreviewModal } from "@/components/project/FilePreviewModal";
+import { SprintList, SprintModal, SprintDetails, SprintSelector, BacklogView } from "@/components/sprint";
+import { SprintSetupWarning } from "@/components/project/SprintSetupWarning";
 import { AttachmentUpload } from "@/components/project/AttachmentUpload";
 import { usePermissions } from "@/hooks/use-permissions";
 import { TruncatedTextModal } from "@/components/ui/truncated-text-modal";
@@ -133,6 +136,7 @@ interface Task {
   dueDate: string;
   durationDays?: number;
   createdAt: string;
+  sprint?: { _id: string; name?: string } | string | null;
 }
 
 type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
@@ -1220,6 +1224,7 @@ const QuickEditTaskForm: React.FC<{
     startDate: new Date(task.startDate).toISOString().split("T")[0],
     dueDate: new Date(task.dueDate).toISOString().split("T")[0],
     assigneeId: task.assignee?._id || "",
+    sprintId: typeof task.sprint === "string" ? task.sprint : task.sprint?._id || "",
   });
 
   // Date objects for calendar popovers
@@ -1242,7 +1247,17 @@ const QuickEditTaskForm: React.FC<{
 
     try {
       setIsSubmitting(true);
-      await putData(`/task/${task._id}`, formData);
+      const payload: any = {
+        ...formData,
+      };
+
+      if (project) {
+        payload.sprintId = formData.sprintId || null;
+      } else {
+        delete payload.sprintId;
+      }
+
+      await putData(`/task/${task._id}`, payload);
       toast.success("Task updated successfully");
       onUpdate?.();
       onClose();
@@ -1325,6 +1340,18 @@ const QuickEditTaskForm: React.FC<{
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <SprintSelector
+          projectId={project?._id || ""}
+          selectedSprintId={formData.sprintId || null}
+          onSelectSprint={(sprintId) =>
+            setFormData({ ...formData, sprintId: sprintId || "" })
+          }
+          taskStartDate={formData.startDate}
+          taskDueDate={formData.dueDate}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -1567,6 +1594,20 @@ const ProjectDetail = () => {
     assignee: "all",
   });
 
+  // Sprint-related state
+  const [showSprintModal, setShowSprintModal] = useState(false);
+  const [selectedSprint, setSelectedSprint] = useState<any>(null);
+  const [sprintView, setSprintView] = useState<'list' | 'details' | 'backlog'>('list');
+  const [sprintStatus, setSprintStatus] = useState<any>(null);
+  const [sprintListRefreshKey, setSprintListRefreshKey] = useState(0);
+  const [sprintForm, setSprintForm] = useState({
+    name: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    goal: ""
+  });
+
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -1575,6 +1616,7 @@ const ProjectDetail = () => {
     assigneeId: "",
     startDate: "",
     dueDate: "",
+    sprintId: null as string | null, // ✅ NEW: Sprint selection required
     rejectionAttachmentType: "either", // ✅ NEW: Default to 'either'
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -1973,6 +2015,15 @@ const ProjectDetail = () => {
     }
   }, [projectId]);
 
+  const fetchSprintStatus = useCallback(async () => {
+    try {
+      const response = await fetchData(`/sprint/project/${projectId}/status`);
+      setSprintStatus(response.data);
+    } catch (error) {
+      console.error("Failed to load sprint status:", error);
+    }
+  }, [projectId]);
+
   // Utility function to format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -1985,8 +2036,8 @@ const ProjectDetail = () => {
   const handleCreateTask = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate) {
-        return toast.error("Please fill all required fields (title, start date, due date)");
+      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate || !newTask.sprintId) {
+        return toast.error("Please fill all required fields (title, start date, due date, sprint)");
       }
 
       const start = new Date(newTask.startDate);
@@ -2076,6 +2127,7 @@ const ProjectDetail = () => {
           assigneeId: "",
           startDate: "",
           dueDate: "",
+          sprintId: null, // ✅ NEW: Reset sprint selection
           rejectionAttachmentType: "either", // ✅ NEW
         });
         setStartDateObj(undefined);
@@ -2108,6 +2160,50 @@ const ProjectDetail = () => {
     [newTask, projectId, fetchAllTasks, fetchUserTasks, project, taskAttachments, taskReferenceLink, isRecurring, recurringFrequency]
   );
 
+  const handleCreateSprint = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!sprintForm.name.trim() || !sprintForm.startDate || !sprintForm.endDate) {
+        return toast.error("Please fill all required fields (name, start date, end date)");
+      }
+
+      const start = new Date(sprintForm.startDate);
+      const end = new Date(sprintForm.endDate);
+      if (start > end) {
+        return toast.error("Start date cannot be after end date");
+      }
+
+      try {
+        if (selectedSprint) {
+          // Editing existing sprint
+          await putData(`/sprint/${selectedSprint._id}`, sprintForm);
+          toast.success('Sprint updated successfully');
+        } else {
+          // Creating new sprint
+          await postData('/sprint', { ...sprintForm, projectId });
+          toast.success('Sprint created successfully');
+        }
+        
+        // Reset form
+        setSprintForm({
+          name: "",
+          description: "",
+          startDate: "",
+          endDate: "",
+          goal: ""
+        });
+        setShowSprintModal(false);
+        setSelectedSprint(null);
+        fetchSprintStatus();
+        setSprintListRefreshKey((prev) => prev + 1);
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to save sprint');
+        throw error;
+      }
+    },
+    [sprintForm, projectId, fetchSprintStatus, selectedSprint]
+  );
+
   useEffect(() => {
     if (isAuthenticated && projectId) {
       Promise.all([
@@ -2116,6 +2212,7 @@ const ProjectDetail = () => {
         fetchAllTasks(),
         fetchUserTasks(),
         fetchAssignableMembers(),
+        fetchSprintStatus(),
         (async () => { try { const res = await fetchData(`/project/${projectId}/role`); setProjectRole(res.projectRole || 'member'); } catch { } })(),
       ]);
     }
@@ -2441,6 +2538,19 @@ const ProjectDetail = () => {
           </div>
         </div>
 
+        {/* Sprint Setup Warning - shown when project has non-recurring tasks without sprints */}
+        {sprintStatus?.needsSetup && (
+          <SprintSetupWarning
+            projectId={projectId!}
+            taskCount={sprintStatus.backlogTaskCount || sprintStatus.taskCount}
+            onCreateSprint={() => {
+              setSelectedSprint(null);
+              setShowSprintModal(true);
+            }}
+            onDismiss={() => setSprintStatus({ ...sprintStatus, needsSetup: false })}
+          />
+        )}
+
         {/* Remove Members Modal */}
         <RemoveProjectMembersModal
           open={showMembersModal}
@@ -2566,9 +2676,9 @@ const ProjectDetail = () => {
       <div className="flex-1">
         <div className={cn("p-3", !isMobile && "p-4")}>
           <Tabs defaultValue="your-tasks" className="space-y-4">
-            <div className="sticky top-0 bg-gray-50 pb-3 z-5">
-              <div className="flex items-center justify-between">
-                <TabsList className="grid w-full max-w-xs grid-cols-3 h-8">
+            <div className="sticky top-0 bg-gray-50 pb-3 z-30">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <TabsList className="grid w-full grid-cols-4 h-8 sm:max-w-md mx-auto">
                   <TabsTrigger
                     value="your-tasks"
                     className="text-xs px-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -2590,12 +2700,36 @@ const ProjectDetail = () => {
                     <CalendarIcon className="w-3 h-3 mr-1" />
                     <span className="hidden sm:inline">Calendar</span>
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="sprints"
+                    className="text-xs px-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white"
+                  >
+                    <Target className="w-3 h-3 mr-1" />
+                    <span className="hidden sm:inline">Sprints</span>
+                  </TabsTrigger>
                 </TabsList>
                 {(isAdmin || isProjectLead) && (
-                  <Button onClick={() => setShowTaskModal(true)} size="sm" className="h-8 bg-[#f2761b] hover:bg-[#f2761b]/90 text-white">
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Create Task
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:justify-end">
+                    <Button
+                      onClick={() => setShowTaskModal(true)}
+                      size="sm"
+                      className="h-8 w-full sm:w-auto bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Create Task
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        console.log('Create Sprint button clicked, opening modal...');
+                        setShowSprintModal(true);
+                      }}
+                      size="sm"
+                      className="h-8 w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      Create Sprint
+                      <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -2664,13 +2798,22 @@ const ProjectDetail = () => {
                         : "No task assigned yet"}
                     </p>
                     {(isAdmin || isProjectLead) && (
-                      <Button
-                        onClick={() => setShowTaskModal(true)}
-                        className="bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Task
-                      </Button>
+                      <div className="flex gap-2 justify-center">
+                        <Button
+                          onClick={() => setShowTaskModal(true)}
+                          className="bg-[#f2761b] hover:bg-[#f2761b]/90 text-white"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Task
+                        </Button>
+                        <Button
+                          onClick={() => setShowSprintModal(true)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                          Create Sprint
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -2989,6 +3132,103 @@ const ProjectDetail = () => {
                 />
               )}
             </TabsContent>
+
+            {/* SPRINTS TAB */}
+            <TabsContent value="sprints" className="mt-0 space-y-4">
+              {/* Sprint Views */}
+              {sprintView === 'list' && (
+                <SprintList
+                  key={sprintListRefreshKey}
+                  projectId={projectId!}
+                  onViewSprintDetails={(sprintId) => {
+                    setSelectedSprint(sprintId);
+                    setSprintView('details');
+                  }}
+                  onEditSprint={(sprint) => {
+                    setSelectedSprint(sprint);
+                    setShowSprintModal(true);
+                  }}
+                  onDeleteSprint={async (sprintId) => {
+                    try {
+                      await deleteData(`/sprint/${sprintId}`);
+                      toast.success('Sprint deleted successfully');
+                      fetchSprintStatus();
+                      setSprintListRefreshKey((prev) => prev + 1);
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to delete sprint');
+                    }
+                  }}
+                  onCreateSprint={() => {
+                    setSelectedSprint(null);
+                    setShowSprintModal(true);
+                  }}
+                  onCompleteSprint={async (sprintId) => {
+                    try {
+                      await postData(`/sprint/${sprintId}/complete`, {});
+                      toast.success('Sprint completed successfully');
+                      fetchSprintStatus();
+                      setSprintListRefreshKey((prev) => prev + 1);
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to complete sprint');
+                    }
+                  }}
+                />
+              )}
+
+              {sprintView === 'details' && selectedSprint && (
+                <SprintDetails
+                  sprintId={typeof selectedSprint === 'string' ? selectedSprint : selectedSprint._id}
+                  onBack={() => {
+                    setSprintView('list');
+                    setSelectedSprint(null);
+                  }}
+                  onEditSprint={(sprint) => {
+                    setSelectedSprint(sprint);
+                    setShowSprintModal(true);
+                  }}
+                  onDeleteSprint={async (sprintId) => {
+                    try {
+                      await deleteData(`/sprint/${sprintId}`);
+                      toast.success('Sprint deleted successfully');
+                      setSprintView('list');
+                      setSelectedSprint(null);
+                      fetchSprintStatus();
+                      setSprintListRefreshKey((prev) => prev + 1);
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to delete sprint');
+                    }
+                  }}
+                  onCompleteSprint={async (sprintId) => {
+                    try {
+                      await postData(`/sprint/${sprintId}/complete`, {});
+                      toast.success('Sprint completed successfully');
+                      setSprintView('list');
+                      setSelectedSprint(null);
+                      fetchSprintStatus();
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to complete sprint');
+                    }
+                  }}
+                  onViewTask={(taskId) => {
+                    navigate(`/task/${taskId}`);
+                  }}
+                />
+              )}
+
+              {sprintView === 'backlog' && (
+                <BacklogView
+                  projectId={projectId!}
+                  onViewTask={(taskId) => {
+                    navigate(`/task/${taskId}`);
+                  }}
+                  onAssignToSprint={(taskId) => {
+                    // TODO: Open task edit modal with sprint selector
+                    toast.info('Sprint assignment feature coming soon');
+                  }}
+                />
+              )}
+            </TabsContent>
+
             <div className="mt-4">
               {project && <ProjectApprovalMetrics projectId={project._id} />}
             </div>
@@ -3007,6 +3247,100 @@ const ProjectDetail = () => {
           </Button>
         )
       }
+
+      {/* CREATE / EDIT SPRINT MODAL */}
+      <Dialog open={showSprintModal} onOpenChange={setShowSprintModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedSprint ? 'Edit Sprint' : 'Create New Sprint'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedSprint ? 'Update sprint details' : 'Create a new sprint for your project'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSprint} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="sprint-name">Name *</Label>
+              <Input
+                id="sprint-name"
+                value={sprintForm.name}
+                onChange={(e) => setSprintForm({ ...sprintForm, name: e.target.value })}
+                placeholder="Sprint name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sprint-description">Description</Label>
+              <Textarea
+                id="sprint-description"
+                value={sprintForm.description}
+                onChange={(e) => setSprintForm({ ...sprintForm, description: e.target.value })}
+                placeholder="Sprint description"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sprint-goal">Goal</Label>
+              <Textarea
+                id="sprint-goal"
+                value={sprintForm.goal}
+                onChange={(e) => setSprintForm({ ...sprintForm, goal: e.target.value })}
+                placeholder="Sprint goal"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Start Date *</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={sprintForm.startDate}
+                  onChange={(e) => setSprintForm({ ...sprintForm, startDate: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-date">End Date *</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={sprintForm.endDate}
+                  onChange={(e) => setSprintForm({ ...sprintForm, endDate: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowSprintModal(false);
+                  setSelectedSprint(null);
+                  setSprintForm({
+                    name: "",
+                    description: "",
+                    startDate: "",
+                    endDate: "",
+                    goal: ""
+                  });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                {selectedSprint ? 'Update Sprint' : 'Create Sprint'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* CREATE TASK MODAL */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
@@ -3031,6 +3365,18 @@ const ProjectDetail = () => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTask({ ...newTask, title: e.target.value })}
                   placeholder="Task title"
                   className="h-8"
+                />
+              </div>
+
+              <div className="space-y-1">
+                {/* <Label className="text-sm">Sprint *</Label> */}
+                <SprintSelector
+                  projectId={projectId!}
+                  selectedSprintId={newTask.sprintId}
+                  onSelectSprint={(sprintId) => setNewTask({ ...newTask, sprintId })}
+                  taskStartDate={newTask.startDate}
+                  taskDueDate={newTask.dueDate}
+                  error={!newTask.sprintId ? "Please select a sprint" : undefined}
                 />
               </div>
 
