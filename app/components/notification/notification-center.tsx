@@ -17,7 +17,7 @@ interface Notification {
     name: string;
     email: string;
   };
-  data?: {
+  data: {
     workspaceId?: string;
     projectId?: string;
     taskId?: string;
@@ -188,7 +188,7 @@ const NotificationCenter = () => {
     setIsOpen(false);
 
     // Navigate based on notification data
-    const { data } = notification || {};
+    const { data } = notification;
 
     // Handle comment notifications that don't have data field but have relatedTask
     if (notification.type === 'task_comment' && notification.relatedTask) {
@@ -214,7 +214,7 @@ const NotificationCenter = () => {
       }
 
       // Check task existence and active status
-      const taskId = data?.taskId || (notification.type === 'task_comment' && notification.relatedTask);
+      const taskId = data.taskId || (notification.type === 'task_comment' && notification.relatedTask);
       if (taskId) {
         const existsResponse = await fetch(buildApiUrl(`/task/${taskId}/exists`), { credentials: 'include', headers });
         if (!existsResponse.ok) {

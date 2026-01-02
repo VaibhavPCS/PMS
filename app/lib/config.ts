@@ -3,7 +3,7 @@ export const getBackendBaseUrl = (): string => {
   if (envApiUrl) {
     return envApiUrl;
   }
-  return 'https://pms.upda.co.in:5001';
+  return 'https://uat.pms.upda.co.in:5001';
   // return 'http://localhost:5000';
 };
 

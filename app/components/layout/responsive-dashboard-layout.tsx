@@ -34,7 +34,7 @@ interface Notification {
   };
   createdAt: string;
   readAt?: string;
-  data?: {
+  data: {
     workspaceId?: string;
     projectId?: string;
     taskId?: string;
@@ -240,14 +240,7 @@ const ResponsiveDashboardContent = () => {
       setIsNotificationOpen(false);
       setIsProfileOpen(false);
 
-      const { data } = notification || {};
-      
-      // Check if data exists before proceeding
-      if (!data) {
-        console.warn('Notification clicked without data:', notification);
-        toast.error("Unable to process notification - missing data");
-        return;
-      }
+      const { data } = notification;
 
       // Check resource existence before navigation
       try {

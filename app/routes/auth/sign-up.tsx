@@ -118,17 +118,19 @@ const SignUp = () => {
   const handleOnSubmit = (values: SignupFormData) => {
     mutate(values, {
       onSuccess: (data: any) => {
-        // BYPASS OTP: Direct registration and auto-login
         toast.success("Registration successful!", {
           description: "Welcome! Redirecting to dashboard...",
         });
 
         form.reset();
 
-        // Navigate to dashboard (user is auto-logged in)
-        setTimeout(() => {
+        // Force auth check to update context with HTTP-only cookie, then navigate to dashboard
+        forceAuthCheck().then(() => {
           navigate("/dashboard");
-        }, 1000);
+        }).catch(() => {
+          // Even if force check fails, try to navigate
+          navigate("/dashboard");
+        });
 
         // ORIGINAL OTP CODE (commented out):
         // toast.success("Registration Initiated", {
@@ -148,6 +150,7 @@ const SignUp = () => {
       onError: (error: any) => {
         const errorMessage =
           error.response?.data?.message || "An error occurred";
+        // console.log(error);
         toast.error(errorMessage);
       },
     });

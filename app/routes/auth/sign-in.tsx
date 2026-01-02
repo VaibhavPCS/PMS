@@ -44,8 +44,6 @@ const SignIn = () => {
       onSuccess: (data: any) => {
         // BYPASS OTP: Direct login without OTP verification
         toast.success("Login successful!");
-        // BYPASS OTP: Direct login without OTP verification
-        toast.success("Login successful!");
 
         // Force auth check to update context with HTTP-only cookie
         forceAuthCheck().then(() => {
@@ -54,43 +52,11 @@ const SignIn = () => {
           // Even if force check fails, try to navigate
           navigate("/dashboard");
         });
-
-        // ORIGINAL OTP CODE (commented out):
-        // if (data.requiresOTP) {
-        //   toast.success("OTP Sent", {
-        //     description:
-        //       "Please check your email for a 6-digit OTP to complete login.",
-        //   });
-        //   navigate("/verify-otp", {
-        //     state: {
-        //       userId: data.userId,
-        //       email: values.email,
-        //       type: "login",
-        //       message:
-        //         "Please enter the 6-digit OTP sent to your email to complete login.",
-        //     },
-        //   });
-        // }
       },
       onError: (error: any) => {
         const errorMessage =
           error.response?.data?.message || "An error occurred";
         toast.error(errorMessage);
-
-        // ORIGINAL EMAIL VERIFICATION CODE (commented out):
-        // if (error.response?.data?.needsVerification) {
-        //   toast.error("Email verification required", {
-        //     description: "Please verify your email first.",
-        //   });
-        //   navigate("/verify-otp", {
-        //     state: {
-        //       userId: error.response.data.userId,
-        //       email: values.email,
-        //       type: "registration",
-        //       message: "Please complete your email verification first.",
-        //     },
-        //   });
-        // }
       },
     });
   };

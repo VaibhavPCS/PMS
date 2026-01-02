@@ -3,7 +3,6 @@ import axios from '../../../lib/axios'
 import { Calendar } from '../../../components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../components/ui/popover'
 import { format } from 'date-fns'
-import { Link } from 'react-router'
 
 type Employee = { userId: string; userName: string }
 
@@ -58,7 +57,6 @@ interface ReportData {
     id: string
     title: string
     project: string
-    startDate: string
     completedAt: string
     priority: string
     daysToComplete: number
@@ -67,13 +65,11 @@ interface ReportData {
     id: string
     title: string
     project: string
-    startDate: string
     dueDate: string
     priority: string
     status: string
     daysUntilDue: number
     isOverdue: boolean
-    age: number
   }>
   projects: Array<{
     projectName: string
@@ -287,17 +283,17 @@ const UserExportPage = () => {
             <div className="bg-white rounded-[12px] border border-[#e6e8ec] p-4 md:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#F2761B] text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0">
-                  {reportData.user?.name?.charAt(0).toUpperCase() || '?'}
+                  {reportData.user.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user?.name || 'Unknown User'}</h2>
-                  <p className="text-[13px] text-[#717182] truncate">{reportData.user?.email || 'No email'}</p>
-                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user?.role || 'No role'}</p>
+                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user.name}</h2>
+                  <p className="text-[13px] text-[#717182] truncate">{reportData.user.email}</p>
+                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user.role}</p>
                 </div>
                 <div className="w-full sm:w-auto sm:text-right">
                   <p className="text-[13px] text-[#717182]">Selected Period</p>
-                  <p className="text-[14px] font-medium text-[#111827]">{reportData.dateRange?.displayText}</p>
-                  <p className="text-[13px] text-[#717182]">{reportData.dateRange?.days} days</p>
+                  <p className="text-[14px] font-medium text-[#111827]">{reportData.dateRange.displayText}</p>
+                  <p className="text-[13px] text-[#717182]">{reportData.dateRange.days} days</p>
                 </div>
               </div>
             </div>
@@ -357,48 +353,34 @@ const UserExportPage = () => {
               </div>
             </div>
 
-            {/* Section 3 & 4: Tables stacked */}
-            <div className="grid grid-cols-1 gap-6">
+            {/* Section 3 & 4: Tables side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Section 3: Completed Tasks Table */}
               <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-5 shadow-sm">
                 <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
                   ✅ Completed Tasks ({reportData.completedTasks.length})
                 </h3>
-                <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
-                    <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                    <thead>
                       <tr className="border-b border-[#e6e8ec]">
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">S.No</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Task</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Project</th>
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">Start Date</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Completed</th>
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">Duration</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Priority</th>
                       </tr>
                     </thead>
                     <tbody>
                       {reportData.completedTasks.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-4 text-[#717182]">No completed tasks</td>
+                          <td colSpan={4} className="text-center py-4 text-[#717182]">No completed tasks</td>
                         </tr>
                       ) : (
-                        reportData.completedTasks.map((task, idx) => (
+                        reportData.completedTasks.slice(0, 10).map((task, idx) => (
                           <tr key={task.id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
-                            <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
-                            <td className="py-2 px-2 text-[#111827]">
-                              <Link
-                                to={`/task/${task.id}`}
-                                className="hover:underline hover:text-blue-600 block min-w-[200px] max-w-[400px] whitespace-normal break-words"
-                                title={task.title}
-                              >
-                                {task.title.length > 100 ? `${task.title.substring(0, 150)}...` : task.title}
-                              </Link>
-                            </td>
+                            <td className="py-2 px-2 text-[#111827]">{task.title}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.project}</td>
-                            <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.completedAt}</td>
-                            <td className="py-2 px-2 text-[#717182]">{task.daysToComplete} days</td>
                             <td className="py-2 px-2">
                               <span className={`px-2 py-1 rounded text-[11px] font-medium ${task.priority === 'urgent' ? 'bg-red-100 text-red-700' : task.priority === 'high' ? 'bg-orange-100 text-orange-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
                                 {task.priority}
@@ -417,41 +399,27 @@ const UserExportPage = () => {
                 <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
                   ⏰ Due in Range ({reportData.openTasks.length})
                 </h3>
-                <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
-                    <thead className="sticky top-0 bg-white z-10 shadow-sm">
+                    <thead>
                       <tr className="border-b border-[#e6e8ec]">
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">S.No</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Task</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Project</th>
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">Start Date</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Due Date</th>
-                        <th className="text-left py-2 px-2 font-semibold text-[#111827]">Duration</th>
                         <th className="text-left py-2 px-2 font-semibold text-[#111827]">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {reportData.openTasks.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-4 text-[#717182]">No open tasks</td>
+                          <td colSpan={4} className="text-center py-4 text-[#717182]">No open tasks</td>
                         </tr>
                       ) : (
-                        reportData.openTasks.map((task, idx) => (
+                        reportData.openTasks.slice(0, 10).map((task, idx) => (
                           <tr key={task.id} className={`${idx % 2 === 0 ? 'bg-gray-50' : ''} ${task.isOverdue ? 'bg-red-50' : ''}`}>
-                            <td className="py-2 px-2 text-[#717182]">{idx + 1}</td>
-                            <td className="py-2 px-2 text-[#111827]">
-                              <Link
-                                to={`/task/${task.id}`}
-                                className="hover:underline hover:text-blue-600 block min-w-[200px] max-w-[400px] whitespace-normal break-words"
-                                title={task.title}
-                              >
-                                {task.title.length > 150 ? `${task.title.substring(0, 150)}...` : task.title}
-                              </Link>
-                            </td>
+                            <td className="py-2 px-2 text-[#111827]">{task.title}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.project}</td>
-                            <td className="py-2 px-2 text-[#717182]">{task.startDate}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.dueDate}</td>
-                            <td className="py-2 px-2 text-[#717182]">{task.age} days</td>
                             <td className="py-2 px-2">
                               <span className={`px-2 py-1 rounded text-[11px] font-medium ${task.status === 'in-progress' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                 {task.status}

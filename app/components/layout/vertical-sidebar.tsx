@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { ChevronDown, Calendar } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useBadges } from "../../provider/badge-context";
 import { useAuth } from "../../provider/auth-context";
 
@@ -9,11 +9,9 @@ interface NavItem {
   name: string;
   href: string;
   icon: string; // SVG path
-  iconComponent?: React.ElementType; // Optional component for icon
   badgeKey?: "notifications" | "messages"; // Key to identify which badge to show
   hasDropdown?: boolean; // For Administration item
   subItems?: { name: string; href: string }[]; // Submenu items for dropdown
-  adminOnly?: boolean; // Only show for admin users
 }
 
 // Define the navigation items matching Figma design
@@ -37,19 +35,12 @@ const navItems: NavItem[] = [
     name: "Excel Upload",
     href: "/excel-upload",
     icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
-    adminOnly: true, // Only show for admins
   },
   {
     name: "Chat",
     href: "/chat",
     icon: "/assets/chat.svg", // ✅ Icon path
     badgeKey: "messages",
-  },
-  {
-    name: "Calendar",
-    href: "/administration/calendar",
-    icon: "",
-    iconComponent: Calendar,
   },
   {
     name: "Administration",
@@ -80,13 +71,7 @@ const VerticalSidebar = () => {
   });
 
   const visibleNavItems = effectiveNavItems.filter(
-    (item) => {
-      // Hide Administration for non-admins
-      if (item.name === "Administration" && !isAdmin) return false;
-      // Hide admin-only items for non-admins
-      if (item.adminOnly && !isAdmin) return false;
-      return true;
-    }
+    (item) => item.name !== "Administration" || isAdmin
   );
 
   const isActive = (
@@ -184,15 +169,11 @@ const VerticalSidebar = () => {
                     `}
                   >
                     <div className="flex items-center gap-[12px]">
-                      {item.iconComponent ? (
-                        <item.iconComponent className="w-[20px] h-[20px]" />
-                      ) : (
-                        <img
-                          src={item.icon}
-                          alt={item.name}
-                          className="w-[20px] h-[20px]"
-                        />
-                      )}
+                      <img
+                        src={item.icon}
+                        alt={item.name}
+                        className="w-[20px] h-[20px]"
+                      />
                       <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal]">
                         {item.name}
                       </span>
@@ -243,15 +224,11 @@ const VerticalSidebar = () => {
                     }
                   `}
                 >
-                  {item.iconComponent ? (
-                    <item.iconComponent className="w-[20px] h-[20px] shrink-0" />
-                  ) : (
-                    <img
-                      src={item.icon}
-                      alt={item.name}
-                      className="w-[20px] h-[20px] shrink-0"
-                    />
-                  )}
+                  <img
+                    src={item.icon}
+                    alt={item.name}
+                    className="w-[20px] h-[20px] shrink-0"
+                  />
                   <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal] grow">
                     {item.name}
                   </span>

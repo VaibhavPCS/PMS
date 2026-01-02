@@ -625,9 +625,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 </Button>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <input
@@ -635,9 +635,10 @@ const ExcelUploadComponent: React.FC = () => {
                                   value={row.title || ''}
                                   onChange={(e) => handleEditCell(index, 'title', e.target.value)}
                                   className="w-full px-2 py-1 text-sm border rounded"
+                                  onBlur={() => setEditingRow(null)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveRow(index);
-                                    if (e.key === 'Escape') handleCancelEdit(index);
+                                    if (e.key === 'Enter') setEditingRow(null);
+                                    if (e.key === 'Escape') setEditingRow(null);
                                   }}
                                   onClick={(e) => e.stopPropagation()}
                                   autoFocus
@@ -646,9 +647,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 row.title
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <textarea
@@ -656,11 +657,13 @@ const ExcelUploadComponent: React.FC = () => {
                                   onChange={(e) => handleEditCell(index, 'description', e.target.value)}
                                   className="w-full px-2 py-1 text-sm border rounded resize-none"
                                   rows={2}
+                                  onBlur={() => setEditingRow(null)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && e.ctrlKey) handleSaveRow(index);
-                                    if (e.key === 'Escape') handleCancelEdit(index);
+                                    if (e.key === 'Enter' && e.ctrlKey) setEditingRow(null);
+                                    if (e.key === 'Escape') setEditingRow(null);
                                   }}
                                   onClick={(e) => e.stopPropagation()}
+                                  autoFocus
                                 />
                               ) : (
                                 <div className="max-w-xs truncate" title={row.description}>
@@ -668,9 +671,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <input
@@ -678,19 +681,21 @@ const ExcelUploadComponent: React.FC = () => {
                                   value={row.startDate ? new Date(row.startDate).toISOString().split('T')[0] : ''}
                                   onChange={(e) => handleEditCell(index, 'startDate', e.target.value)}
                                   className="w-full px-2 py-1 text-sm border rounded"
+                                  onBlur={() => setEditingRow(null)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveRow(index);
-                                    if (e.key === 'Escape') handleCancelEdit(index);
+                                    if (e.key === 'Enter') setEditingRow(null);
+                                    if (e.key === 'Escape') setEditingRow(null);
                                   }}
                                   onClick={(e) => e.stopPropagation()}
+                                  autoFocus
                                 />
                               ) : (
                                 new Date(row.startDate).toLocaleDateString()
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <input
@@ -698,19 +703,20 @@ const ExcelUploadComponent: React.FC = () => {
                                   value={row.dueDate ? new Date(row.dueDate).toISOString().split('T')[0] : ''}
                                   onChange={(e) => handleEditCell(index, 'dueDate', e.target.value)}
                                   className="w-full px-2 py-1 text-sm border rounded"
+                                  onBlur={() => setEditingRow(null)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveRow(index);
-                                    if (e.key === 'Escape') handleCancelEdit(index);
+                                    if (e.key === 'Enter') setEditingRow(null);
+                                    if (e.key === 'Escape') setEditingRow(null);
                                   }}
-                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
                                 />
                               ) : (
                                 new Date(row.dueDate).toLocaleDateString()
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <Select value={row.status || 'to-do'} onValueChange={(value) => handleEditCell(index, 'status', value)}>
@@ -728,9 +734,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 <Badge variant="outline">{row.status || 'to-do'}</Badge>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <Select value={row.priority || 'medium'} onValueChange={(value) => handleEditCell(index, 'priority', value)}>
@@ -748,9 +754,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 <Badge variant="outline">{row.priority || 'medium'}</Badge>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <Select value={row.approvalStatus || 'not-required'} onValueChange={(value) => handleEditCell(index, 'approvalStatus', value)}>
@@ -765,22 +771,22 @@ const ExcelUploadComponent: React.FC = () => {
                                   </SelectContent>
                                 </Select>
                               ) : (
-                                <Badge
-                                  variant={row.approvalStatus === 'approved' ? 'default' :
-                                         row.approvalStatus === 'rejected' ? 'destructive' :
+                                <Badge 
+                                  variant={row.approvalStatus === 'approved' ? 'default' : 
+                                         row.approvalStatus === 'rejected' ? 'destructive' : 
                                          row.approvalStatus === 'pending-approval' ? 'secondary' : 'outline'}
                                 >
                                   {row.approvalStatus || 'not-required'}
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
-                                <Select
-                                  value={row.approvalBy || 'none'}
+                                <Select 
+                                  value={row.approvalBy || 'none'} 
                                   onValueChange={(value) => handleEditCell(index, 'approvalBy', value === 'none' ? null : value)}
                                   disabled={row.approvalStatus !== 'approved'}
                                 >
@@ -802,9 +808,9 @@ const ExcelUploadComponent: React.FC = () => {
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell
+                            <TableCell 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => editingRow !== index && setEditingRow(index)}
+                              onClick={() => setEditingRow(index)}
                             >
                               {editingRow === index ? (
                                 <input
@@ -813,11 +819,12 @@ const ExcelUploadComponent: React.FC = () => {
                                   onChange={(e) => handleEditCell(index, 'approvalDate', e.target.value === '' ? null : e.target.value)}
                                   className="w-full px-2 py-1 text-sm border rounded"
                                   disabled={row.approvalStatus !== 'approved'}
+                                  onBlur={() => setEditingRow(null)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveRow(index);
-                                    if (e.key === 'Escape') handleCancelEdit(index);
+                                    if (e.key === 'Enter') setEditingRow(null);
+                                    if (e.key === 'Escape') setEditingRow(null);
                                   }}
-                                  onClick={(e) => e.stopPropagation()}
+                                  autoFocus
                                 />
                               ) : (
                                 <span className="text-sm">

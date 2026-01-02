@@ -57,17 +57,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function HydrateFallback() {
-  return (
-    <div className="flex h-screen w-screen items-center justify-center bg-gray-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#F2761B] border-t-transparent" />
-        <p className="text-[#717182] animate-pulse font-medium">Loading application...</p>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <ReactQueryProvider>

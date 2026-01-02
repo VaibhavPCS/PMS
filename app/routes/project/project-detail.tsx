@@ -1554,13 +1554,7 @@ const DroppableColumn = ({
           />
         </div>
       </div>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "space-y-2 min-h-[20rem]",
-          count > 4 && "max-h-[600px] overflow-y-auto pr-2"
-        )}
-      >
+      <div ref={setNodeRef} className="space-y-2 min-h-[20rem]">
         {children}
       </div>
     </div>
@@ -2048,14 +2042,8 @@ const ProjectDetail = () => {
 
       const start = new Date(newTask.startDate);
       const end = new Date(newTask.dueDate);
-      
-      // Normalize dates to start of day for consistent comparison
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
-      
       const projectStart = project ? new Date(project.startDate) : new Date();
       projectStart.setHours(0, 0, 0, 0);
-      
       if (start < projectStart || end < projectStart) {
         return toast.error("Task dates must be on or after the project start date");
       }
@@ -2063,11 +2051,9 @@ const ProjectDetail = () => {
         return toast.error("Start date cannot be after due date");
       }
       const projectEnd = project ? new Date(project.endDate) : undefined;
-      if (projectEnd) {
-        projectEnd.setHours(0, 0, 0, 0);
-        if (end > projectEnd) {
-          return toast.error("Due date cannot be after project end date");
-        }
+      if (projectEnd) projectEnd.setHours(0, 0, 0, 0);
+      if (projectEnd && end > projectEnd) {
+        return toast.error("Due date cannot be after project end date");
       }
 
       // Validate reference link if provided (must be Figma or GitHub)
@@ -3529,7 +3515,11 @@ const ProjectDetail = () => {
                           }
                           const selected = new Date(date);
                           selected.setHours(0, 0, 0, 0);
-                          if (projEnd && selected.getTime() > projEnd.getTime()) {
+                          const projEndPlusOne = projEnd ? new Date(projEnd) : undefined;
+                          if (projEndPlusOne) {
+                            projEndPlusOne.setDate(projEndPlusOne.getDate() + 1);
+                          }
+                          if (projEndPlusOne && selected.getTime() >= projEndPlusOne.getTime()) {
                             toast.error("Due date cannot be after project end date");
                             setDueDateObj(projEnd);
                             setNewTask({ ...newTask, dueDate: projEnd ? format(projEnd, "yyyy-MM-dd") : "" });
