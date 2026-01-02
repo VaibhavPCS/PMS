@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import SprintSelector from '@/components/sprint/SprintSelector';
 
 interface AssignableMember {
   _id: string;
@@ -38,6 +39,7 @@ interface Task {
   startDate?: string;
   endDate?: string;
   status: string;
+   sprint?: { _id: string; name?: string } | string | null;
 }
 
 interface Project {
@@ -71,6 +73,7 @@ export const QuickEditTaskForm: React.FC<QuickEditTaskFormProps> = ({
     assigneeId: task.assignee?._id || '',
     startDate: task.startDate ? new Date(task.startDate) : undefined,
     endDate: task.endDate ? new Date(task.endDate) : undefined,
+    sprintId: typeof task.sprint === 'string' ? task.sprint : task.sprint?._id || '',
   });
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -95,6 +98,10 @@ export const QuickEditTaskForm: React.FC<QuickEditTaskFormProps> = ({
 
       if (formData.endDate) {
         updateData.endDate = format(formData.endDate, 'yyyy-MM-dd');
+      }
+
+      if (project) {
+        updateData.sprintId = formData.sprintId || null;
       }
 
       await putData(`/task/${task._id}`, updateData);
@@ -171,6 +178,24 @@ export const QuickEditTaskForm: React.FC<QuickEditTaskFormProps> = ({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {project && (
+        <div className="space-y-2">
+          <SprintSelector
+            projectId={project._id}
+            selectedSprintId={formData.sprintId || null}
+            onSelectSprint={(sprintId) =>
+              setFormData({ ...formData, sprintId: sprintId || '' })
+            }
+            taskStartDate={
+              formData.startDate ? format(formData.startDate, 'yyyy-MM-dd') : undefined
+            }
+            taskDueDate={
+              formData.endDate ? format(formData.endDate, 'yyyy-MM-dd') : undefined
+            }
+          />
         </div>
       )}
 
