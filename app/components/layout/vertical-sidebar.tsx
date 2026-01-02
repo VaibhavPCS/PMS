@@ -31,11 +31,11 @@ const navItems: NavItem[] = [
     href: "/analytics",
     icon: "/assets/analytics-icon-1.svg", // ✅ Icon path
   },
-  {
-    name: "Excel Upload",
-    href: "/excel-upload",
-    icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
-  },
+  // {
+  //   name: "Excel Upload",
+  //   href: "/excel-upload",
+  //   icon: "/assets/file-spreadsheet.svg", // Spreadsheet icon for Excel upload
+  // },
   {
     name: "Chat",
     href: "/chat",
