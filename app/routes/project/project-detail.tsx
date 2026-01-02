@@ -2161,37 +2161,19 @@ const ProjectDetail = () => {
   );
 
   const handleCreateSprint = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!sprintForm.name.trim() || !sprintForm.startDate || !sprintForm.endDate) {
-        return toast.error("Please fill all required fields (name, start date, end date)");
-      }
-
-      const start = new Date(sprintForm.startDate);
-      const end = new Date(sprintForm.endDate);
-      if (start > end) {
-        return toast.error("Start date cannot be after end date");
-      }
-
+    async (sprintData: any) => {
       try {
-        if (selectedSprint) {
+        if (selectedSprint?._id) {
           // Editing existing sprint
-          await putData(`/sprint/${selectedSprint._id}`, sprintForm);
+          await putData(`/sprint/${selectedSprint._id}`, sprintData);
           toast.success('Sprint updated successfully');
         } else {
           // Creating new sprint
-          await postData('/sprint', { ...sprintForm, projectId });
+          await postData('/sprint', sprintData);
           toast.success('Sprint created successfully');
         }
-        
-        // Reset form
-        setSprintForm({
-          name: "",
-          description: "",
-          startDate: "",
-          endDate: "",
-          goal: ""
-        });
+
+        // Reset state
         setShowSprintModal(false);
         setSelectedSprint(null);
         fetchSprintStatus();
@@ -2201,7 +2183,7 @@ const ProjectDetail = () => {
         throw error;
       }
     },
-    [sprintForm, projectId, fetchSprintStatus, selectedSprint]
+    [projectId, fetchSprintStatus, selectedSprint]
   );
 
   useEffect(() => {
@@ -3140,9 +3122,56 @@ const ProjectDetail = () => {
                 <SprintList
                   key={sprintListRefreshKey}
                   projectId={projectId!}
-                  onViewSprintDetails={(sprintId) => {
-                    setSelectedSprint(sprintId);
-                    setSprintView('details');
+                  onStartSprint={async (sprintId) => {
+                    try {
+                      await postData(`/sprint/${sprintId}/start`, {});
+                      toast.success('Sprint started successfully');
+                      fetchSprintStatus();
+                      setSprintListRefreshKey((prev) => prev + 1);
+                    } catch (error: any) {
+                      console.error('Start sprint error:', error);
+                      const errorMessage = error.response?.data?.message || error.message || 'Failed to start sprint';
+                      toast.error(errorMessage);
+                    }
+                  }}
+                  onViewSprintDetails={async (sprintId) => {
+                    // Check user permissions before opening sprint details
+                    const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
+
+                    // Privileged roles that can bypass task requirement
+                    const isPrivilegedUser =
+                      isAdmin ||
+                      isProjectLead ||
+                      projectRole === 'tl' ||
+                      projectRole === 'lead' ||
+                      projectRole === 'owner';
+
+                    // If user is privileged, allow access immediately
+                    if (isPrivilegedUser) {
+                      setSelectedSprint(sprintId);
+                      setSprintView('details');
+                      return;
+                    }
+
+                    // For non-privileged users, check if they have tasks in this sprint
+                    try {
+                      const sprintData = await fetchData<{ data: { tasks: any[] } }>(`/sprint/${sprintId}`);
+                      const userTasks = sprintData.data.tasks.filter(
+                        (task: any) => task.assignee?._id?.toString() === currentUserIdStr
+                      );
+
+                      if (userTasks.length > 0) {
+                        // User has tasks in this sprint, allow access
+                        setSelectedSprint(sprintId);
+                        setSprintView('details');
+                      } else {
+                        // User has no tasks in this sprint, deny access
+                        toast.error('You do not have permission to view this sprint. Only team leads, project leads, admins, and users with tasks in the sprint can access it.');
+                      }
+                    } catch (error: any) {
+                      console.error('Error checking sprint access:', error);
+                      toast.error('Failed to check sprint access permissions');
+                    }
                   }}
                   onEditSprint={(sprint) => {
                     setSelectedSprint(sprint);
@@ -3249,98 +3278,17 @@ const ProjectDetail = () => {
       }
 
       {/* CREATE / EDIT SPRINT MODAL */}
-      <Dialog open={showSprintModal} onOpenChange={setShowSprintModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedSprint ? 'Edit Sprint' : 'Create New Sprint'}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedSprint ? 'Update sprint details' : 'Create a new sprint for your project'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateSprint} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="sprint-name">Name *</Label>
-              <Input
-                id="sprint-name"
-                value={sprintForm.name}
-                onChange={(e) => setSprintForm({ ...sprintForm, name: e.target.value })}
-                placeholder="Sprint name"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sprint-description">Description</Label>
-              <Textarea
-                id="sprint-description"
-                value={sprintForm.description}
-                onChange={(e) => setSprintForm({ ...sprintForm, description: e.target.value })}
-                placeholder="Sprint description"
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sprint-goal">Goal</Label>
-              <Textarea
-                id="sprint-goal"
-                value={sprintForm.goal}
-                onChange={(e) => setSprintForm({ ...sprintForm, goal: e.target.value })}
-                placeholder="Sprint goal"
-                rows={2}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start-date">Start Date *</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={sprintForm.startDate}
-                  onChange={(e) => setSprintForm({ ...sprintForm, startDate: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-date">End Date *</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={sprintForm.endDate}
-                  onChange={(e) => setSprintForm({ ...sprintForm, endDate: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowSprintModal(false);
-                  setSelectedSprint(null);
-                  setSprintForm({
-                    name: "",
-                    description: "",
-                    startDate: "",
-                    endDate: "",
-                    goal: ""
-                  });
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">
-                {selectedSprint ? 'Update Sprint' : 'Create Sprint'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <SprintModal
+        isOpen={showSprintModal}
+        onClose={() => {
+          setShowSprintModal(false);
+          setSelectedSprint(null);
+        }}
+        onSubmit={handleCreateSprint}
+        projectId={projectId!}
+        sprint={selectedSprint}
+        mode={selectedSprint ? 'edit' : 'create'}
+      />
 
       {/* CREATE TASK MODAL */}
       <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>

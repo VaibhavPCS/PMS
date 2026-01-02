@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Target, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -44,51 +47,66 @@ export const SprintModal: React.FC<SprintModalProps> = ({
     name: '',
     goal: '',
     startDate: '',
-    endDate: '',
-    durationDays: '',
-    useDuration: false
+    endDate: ''
   });
 
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [endDateObj, setEndDateObj] = useState<Date | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [calculatedEndDate, setCalculatedEndDate] = useState<string>('');
 
   useEffect(() => {
     if (sprint && mode === 'edit') {
       const startDate = formatDateForInput(sprint.startDate);
       const endDate = formatDateForInput(sprint.endDate);
       setFormData({
-        name: sprint.name,
-        goal: sprint.goal,
+        name: sprint.name || '',
+        goal: sprint.goal || '',
         startDate,
-        endDate,
-        durationDays: '',
-        useDuration: false
+        endDate
       });
-      setStartDateObj(new Date(sprint.startDate));
-      setEndDateObj(new Date(sprint.endDate));
+
+      // Set date objects only if valid dates exist
+      if (sprint.startDate) {
+        const startDateObj = new Date(sprint.startDate);
+        if (!isNaN(startDateObj.getTime())) {
+          setStartDateObj(startDateObj);
+        } else {
+          setStartDateObj(undefined);
+        }
+      }
+      if (sprint.endDate) {
+        const endDateObj = new Date(sprint.endDate);
+        if (!isNaN(endDateObj.getTime())) {
+          setEndDateObj(endDateObj);
+        } else {
+          setEndDateObj(undefined);
+        }
+      }
     } else {
       // Reset form for create mode
       setFormData({
         name: '',
         goal: '',
         startDate: '',
-        endDate: '',
-        durationDays: '',
-        useDuration: false
+        endDate: ''
       });
       setStartDateObj(undefined);
       setEndDateObj(undefined);
     }
     setErrors({});
-    setCalculatedEndDate('');
   }, [sprint, mode, isOpen]);
 
   const formatDateForInput = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -99,75 +117,30 @@ export const SprintModal: React.FC<SprintModalProps> = ({
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-
-    // Calculate end date if using duration mode
-    if (name === 'durationDays' && formData.useDuration && formData.startDate && value) {
-      calculateEndDate(formData.startDate, parseInt(value));
-    }
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { checked } = e.target;
-    setFormData(prev => ({ ...prev, useDuration: checked }));
-
-    if (checked && formData.startDate && formData.durationDays) {
-      calculateEndDate(formData.startDate, parseInt(formData.durationDays));
-    } else {
-      setCalculatedEndDate('');
-    }
-  };
-
-  const calculateEndDate = async (startDate: string, durationDays: number) => {
-    // This is a client-side approximation
-    // The server will do the actual calculation excluding Sundays
-    const start = new Date(startDate);
-    let workingDaysAdded = 0;
-    let currentDate = new Date(start);
-
-    while (workingDaysAdded < durationDays - 1) {
-      currentDate.setDate(currentDate.getDate() + 1);
-      // Skip Sundays
-      if (currentDate.getDay() !== 0) {
-        workingDaysAdded++;
-      }
-    }
-
-    // Skip if landed on Sunday
-    while (currentDate.getDay() === 0) {
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    setCalculatedEndDate(formatDateForInput(currentDate.toISOString()));
   };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Sprint name is required';
+      newErrors.name = 'Title is required';
     }
 
     if (!formData.goal.trim()) {
-      newErrors.goal = 'Sprint goal is required';
+      newErrors.goal = 'Description is required';
     }
 
     if (!formData.startDate) {
       newErrors.startDate = 'Start date is required';
     }
 
-    if (formData.useDuration) {
-      if (!formData.durationDays || parseInt(formData.durationDays) < 1) {
-        newErrors.durationDays = 'Duration must be at least 1 day';
-      }
-    } else {
-      if (!formData.endDate) {
-        newErrors.endDate = 'End date is required';
-      } else if (formData.startDate && formData.endDate) {
-        const start = new Date(formData.startDate);
-        const end = new Date(formData.endDate);
-        if (end <= start) {
-          newErrors.endDate = 'End date must be after start date';
-        }
+    if (!formData.endDate) {
+      newErrors.endDate = 'End date is required';
+    } else if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (end <= start) {
+        newErrors.endDate = 'End date must be after start date';
       }
     }
 
@@ -189,14 +162,9 @@ export const SprintModal: React.FC<SprintModalProps> = ({
         name: formData.name.trim(),
         goal: formData.goal.trim(),
         startDate: formData.startDate,
+        endDate: formData.endDate,
         projectId
       };
-
-      if (formData.useDuration) {
-        submitData.durationDays = parseInt(formData.durationDays);
-      } else {
-        submitData.endDate = formData.endDate;
-      }
 
       await onSubmit(submitData);
       onClose();
@@ -228,59 +196,61 @@ export const SprintModal: React.FC<SprintModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sprint Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Sprint Name *
-            </label>
-            <input
+          {/* Sprint Title */}
+          <div className="space-y-[6px]">
+            <Label htmlFor="name" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+              Title <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+            </Label>
+            <Input
               type="text"
               id="name"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                "h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px]",
+                errors.name && "border-[#cd2818] focus-visible:ring-[#cd2818]"
+              )}
               placeholder="e.g., Sprint 1, Q1 2025 Sprint, Feature X Sprint"
             />
             {errors.name && (
-              <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
+              <p className="mt-1 text-[12px] text-[#cd2818] flex items-center gap-1 font-['Inter']">
+                <AlertCircle className="w-3.5 h-3.5" />
                 {errors.name}
               </p>
             )}
           </div>
 
-          {/* Sprint Goal */}
-          <div>
-            <label htmlFor="goal" className="block text-sm font-medium text-gray-700 mb-2">
-              Sprint Goal *
-            </label>
-            <textarea
+          {/* Sprint Description */}
+          <div className="space-y-[6px]">
+            <Label htmlFor="goal" className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+              Description <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+            </Label>
+            <Textarea
               id="goal"
               name="goal"
               value={formData.goal}
               onChange={handleChange}
               rows={3}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.goal ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                "min-h-[88px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px]",
+                errors.goal && "border-[#cd2818] focus-visible:ring-[#cd2818]"
+              )}
               placeholder="What do you want to achieve in this sprint?"
             />
             {errors.goal && (
-              <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
+              <p className="mt-1 text-[12px] text-[#cd2818] flex items-center gap-1 font-['Inter']">
+                <AlertCircle className="w-3.5 h-3.5" />
                 {errors.goal}
               </p>
             )}
           </div>
 
           {/* Start Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date *
-            </label>
+          <div className="space-y-[6px]">
+            <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+              Start Date <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+            </Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -315,123 +285,80 @@ export const SprintModal: React.FC<SprintModalProps> = ({
                       setEndDateObj(date);
                       setFormData(prev => ({ ...prev, endDate: formattedDate }));
                     }
-
-                    // Calculate end date if using duration mode
-                    if (formData.useDuration && formData.durationDays) {
-                      calculateEndDate(formattedDate, parseInt(formData.durationDays));
-                    }
                   }}
-                  initialFocus
+                  disabled={(date) => {
+                    // Disable dates before today
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
                 />
               </PopoverContent>
             </Popover>
             {errors.startDate && (
-              <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
+              <p className="mt-1 text-[12px] text-[#cd2818] flex items-center gap-1 font-['Inter']">
+                <AlertCircle className="w-3.5 h-3.5" />
                 {errors.startDate}
               </p>
             )}
           </div>
 
-          {/* Duration Mode Toggle */}
-          {mode === 'create' && (
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="useDuration"
-                checked={formData.useDuration}
-                onChange={handleCheckboxChange}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="useDuration" className="text-sm font-medium text-gray-700">
-                Calculate end date from duration (excluding Sundays)
-              </label>
-            </div>
-          )}
+          {/* End Date */}
+          <div className="space-y-[6px]">
+            <Label className="text-[14px] font-medium font-['Inter'] text-[#414651] leading-[20px]">
+              End Date <span className="text-[#cd2818] font-['Work_Sans']">*</span>
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal",
+                    !endDateObj && "text-[#717680]",
+                    errors.endDate && "border-red-500"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDateObj ? format(endDateObj, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={endDateObj}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    setEndDateObj(date);
+                    setFormData(prev => ({ ...prev, endDate: format(date, "yyyy-MM-dd") }));
 
-          {/* Duration Days (if enabled) */}
-          {formData.useDuration && mode === 'create' ? (
-            <div>
-              <label htmlFor="durationDays" className="block text-sm font-medium text-gray-700 mb-2">
-                Duration (working days, excluding Sundays) *
-              </label>
-              <input
-                type="number"
-                id="durationDays"
-                name="durationDays"
-                value={formData.durationDays}
-                onChange={handleChange}
-                min="1"
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.durationDays ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="e.g., 14"
-              />
-              {errors.durationDays && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  {errors.durationDays}
-                </p>
-              )}
-              {calculatedEndDate && (
-                <p className="mt-2 text-sm text-gray-600">
-                  Calculated end date: {new Date(calculatedEndDate).toLocaleDateString('en-GB')}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date *
-              </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] justify-start text-left font-normal",
-                      !endDateObj && "text-[#717680]",
-                      errors.endDate && "border-red-500"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDateObj ? format(endDateObj, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={endDateObj}
-                    onSelect={(date) => {
-                      if (!date) return;
-                      setEndDateObj(date);
-                      setFormData(prev => ({ ...prev, endDate: format(date, "yyyy-MM-dd") }));
+                    // Clear error for this field
+                    if (errors.endDate) {
+                      setErrors(prev => ({ ...prev, endDate: '' }));
+                    }
+                  }}
+                  disabled={(date) => {
+                    // Disable dates before today
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    if (date < today) return true;
 
-                      // Clear error for this field
-                      if (errors.endDate) {
-                        setErrors(prev => ({ ...prev, endDate: '' }));
-                      }
-                    }}
-                    disabled={(date) => {
-                      // Disable dates before start date
-                      if (startDateObj && date < startDateObj) return true;
-                      return false;
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              {errors.endDate && (
-                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  {errors.endDate}
-                </p>
-              )}
-            </div>
-          )}
+                    // Disable dates before start date
+                    if (startDateObj && date < startDateObj) return true;
+                    return false;
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            {errors.endDate && (
+              <p className="mt-1 text-[12px] text-[#cd2818] flex items-center gap-1 font-['Inter']">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {errors.endDate}
+              </p>
+            )}
+          </div>
 
           {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start gap-2">
               <Target className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-blue-800">
@@ -442,12 +369,12 @@ export const SprintModal: React.FC<SprintModalProps> = ({
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Error Message */}
           {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800 flex items-center gap-2">
+            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[8px] p-[16px]">
+              <p className="text-[14px] text-[#991b1b] flex items-center gap-2 font-['Inter']">
                 <AlertCircle className="w-5 h-5" />
                 {errors.submit}
               </p>

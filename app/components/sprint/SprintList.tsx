@@ -29,6 +29,7 @@ interface SprintListProps {
   onCreateSprint: () => void;
   onEditSprint: (sprint: Sprint) => void;
   onDeleteSprint: (sprintId: string) => void;
+  onStartSprint: (sprintId: string) => void;
   onCompleteSprint: (sprintId: string) => void;
   onViewSprintDetails: (sprintId: string) => void;
 }
@@ -38,6 +39,7 @@ export const SprintList: React.FC<SprintListProps> = ({
   onCreateSprint,
   onEditSprint,
   onDeleteSprint,
+  onStartSprint,
   onCompleteSprint,
   onViewSprintDetails
 }) => {
@@ -271,6 +273,18 @@ export const SprintList: React.FC<SprintListProps> = ({
                   >
                     Edit
                   </button>
+
+                  {sprint.status === 'Planning' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartSprint(sprint._id);
+                      }}
+                      className="flex-1 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    >
+                      Start
+                    </button>
+                  )}
 
                   {sprint.status === 'Active' && (
                     <button
