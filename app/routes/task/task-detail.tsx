@@ -2753,12 +2753,21 @@ const TaskDetail = () => {
                   ) : (
                     <div className="space-y-2">
                       {subtasks.map((st) => (
-                        <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
+                        <div 
+                          key={st._id} 
+                          className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-blue-300 hover:shadow-sm transition-all duration-150 group"
+                          onClick={() => navigate(`/task/${st._id}`)}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700">{st.title}</p>
                             <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
                           </div>
-                          <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
+                            <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
                         </div>
                       ))}
                     </div>
