@@ -18,12 +18,26 @@ function AnalyticsContent() {
 
   const isAdmin = selectedRole === 'admin' || selectedRole === 'super_admin';
 
+  // Determine workspace role for restricted access
+  const currentWorkspaceId = typeof user?.currentWorkspace === 'string'
+    ? user.currentWorkspace
+    : user?.currentWorkspace?._id;
+
+  const workspaceRole = user?.workspaces?.find((w: any) =>
+    w?.workspaceId?._id === currentWorkspaceId || w?.workspaceId === currentWorkspaceId
+  )?.role || 'member';
+
+  const isWorkspaceLead = workspaceRole === 'lead';
+  const isWorkspaceOwner = workspaceRole === 'owner';
+  const hasRestrictedAccess = isAdmin || isWorkspaceLead || isWorkspaceOwner;
+
   // Determine active tab based on current route
   const getActiveTab = () => {
     const path = location.pathname;
-    if (!isAdmin) return "personal";
+    if (!isAdmin && !hasRestrictedAccess) return "personal";
     if (path.includes("/analytics/workspace")) return "workspace";
     if (path.includes("/analytics/leaderboard")) return "leaderboard";
+    if (path.includes("/analytics/restricted")) return "restricted";
     if (path.includes("/analytics/personal")) return "personal";
     return "performance";
   };
@@ -38,15 +52,28 @@ function AnalyticsContent() {
   useEffect(() => {
     if (!isAdmin) {
       const path = location.pathname;
+      
+      // Allow access to restricted analytics if user has permission
+      if (path.includes('/analytics/restricted') && hasRestrictedAccess) {
+        return;
+      }
+
       if (!path.includes('/analytics/personal')) {
         navigate('/analytics/personal', { replace: true });
       }
     }
-  }, [isAdmin, location.pathname, navigate]);
+  }, [isAdmin, hasRestrictedAccess, location.pathname, navigate]);
 
   // Handle tab navigation
   const handleTabChange = (tab: string) => {
-    if (!isAdmin && tab !== 'personal') {
+    // Check if user has access to restricted tab
+    if (tab === 'restricted' && !hasRestrictedAccess) {
+      setActiveTab('personal');
+      navigate('/analytics/personal', { replace: true });
+      return;
+    }
+
+    if (!isAdmin && tab !== 'personal' && tab !== 'restricted') {
       setActiveTab('personal');
       navigate('/analytics/personal', { replace: true });
       return;
@@ -58,6 +85,8 @@ function AnalyticsContent() {
       navigate("/analytics/workspace");
     } else if (tab === "leaderboard") {
       navigate("/analytics/leaderboard");
+    } else if (tab === "restricted") {
+      navigate("/analytics/restricted");
     } else if (tab === "personal") {
       navigate("/analytics/personal");
     }
@@ -84,6 +113,7 @@ function AnalyticsContent() {
   const showPerformanceTab = isAdmin;
   const showWorkspaceTab = isAdmin;
   const showLeaderboardTab = isAdmin;
+  const showRestrictedTab = hasRestrictedAccess; // Leads and admins can see restricted
   const showPersonalTab = true; // All roles can see personal
 
   return (
@@ -158,6 +188,22 @@ function AnalyticsContent() {
                     }`}
                 >
                   Personal
+                </button>
+              )}
+
+              {/* Restricted Tab - Only for Leads & Admins */}
+              {showRestrictedTab && (
+                <button
+                  onClick={() => handleTabChange("restricted")}
+                  className={`px-[10px] py-[10px] rounded-tl-[10px] rounded-tr-[10px] text-[14px] font-['Inter'] font-normal text-[#000d2a] leading-normal transition-all whitespace-nowrap flex items-center gap-1 ${activeTab === "restricted"
+                    ? "border-b-[1px] border-[#f2761b] opacity-100"
+                    : "opacity-60 hover:opacity-100"
+                    }`}
+                >
+                  Team Report
+                  {/* <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg> */}
                 </button>
               )}
             </div>
