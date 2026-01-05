@@ -161,10 +161,8 @@ export default function Calendar() {
           viewMode
         });
         
-        // Use different endpoint based on role
-        const endpoint = isAdmin 
-          ? `/task/calendar/${selectedWorkspace}` 
-          : `/task/calendar/user/${selectedWorkspace}`;
+        // Unified endpoint for all users (backend handles hierarchy)
+        const endpoint = `/task/calendar/${selectedWorkspace}`;
           
         const response = await axios.get(endpoint, {
           params: {
