@@ -25,7 +25,7 @@ interface Task {
   startDate?: string;
   project: {
     _id: string;
-    name: string;
+    title: string;
   };
   assignee?: {
     _id: string;
@@ -427,7 +427,7 @@ export default function Calendar() {
                               {task.title}
                             </h3>
                             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                              <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.name || 'No Project'}</span>
+                              <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.title || 'No Project'}</span>
                               <span>•</span>
                               <span className="capitalize">{task.status.replace('-', ' ')}</span>
                             </div>
@@ -527,7 +527,7 @@ export default function Calendar() {
                                   className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
                                     statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'
                                   } text-white font-medium cursor-pointer hover:opacity-80`}
-                                  title={`${task.title} - ${task.project?.name || 'No Project'}`}
+                                  title={`${task.title} - ${task.project?.title || 'No Project'}`}
                                   onClick={() => setSelectedTask(task)}
                                 >
                                   {multiDayIndicator && (
@@ -627,7 +627,7 @@ export default function Calendar() {
                     {selectedTask?.title}
                   </DialogTitle>
                   <DialogDescription className="mt-1">
-                    {selectedTask?.project?.name || 'No Project'}
+                    {selectedTask?.project?.title || 'No Project'}
                   </DialogDescription>
                 </div>
                 {/* <button
