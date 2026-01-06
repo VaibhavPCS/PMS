@@ -75,6 +75,12 @@ const statusColors = {
     text: 'text-green-700'
   },
   'on-hold': {
+    bg: 'bg-gray-500',
+    border: 'border-gray-500',
+    ring: 'ring-gray-100',
+    text: 'text-gray-700'
+  },
+  'overdue': {
     bg: 'bg-red-500',
     border: 'border-red-500',
     ring: 'ring-red-100',
@@ -230,6 +236,9 @@ export default function Calendar() {
     const checkDate = new Date(date);
     checkDate.setHours(0, 0, 0, 0);
 
+    // Is today?
+    const isTodayDate = isToday(checkDate);
+
     const dayTasks = tasks.filter(task => {
       // Normalize start date
       const taskStartDate = task.startDate ? new Date(task.startDate) : new Date(task.dueDate);
@@ -240,7 +249,18 @@ export default function Calendar() {
       taskEndDate.setHours(23, 59, 59, 999);
       
       // Check if the check date falls within the task duration
-      return checkDate >= taskStartDate && checkDate <= taskEndDate;
+      const isInRange = checkDate >= taskStartDate && checkDate <= taskEndDate;
+      
+      // Check if task is overdue and active (should appear on today if not already shown)
+      const isOverdue = taskEndDate < new Date() && 
+                        task.status !== 'done';
+                        
+      // If today is the current view date, show overdue tasks
+      if (isTodayDate && isOverdue) {
+        return true;
+      }
+
+      return isInRange;
     });
     return dayTasks;
   };
@@ -413,57 +433,70 @@ export default function Calendar() {
               {viewMode === 'day' ? (
                 <div className="flex flex-col gap-3">
                   {getTasksForDay(currentDate).length > 0 ? (
-                    getTasksForDay(currentDate).map((task) => (
-                      <div 
-                        key={task._id}
-                        onClick={() => setSelectedTask(task)}
-                        className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-1 h-12 rounded-full ${statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'}`} />
-                          
-                          <div>
-                            <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-lg">
-                              {task.title}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                              <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.title || 'No Project'}</span>
-                              <span>•</span>
-                              <span className="capitalize">{task.status.replace('-', ' ')}</span>
+                    getTasksForDay(currentDate).map((task) => {
+                      // Check if task is overdue
+                      const taskEndDate = new Date(task.dueDate);
+                      taskEndDate.setHours(23, 59, 59, 999);
+                      const isOverdue = taskEndDate < new Date() && 
+                                        task.status !== 'done';
+                                        
+                      // Determine color key
+                      const colorKey = isOverdue ? 'overdue' : task.status;
+
+                      return (
+                        <div 
+                          key={task._id}
+                          onClick={() => setSelectedTask(task)}
+                          className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-1 h-12 rounded-full ${statusColors[colorKey as keyof typeof statusColors]?.bg || 'bg-gray-500'}`} />
+                            
+                            <div>
+                              <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors text-lg">
+                                {task.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                                <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.title || 'No Project'}</span>
+                                <span>•</span>
+                                <span className={`capitalize ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                  {isOverdue ? 'Overdue' : task.status.replace('-', ' ')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+  
+                          <div className="flex items-center gap-8">
+                            {/* Assignee */}
+                            {task.assignee && (
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                                  {task.assignee.name ? task.assignee.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '??'}
+                                </div>
+                                <div className="hidden md:block text-gray-700">
+                                  <div className="font-medium text-xs text-gray-500">Assigned to</div>
+                                  <div className="text-sm font-medium">{task.assignee.name}</div>
+                                </div>
+                              </div>
+                            )}
+  
+                            {/* Priority & Due Date */}
+                            <div className="text-right min-w-[100px]">
+                              <Badge variant="outline" className={`mb-1 ${
+                                task.priority === 'urgent' ? 'text-red-600 border-red-200 bg-red-50' :
+                                task.priority === 'high' ? 'text-orange-600 border-orange-200 bg-orange-50' :
+                                'text-gray-600'
+                              }`}>
+                                {task.priority.toUpperCase()}
+                              </Badge>
+                              <div className={`text-xs font-medium mt-1 ${isOverdue ? 'text-red-600' : 'text-gray-500'}`}>
+                                Due: {format(new Date(task.dueDate), 'MMM dd')}
+                              </div>
                             </div>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-8">
-                          {/* Assignee */}
-                          {task.assignee && (
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
-                                {task.assignee.name ? task.assignee.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '??'}
-                              </div>
-                              <div className="hidden md:block text-gray-700">
-                                <div className="font-medium text-xs text-gray-500">Assigned to</div>
-                                <div className="text-sm font-medium">{task.assignee.name}</div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Priority & Due Date */}
-                          <div className="text-right min-w-[100px]">
-                            <Badge variant="outline" className={`mb-1 ${
-                              task.priority === 'urgent' ? 'text-red-600 border-red-200 bg-red-50' :
-                              task.priority === 'high' ? 'text-orange-600 border-orange-200 bg-orange-50' :
-                              'text-gray-600'
-                            }`}>
-                              {task.priority.toUpperCase()}
-                            </Badge>
-                            <div className="text-xs text-gray-500 font-medium mt-1">
-                              Due: {format(new Date(task.dueDate), 'MMM dd')}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
                       <div className="bg-gray-100 p-4 rounded-full mb-4">
@@ -520,14 +553,23 @@ export default function Calendar() {
                               const multiDayIndicator = isMultiDayTask(task)
                                 ? getMultiDayIndicator(task, day)
                                 : null;
+                                
+                              // Check if task is overdue
+                              const taskEndDate = new Date(task.dueDate);
+                              taskEndDate.setHours(23, 59, 59, 999);
+                              const isOverdue = taskEndDate < new Date() && 
+                                                task.status !== 'done';
+                                                
+                              // Determine color key
+                              const colorKey = isOverdue ? 'overdue' : task.status;
 
                               return (
                                 <div
                                   key={task._id}
                                   className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
-                                    statusColors[task.status as keyof typeof statusColors]?.bg || 'bg-gray-500'
+                                    statusColors[colorKey as keyof typeof statusColors]?.bg || 'bg-gray-500'
                                   } text-white font-medium cursor-pointer hover:opacity-80`}
-                                  title={`${task.title} - ${task.project?.title || 'No Project'}`}
+                                  title={`${task.title} - ${task.project?.title || 'No Project'}${isOverdue ? ' (Overdue)' : ''}`}
                                   onClick={() => setSelectedTask(task)}
                                 >
                                   {multiDayIndicator && (
