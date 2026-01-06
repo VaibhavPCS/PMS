@@ -148,34 +148,42 @@ const NotificationCenter = () => {
   };
 
   // Generate href for notification navigation
-   const getNotificationHref = (notification: Notification): string => {
-     const { data, relatedTask, type } = notification;
-     
-     // Handle comment notifications that use relatedTask field
-     if (type === 'task_comment' && relatedTask) {
-       return `/task/${relatedTask}`;
-     }
-     
-     // Handle cases where data might be undefined or null
-     if (!data) {
-       return '/dashboard';
-     }
-     
-     // Decide the most specific target route first
-     if (data?.taskId) {
-       return `/task/${data.taskId}`;
-     } else if (data?.projectId) {
-       return `/project/${data.projectId}`;
-     } else if (data?.workspaceId) {
-       return `/workspace`;
-     } else if (data?.meetingId) {
-       return `/meetings`;
-     } else if (data?.inviteId) {
-       return `/workspace`;
-     }
-     
-     return '/dashboard';
-   };
+  const getNotificationHref = (notification: Notification): string => {
+    const { data, relatedTask, type } = notification;
+
+    // Handle comment notifications that use relatedTask field
+    if (type === 'task_comment') {
+      if (relatedTask) {
+        // Check if relatedTask is an object (populated) or string
+        const relatedTaskId = typeof relatedTask === 'object' ? (relatedTask as any)._id : relatedTask;
+        return `/task/${relatedTaskId}`;
+      }
+      // Fallback to data.taskId if relatedTask is missing but data exists
+      if (data?.taskId) {
+        return `/task/${data.taskId}`;
+      }
+    }
+
+    // Handle cases where data might be undefined or null
+    if (!data) {
+      return '/dashboard';
+    }
+
+    // Decide the most specific target route first
+    if (data?.taskId) {
+      return `/task/${data.taskId}`;
+    } else if (data?.projectId) {
+      return `/project/${data.projectId}`;
+    } else if (data?.workspaceId) {
+      return `/workspace`;
+    } else if (data?.meetingId) {
+      return `/meetings`;
+    } else if (data?.inviteId) {
+      return `/workspace`;
+    }
+
+    return '/dashboard';
+  };
 
   // Enhanced navigation function for notifications with existence checks
   const handleNotificationClick = async (notification: Notification) => {

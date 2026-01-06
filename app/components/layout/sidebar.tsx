@@ -281,8 +281,16 @@ const Sidebar = () => {
     const { data, relatedTask, type } = notification;
 
     // Handle comment notifications that use relatedTask field
-    if (type === 'task_comment' && relatedTask) {
-      return `/task/${relatedTask}`;
+    if (type === 'task_comment') {
+      if (relatedTask) {
+        // Check if relatedTask is an object (populated) or string
+        const relatedTaskId = typeof relatedTask === 'object' ? (relatedTask as any)._id : relatedTask;
+        return `/task/${relatedTaskId}`;
+      }
+      // Fallback to data.taskId if relatedTask is missing but data exists
+      if (data?.taskId) {
+        return `/task/${data.taskId}`;
+      }
     }
 
     // Handle cases where data might be undefined or null

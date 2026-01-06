@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/provider/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, ChevronDown, EyeOff, Calendar as CalendarIcon, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, EyeOff, Calendar as CalendarIcon, X, ExternalLink } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays, differenceInDays } from 'date-fns';
 import axios from '@/lib/axios';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ interface Task {
   createdAt?: string;
   completedAt?: string;
   startedAt?: string;
+  isActive?: boolean;
 }
 
 interface Workspace {
@@ -254,9 +255,12 @@ export default function Calendar() {
       // Check if task is overdue and active (should appear on today if not already shown)
       const isOverdue = taskEndDate < new Date() && 
                         task.status !== 'done';
+
+      // Check if task is overdue but on-hold (should also appear)
+      const isOverdueOnHold = isOverdue && task.status === 'on-hold';
                         
-      // If today is the current view date, show overdue tasks
-      if (isTodayDate && isOverdue) {
+      // If today is the current view date, show overdue tasks (both regular overdue and overdue on-hold)
+      if (isTodayDate && (isOverdue || isOverdueOnHold)) {
         return true;
       }
 
@@ -440,8 +444,11 @@ export default function Calendar() {
                       const isOverdue = taskEndDate < new Date() && 
                                         task.status !== 'done';
                                         
-                      // Determine color key
-                      const colorKey = isOverdue ? 'overdue' : task.status;
+                      // Check if overdue but on-hold
+                      const isOverdueOnHold = isOverdue && task.status === 'on-hold';
+                                        
+                      // Determine color key: if on-hold (even if overdue), use 'on-hold' color; else if overdue, use 'overdue'
+                      const colorKey = isOverdueOnHold ? 'on-hold' : (isOverdue ? 'overdue' : task.status);
 
                       return (
                         <div 
@@ -459,8 +466,12 @@ export default function Calendar() {
                               <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
                                 <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.title || 'No Project'}</span>
                                 <span>•</span>
-                                <span className={`capitalize ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                                  {isOverdue ? 'Overdue' : task.status.replace('-', ' ')}
+                                <span className={`capitalize ${isOverdueOnHold ? 'text-gray-600 font-medium' : (isOverdue ? 'text-red-600 font-medium' : '')}`}>
+                                  {isOverdueOnHold ? (
+                                    <span className="flex items-center gap-1">
+                                      On Hold <span className="text-red-500 text-[10px] bg-red-50 px-1 rounded border border-red-100 ml-1">Overdue</span>
+                                    </span>
+                                  ) : (isOverdue ? 'Overdue' : task.status.replace('-', ' '))}
                                 </span>
                               </div>
                             </div>
@@ -559,9 +570,12 @@ export default function Calendar() {
                               taskEndDate.setHours(23, 59, 59, 999);
                               const isOverdue = taskEndDate < new Date() && 
                                                 task.status !== 'done';
+                              
+                              // Check if overdue but on-hold
+                              const isOverdueOnHold = isOverdue && task.status === 'on-hold';
                                                 
-                              // Determine color key
-                              const colorKey = isOverdue ? 'overdue' : task.status;
+                              // Determine color key: if on-hold (even if overdue), use 'on-hold' color; else if overdue, use 'overdue'
+                              const colorKey = isOverdueOnHold ? 'on-hold' : (isOverdue ? 'overdue' : task.status);
 
                               return (
                                 <div
@@ -692,6 +706,17 @@ export default function Calendar() {
                   >
                     {selectedTask.status.replace('-', ' ').toUpperCase()}
                   </Badge>
+                  
+                  {/* Open in New Tab Link */}
+                  <a 
+                    href={`/task/${selectedTask._id}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="ml-2 p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all"
+                    title="Open task in new tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 </div>
 
                 {/* Description */}

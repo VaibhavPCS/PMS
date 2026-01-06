@@ -2742,7 +2742,11 @@ const TaskDetail = () => {
                   ) : (
                     <div className="space-y-2">
                       {subtasks.map((st) => (
-                        <div key={st._id} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg">
+                        <div 
+                          key={st._id} 
+                          className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => navigate(`/task/${st._id}`)}
+                        >
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
                             <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
