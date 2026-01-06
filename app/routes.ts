@@ -36,6 +36,7 @@ export default [
     route("administration/project-management/employee-performance", "routes/administration/project-management/employee-performance.tsx"),
     route("administration/project-management/task-lifecycle", "routes/administration/project-management/task-lifecycle.tsx"),
     route("administration/project-management/workspace-report", "routes/administration/project-management/workspace-report.tsx"),
+    route("administration/project-management/report-screen", "routes/administration/project-management/report-screen.tsx"),
     route("administration/calendar", "routes/administration/calendar.tsx"),
     route("excel-upload", "routes/excel-upload/excel-upload.tsx"),
     

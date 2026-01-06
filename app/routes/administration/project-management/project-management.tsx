@@ -67,6 +67,15 @@ const ProjectManagement = () => {
               </div>
             </div>
           </Link>
+
+          <Link to="/administration/project-management/report-screen" className="block bg-white rounded-[8px] border border-[#e6e8ec] p-4 hover:shadow-sm transition-shadow">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-[16px] font-semibold text-[#111827] mb-1">Project Live Report</h2>
+                <p className="text-[#717182] text-[13px]">Real-time project insights with status breakdown, member performance, and cascading filters.</p>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
     </div>
