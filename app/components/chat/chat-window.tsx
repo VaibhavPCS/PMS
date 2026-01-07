@@ -555,7 +555,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
               id="chat-attach"
               ref={fileInputRef}
               multiple
-              accept="image/*,.pdf,.docx,.doc,.xlsx,.xls,.txt,.apk"
+              accept="image/*,.pdf,.docx,.doc,.xlsx,.xls,.txt,.apk,.aab,.ipa"
               className="hidden"
               type="file"
               onChange={handleFileChange}
@@ -605,7 +605,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         multiple
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt,.apk"
+        accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt,.apk,.aab,.ipa"
       />
     </div>
   );
