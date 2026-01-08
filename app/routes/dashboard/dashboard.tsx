@@ -4,6 +4,7 @@ import { Navigate, useNavigate } from "react-router";
 import { fetchData, postData } from "@/lib/fetch-util";
 import { buildApiUrl } from "@/lib/config";
 import { formatDateDDMMYYYY, calculateDaysBetween } from "@/lib/date-utils";
+import { format } from "date-fns";
 import {
   Calendar,
   Clock,
@@ -20,6 +21,9 @@ import {
   Pencil,
   Trash2,
   ArrowUpDown,
+  Upload,
+  File as FileIcon,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +44,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -66,6 +72,15 @@ const limitWords = (text: string, maxWords: number) => {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) return text;
   return words.slice(0, maxWords).join(" ") + "...";
+};
+
+// Helper to format date for display
+const formatDate = (date: string) => {
+  const d = new Date(date);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 // ==================== INTERFACES ====================
@@ -177,6 +192,20 @@ const Dashboard = () => {
   const [approvalTasksLoading, setApprovalTasksLoading] = useState(false);
   const [approvalSearchQuery, setApprovalSearchQuery] = useState("");
   const [approvalProjectFilter, setApprovalProjectFilter] = useState("all");
+  // Loading states for individual task actions
+  const [approvingTaskId, setApprovingTaskId] = useState<string | null>(null);
+  const [rejectingTaskId, setRejectingTaskId] = useState<string | null>(null);
+
+  // Rejection modal states (copied from task-detail)
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionFiles, setRejectionFiles] = useState<File[]>([]);
+  const [rejectionLink, setRejectionLink] = useState("");
+  const [rejectDueDate, setRejectDueDate] = useState("");
+  const [rejectReassigneeId, setRejectReassigneeId] = useState("");
+
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [taskToReject, setTaskToReject] = useState<Task | null>(null);
 
   // Height synchronization refs
   const projectsTableRef = useRef<HTMLDivElement>(null);
@@ -744,6 +773,7 @@ const Dashboard = () => {
 
   // Handle task approval
   const handleApproveTask = async (taskId: string) => {
+    setApprovingTaskId(taskId);
     try {
       const response = await fetch(buildApiUrl(`/task/${taskId}/approve`), {
         method: "POST",
@@ -765,21 +795,81 @@ const Dashboard = () => {
     } catch (error: any) {
       console.error("Failed to approve task:", error);
       toast.error(error.message || "Failed to approve task");
+    } finally {
+      setApprovingTaskId(null);
     }
   };
 
-  // Handle task rejection
-  const handleRejectTask = async (taskId: string, reason?: string) => {
+  // Open rejection modal
+  const openRejectModal = (task: Task) => {
+    setTaskToReject(task);
+    setRejectionReason("");
+    setRejectionFiles([]);
+    setRejectionLink("");
+    setRejectDueDate("");
+    setRejectReassigneeId("");
+    setShowRejectDialog(true);
+  };
+
+  // Handle task rejection from modal
+  const handleRejectTask = async () => {
+    if (!taskToReject || !rejectionReason.trim() || !rejectDueDate) {
+      toast.error("Please provide a rejection reason and new due date");
+      return;
+    }
+
+    setIsRejecting(true);
     try {
-      const response = await fetch(buildApiUrl(`/task/${taskId}/reject`), {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-        },
-        body: JSON.stringify({ reason }),
-      });
+      const hasFile = rejectionFiles.length > 0;
+      const hasLink = rejectionLink.trim();
+
+      // Validate link if provided
+      if (hasLink) {
+        const figmaPattern = /^https?:\/\/(www\.)?figma\.com\//i;
+        const githubPattern = /^https?:\/\/(www\.)?github\.com\//i;
+        if (!figmaPattern.test(rejectionLink) && !githubPattern.test(rejectionLink)) {
+          toast.error("Only Figma and GitHub links are allowed");
+          return;
+        }
+      }
+
+      let response;
+      if (hasFile) {
+        // Use FormData for file upload
+        const formData = new FormData();
+        formData.append("reason", rejectionReason.trim());
+        formData.append("newDueDate", rejectDueDate);
+        if (rejectReassigneeId) formData.append("reassigneeId", rejectReassigneeId);
+        if (hasLink) formData.append("rejectionLink", rejectionLink.trim());
+        rejectionFiles.forEach((file) => {
+          formData.append("rejectionFiles", file);
+        });
+
+        response = await fetch(buildApiUrl(`/task/${taskToReject._id}/reject`), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+          body: formData,
+        });
+      } else {
+        // Use JSON for non-file requests
+        response = await fetch(buildApiUrl(`/task/${taskToReject._id}/reject`), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+          },
+          body: JSON.stringify({
+            reason: rejectionReason.trim(),
+            newDueDate: rejectDueDate,
+            reassigneeId: rejectReassigneeId || undefined,
+            rejectionLink: hasLink ? rejectionLink.trim() : undefined,
+          }),
+        });
+      }
 
       if (!response.ok) {
         const error = await response.json();
@@ -787,11 +877,14 @@ const Dashboard = () => {
       }
 
       toast.success("Task rejected successfully");
+      setShowRejectDialog(false);
       fetchApprovalTasks(); // Refresh approval tasks
       fetchApprovalStats(); // Refresh approval stats
     } catch (error: any) {
       console.error("Failed to reject task:", error);
       toast.error(error.message || "Failed to reject task");
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -1825,20 +1918,32 @@ const Dashboard = () => {
                                       e.stopPropagation();
                                       handleApproveTask(task._id);
                                     }}
-                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs h-auto"
+                                    disabled={!!approvingTaskId || !!rejectingTaskId}
+                                    className={cn(
+                                      "px-3 py-1 text-xs h-auto",
+                                      approvingTaskId === task._id
+                                        ? "bg-green-300 text-green-800 cursor-not-allowed"
+                                        : "bg-green-600 hover:bg-green-700 text-white"
+                                    )}
                                   >
-                                    Approve
+                                    {approvingTaskId === task._id ? "Approving..." : "Approve"}
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="destructive"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleRejectTask(task._id);
+                                      openRejectModal(task);
                                     }}
-                                    className="px-3 py-1 text-xs h-auto"
+                                    disabled={!!approvingTaskId || !!rejectingTaskId}
+                                    className={cn(
+                                      "px-3 py-1 text-xs h-auto",
+                                      rejectingTaskId === task._id
+                                        ? "bg-red-300 text-red-800 cursor-not-allowed"
+                                        : ""
+                                    )}
                                   >
-                                    Reject
+                                    {rejectingTaskId === task._id ? "Rejecting..." : "Reject"}
                                   </Button>
                                 </div>
                               </td>
@@ -1987,8 +2092,159 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reject Task Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className="sm:max-w-[500px] p-0 gap-0 rounded-[16px] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="px-6 py-4 border-b border-gray-200">
+            <DialogTitle className="text-lg font-semibold">Reject Task</DialogTitle>
+            <DialogDescription className="text-sm text-gray-600">
+              Provide a reason and new due date for rejecting this task.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="rejection-reason">Rejection Reason *</Label>
+                <Textarea
+                  id="rejection-reason"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Explain why this task is being rejected..."
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label>New Due Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={`w-full h-[44px] border-[#d5d7da] rounded-[8px] px-[14px] py-[8px] text-[14px] font-['Inter'] justify-start text-left font-normal ${!rejectDueDate && "text-[#717680]"}`}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {rejectDueDate ? formatDate(rejectDueDate) : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={rejectDueDate ? new Date(rejectDueDate) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          setRejectDueDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date: Date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateToCheck = new Date(date);
+                        dateToCheck.setHours(0, 0, 0, 0);
+                        const taskStart = taskToReject?.startDate ? new Date(taskToReject.startDate) : null;
+                        if (taskStart) taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = taskToReject?.dueDate ? new Date(taskToReject.dueDate) : null;
+                        if (taskDue) taskDue.setHours(0, 0, 0, 0);
+
+                        // Disable past dates (but allow today)
+                        if (dateToCheck < today) return true;
+
+                        // Disable dates outside parent task range
+                        if (taskStart && dateToCheck < taskStart) return true;
+                        if (taskDue && dateToCheck > taskDue) return true;
+
+                        return false;
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="reassignee">Reassign To (Optional)</Label>
+                <Input
+                  id="reassignee"
+                  type="text"
+                  value={rejectReassigneeId}
+                  onChange={(e) => setRejectReassigneeId(e.target.value)}
+                  placeholder="Enter user ID for reassignment"
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="rejection-link">Reference Link (Optional)</Label>
+                <Input
+                  id="rejection-link"
+                  type="url"
+                  value={rejectionLink}
+                  onChange={(e) => setRejectionLink(e.target.value)}
+                  placeholder="https://github.com/... or https://figma.com/..."
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500">Only GitHub and Figma links are allowed</p>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label>Attachment Files (Optional)</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                  <Input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                    onChange={(e) => setRejectionFiles(Array.from(e.target.files || []))}
+                    className="hidden"
+                    id="rejection-files"
+                  />
+                  <Label htmlFor="rejection-files" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-8 w-8 text-gray-400" />
+                      <span className="text-sm text-gray-600">Click to upload files</span>
+                      <span className="text-xs text-gray-500">PDF, DOC, DOCX, TXT, JPG, JPEG, PNG, GIF</span>
+                    </div>
+                  </Label>
+                </div>
+                {rejectionFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {rejectionFiles.map((file, index) => (
+                      <div key={index} className="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                        <FileIcon className="h-4 w-4" />
+                        <span className="flex-1 truncate">{file.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRejectionFiles(rejectionFiles.filter((_, i) => i !== index))}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="px-6 py-4 border-t border-gray-200 flex gap-2">
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={isRejecting}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRejectTask} 
+              disabled={isRejecting || !rejectionReason.trim() || !rejectDueDate}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isRejecting ? "Rejecting..." : "Reject Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
-};
+}
 
 export default Dashboard;
