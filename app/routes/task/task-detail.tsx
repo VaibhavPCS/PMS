@@ -835,6 +835,8 @@ const TaskDetail = () => {
   const [reassignProjectEnd, setReassignProjectEnd] = useState<Date | null>(null);
   const [subtasks, setSubtasks] = useState<any[]>([]);
   const [showCreateSubtask, setShowCreateSubtask] = useState(false);
+  const [showEditSubtask, setShowEditSubtask] = useState(false);
+  const [editingSubtask, setEditingSubtask] = useState<any | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [subtaskDescription, setSubtaskDescription] = useState("");
   const [subtaskAssigneeId, setSubtaskAssigneeId] = useState("");
@@ -844,6 +846,15 @@ const TaskDetail = () => {
   const [subtaskProjectStart, setSubtaskProjectStart] = useState<Date | null>(null);
   const [subtaskProjectEnd, setSubtaskProjectEnd] = useState<Date | null>(null);
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false); // ✅ NEW: Loading state for subtask creation
+  const [isUpdatingSubtask, setIsUpdatingSubtask] = useState(false);
+  const [editSubtaskTitle, setEditSubtaskTitle] = useState("");
+  const [editSubtaskDescription, setEditSubtaskDescription] = useState("");
+  const [editSubtaskAssigneeId, setEditSubtaskAssigneeId] = useState("");
+  const [editSubtaskPriority, setEditSubtaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
+  const [editSubtaskStartDate, setEditSubtaskStartDate] = useState("");
+  const [editSubtaskEndDate, setEditSubtaskEndDate] = useState("");
+  const [editSubtaskProjectStart, setEditSubtaskProjectStart] = useState<Date | null>(null);
+  const [editSubtaskProjectEnd, setEditSubtaskProjectEnd] = useState<Date | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false); // ✅ NEW: Loading state for status changes
   const [handoverEditor, setHandoverEditor] = useState<any | null>(null);
   const [isBoldActive, setIsBoldActive] = useState(false);
@@ -2751,7 +2762,32 @@ const TaskDetail = () => {
                             <p className="text-sm font-medium text-gray-900 truncate">{st.title}</p>
                             <p className="text-xs text-gray-500 capitalize">{st.status?.replace('-', ' ')}</p>
                           </div>
-                          <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 capitalize">{st.priority}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingSubtask(st);
+                                setEditSubtaskTitle(st.title || "");
+                                setEditSubtaskDescription(st.description || "");
+                                const assigneeId = st.assignee?._id || st.assignee || "";
+                                setEditSubtaskAssigneeId(assigneeId);
+                                setEditSubtaskPriority((st.priority as "low" | "medium" | "high" | "urgent") || "medium");
+                                const start = st.startDate ? new Date(st.startDate) : null;
+                                const end = st.dueDate ? new Date(st.dueDate) : null;
+                                setEditSubtaskProjectStart(start);
+                                setEditSubtaskProjectEnd(end);
+                                setEditSubtaskStartDate(start ? start.toISOString() : "");
+                                setEditSubtaskEndDate(end ? end.toISOString() : "");
+                                setShowEditSubtask(true);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -3115,6 +3151,303 @@ const TaskDetail = () => {
               className="w-full sm:w-auto bg-[#007aff] hover:bg-[#0066cc] text-white h-10 font-semibold"
             >
               {isCreatingSubtask ? "Creating..." : "Create Subtask"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showEditSubtask}
+        onOpenChange={(open) => {
+          setShowEditSubtask(open);
+          if (!open) {
+            setEditingSubtask(null);
+            setEditSubtaskTitle("");
+            setEditSubtaskDescription("");
+            setEditSubtaskAssigneeId("");
+            setEditSubtaskPriority("medium");
+            setEditSubtaskStartDate("");
+            setEditSubtaskEndDate("");
+            setEditSubtaskProjectStart(null);
+            setEditSubtaskProjectEnd(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl font-bold">Edit Subtask</DialogTitle>
+            <DialogDescription className="text-sm text-gray-600">
+              Update the subtask under "<span className="font-medium">{task.title}</span>"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={editSubtaskTitle}
+                onChange={(e) => setEditSubtaskTitle(e.target.value)}
+                placeholder="Enter subtask title"
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-700 mb-2 block">Description</label>
+              <Textarea
+                value={editSubtaskDescription}
+                onChange={(e) => setEditSubtaskDescription(e.target.value)}
+                placeholder="Enter subtask description"
+                className="min-h-[100px] resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Assignee <span className="text-red-500">*</span>
+                </label>
+                <Select value={editSubtaskAssigneeId} onValueChange={setEditSubtaskAssigneeId}>
+                  <SelectTrigger className="h-10 bg-white">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableMembers
+                      .filter((m) => m.role === "member" || m.role === "trainee")
+                      .map((m) => (
+                        <SelectItem key={m._id} value={m._id}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Priority <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={editSubtaskPriority}
+                  onValueChange={(val) =>
+                    setEditSubtaskPriority(val as "low" | "medium" | "high" | "urgent")
+                  }
+                >
+                  <SelectTrigger className="h-10 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Start Date <span className="text-red-500">*</span>
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 justify-start text-left font-normal bg-white hover:bg-gray-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                      {editSubtaskProjectStart ? format(editSubtaskProjectStart, "PPP") : "Pick start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={editSubtaskProjectStart || undefined}
+                      onSelect={(date) => {
+                        setEditSubtaskProjectStart(date || null);
+                        if (date) {
+                          setEditSubtaskStartDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateToCheck = new Date(date);
+                        dateToCheck.setHours(0, 0, 0, 0);
+                        const taskStart = task.startDate ? new Date(task.startDate) : null;
+                        if (taskStart) taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = task.dueDate ? new Date(task.dueDate) : null;
+                        if (taskDue) taskDue.setHours(0, 0, 0, 0);
+
+                        if (dateToCheck < today) return true;
+                        if (taskStart && dateToCheck < taskStart) return true;
+                        if (taskDue && dateToCheck > taskDue) return true;
+
+                        return false;
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                  Due Date <span className="text-red-500">*</span>
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 justify-start text-left font-normal bg-white hover:bg-gray-50"
+                    >
+                      <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+                      {editSubtaskProjectEnd ? format(editSubtaskProjectEnd, "PPP") : "Pick due date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={editSubtaskProjectEnd || undefined}
+                      onSelect={(date) => {
+                        setEditSubtaskProjectEnd(date || null);
+                        if (date) {
+                          setEditSubtaskEndDate(date.toISOString());
+                        }
+                      }}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dateToCheck = new Date(date);
+                        dateToCheck.setHours(0, 0, 0, 0);
+                        const taskStart = task.startDate ? new Date(task.startDate) : null;
+                        if (taskStart) taskStart.setHours(0, 0, 0, 0);
+                        const taskDue = task.dueDate ? new Date(task.dueDate) : null;
+                        if (taskDue) taskDue.setHours(0, 0, 0, 0);
+                        const selectedStart = editSubtaskProjectStart ? new Date(editSubtaskProjectStart) : null;
+                        if (selectedStart) selectedStart.setHours(0, 0, 0, 0);
+
+                        if (dateToCheck < today) return true;
+                        if (selectedStart && dateToCheck < selectedStart) return true;
+                        if (taskStart && dateToCheck < taskStart) return true;
+                        if (taskDue && dateToCheck > taskDue) return true;
+
+                        return false;
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditSubtask(false);
+                setEditingSubtask(null);
+                setEditSubtaskTitle("");
+                setEditSubtaskDescription("");
+                setEditSubtaskAssigneeId("");
+                setEditSubtaskPriority("medium");
+                setEditSubtaskStartDate("");
+                setEditSubtaskEndDate("");
+                setEditSubtaskProjectStart(null);
+                setEditSubtaskProjectEnd(null);
+              }}
+              disabled={isUpdatingSubtask}
+              className="w-full sm:w-auto h-10 font-medium"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editingSubtask) return;
+                if (!editSubtaskTitle) {
+                  toast.error("Subtask title is required");
+                  return;
+                }
+
+                if (editSubtaskStartDate && editSubtaskEndDate) {
+                  const startDate = new Date(editSubtaskStartDate);
+                  startDate.setHours(0, 0, 0, 0);
+                  const endDate = new Date(editSubtaskEndDate);
+                  endDate.setHours(0, 0, 0, 0);
+
+                  if (startDate > endDate) {
+                    toast.error("End date must be after or equal to start date");
+                    return;
+                  }
+
+                  if (task) {
+                    const taskStartDate = new Date(task.startDate);
+                    taskStartDate.setHours(0, 0, 0, 0);
+                    const taskDueDate = new Date(task.dueDate);
+                    taskDueDate.setHours(0, 0, 0, 0);
+
+                    if (startDate < taskStartDate || endDate > taskDueDate) {
+                      toast.error(
+                        "Subtask dates must be within the parent task date range (including task start and end dates)"
+                      );
+                      return;
+                    }
+                  }
+                }
+
+                setIsUpdatingSubtask(true);
+                try {
+                  const res = await fetch(buildApiUrl(`/task/subtask/${editingSubtask._id}`), {
+                    method: "PUT",
+                    credentials: "include",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
+                    },
+                    body: JSON.stringify({
+                      title: editSubtaskTitle,
+                      description: editSubtaskDescription,
+                      assigneeId: editSubtaskAssigneeId || undefined,
+                      priority: editSubtaskPriority,
+                      startDate: editSubtaskStartDate || undefined,
+                      dueDate: editSubtaskEndDate || undefined,
+                    }),
+                  });
+
+                  if (res.ok) {
+                    toast.success("Subtask updated");
+                    setShowEditSubtask(false);
+                    setEditingSubtask(null);
+                    setEditSubtaskTitle("");
+                    setEditSubtaskDescription("");
+                    setEditSubtaskAssigneeId("");
+                    setEditSubtaskPriority("medium");
+                    setEditSubtaskStartDate("");
+                    setEditSubtaskEndDate("");
+                    setEditSubtaskProjectStart(null);
+                    setEditSubtaskProjectEnd(null);
+                    await fetchSubtasks();
+                  } else {
+                    const errorData = await res.json().catch(() => ({ message: "Unknown error" }));
+                    toast.error(errorData.message || "Failed to update subtask");
+                  }
+                } catch (e: any) {
+                  toast.error(e?.message || "Failed to update subtask");
+                } finally {
+                  setIsUpdatingSubtask(false);
+                }
+              }}
+              disabled={
+                isUpdatingSubtask ||
+                !editSubtaskTitle ||
+                !editSubtaskAssigneeId ||
+                !editSubtaskStartDate ||
+                !editSubtaskEndDate
+              }
+              className="w-full sm:w-auto bg-[#007aff] hover:bg-[#0066cc] text-white h-10 font-semibold"
+            >
+              {isUpdatingSubtask ? "Updating..." : "Update Subtask"}
             </Button>
           </div>
         </DialogContent>
