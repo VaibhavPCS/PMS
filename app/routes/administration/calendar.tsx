@@ -476,16 +476,16 @@ export default function Calendar() {
                                 <span className="font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-xs">{task.project?.title || 'No Project'}</span>
                                 <span>•</span>
                                 <span className={`capitalize ${isOverdueOnHold ? 'text-gray-600 font-medium' : (isOverdue ? 'text-red-600 font-medium' : '')}`}>
-                                  {isOverdueOnHold ? (
-                                    <span className="flex items-center gap-1">
-                                      On Hold <span className="text-red-500 text-[10px] bg-red-50 px-1 rounded border border-red-100 ml-1">Overdue</span>
-                                    </span>
-                                  ) : (isOverdue ? 'Overdue' : task.status.replace('-', ' '))}
-                                </span>
+                                {isOverdueOnHold ? (
+                                  <span className="flex items-center gap-1">
+                                    On Hold
+                                  </span>
+                                ) : (isOverdue ? 'Overdue' : task.status.replace('-', ' '))}
+                              </span>
                               </div>
                               
                               {/* Display hold reason and datetime for on-hold tasks */}
-                              {/* {task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 && (
+                              {task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 && (
                                 <div className="mt-2 text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
                                   <div className="font-medium text-yellow-800 mb-1">Hold Details:</div>
                                   <div className="space-y-1">
@@ -494,7 +494,7 @@ export default function Calendar() {
                                     <div><span className="font-medium">By:</span> {task.holdHistory[task.holdHistory.length - 1].putOnHoldBy.name}</div>
                                   </div>
                                 </div>
-                              )} */}
+                              )}
                             </div>
                           </div>
   
@@ -521,7 +521,7 @@ export default function Calendar() {
                               }`}>
                                 {task.priority.toUpperCase()}
                               </Badge>
-                              <div className={`text-xs font-medium mt-1 ${isOverdue ? 'text-red-600' : 'text-gray-500'}`}>
+                              <div className={`text-xs font-medium mt-1 ${isOverdue && !isOverdueOnHold ? 'text-red-600' : 'text-gray-500'}`}>
                                 Due: {format(new Date(task.dueDate), 'MMM dd')}
                               </div>
                             </div>
@@ -604,7 +604,7 @@ export default function Calendar() {
                                   className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
                                     statusColors[colorKey as keyof typeof statusColors]?.bg || 'bg-gray-500'
                                   } text-white font-medium cursor-pointer hover:opacity-80`}
-                                  title={`${task.title} - ${task.project?.title || 'No Project'}${isOverdue ? ' (Overdue)' : ''}${task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 ? ` (On Hold: ${task.holdHistory[task.holdHistory.length - 1].reason || 'No reason provided'} - ${new Date(task.holdHistory[task.holdHistory.length - 1].putOnHoldAt).toLocaleString()})` : ''}`}
+                                  title={`${task.title} - ${task.project?.title || 'No Project'}${isOverdue && !isOverdueOnHold ? ' (Overdue)' : ''}${task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 ? ` (On Hold: ${task.holdHistory[task.holdHistory.length - 1].reason || 'No reason provided'} - ${new Date(task.holdHistory[task.holdHistory.length - 1].putOnHoldAt).toLocaleString()})` : ''}`}
                                   onClick={() => setSelectedTask(task)}
                                 >
                                   {multiDayIndicator && (
