@@ -41,6 +41,15 @@ interface Task {
   completedAt?: string;
   startedAt?: string;
   isActive?: boolean;
+  holdHistory?: {
+    putOnHoldBy: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    putOnHoldAt: string;
+    reason?: string;
+  }[];
 }
 
 interface Workspace {
@@ -474,6 +483,18 @@ export default function Calendar() {
                                   ) : (isOverdue ? 'Overdue' : task.status.replace('-', ' '))}
                                 </span>
                               </div>
+                              
+                              {/* Display hold reason and datetime for on-hold tasks */}
+                              {/* {task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 && (
+                                <div className="mt-2 text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                                  <div className="font-medium text-yellow-800 mb-1">Hold Details:</div>
+                                  <div className="space-y-1">
+                                    <div><span className="font-medium">Reason:</span> {task.holdHistory[task.holdHistory.length - 1].reason || 'No reason provided'}</div>
+                                    <div><span className="font-medium">Date:</span> {new Date(task.holdHistory[task.holdHistory.length - 1].putOnHoldAt).toLocaleString()}</div>
+                                    <div><span className="font-medium">By:</span> {task.holdHistory[task.holdHistory.length - 1].putOnHoldBy.name}</div>
+                                  </div>
+                                </div>
+                              )} */}
                             </div>
                           </div>
   
@@ -583,7 +604,7 @@ export default function Calendar() {
                                   className={`text-[10px] px-1.5 py-0.5 rounded truncate ${
                                     statusColors[colorKey as keyof typeof statusColors]?.bg || 'bg-gray-500'
                                   } text-white font-medium cursor-pointer hover:opacity-80`}
-                                  title={`${task.title} - ${task.project?.title || 'No Project'}${isOverdue ? ' (Overdue)' : ''}`}
+                                  title={`${task.title} - ${task.project?.title || 'No Project'}${isOverdue ? ' (Overdue)' : ''}${task.status === 'on-hold' && task.holdHistory && task.holdHistory.length > 0 ? ` (On Hold: ${task.holdHistory[task.holdHistory.length - 1].reason || 'No reason provided'} - ${new Date(task.holdHistory[task.holdHistory.length - 1].putOnHoldAt).toLocaleString()})` : ''}`}
                                   onClick={() => setSelectedTask(task)}
                                 >
                                   {multiDayIndicator && (
@@ -718,6 +739,21 @@ export default function Calendar() {
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
+
+                {/* Hold Details - Red Banner for On-Hold Tasks */}
+                {selectedTask.status === 'on-hold' && selectedTask.holdHistory && selectedTask.holdHistory.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <h4 className="text-sm font-semibold text-red-800">Task Currently On Hold</h4>
+                    </div>
+                    <div className="space-y-1 text-sm text-red-700">
+                      <div><span className="font-medium">Reason:</span> {selectedTask.holdHistory[selectedTask.holdHistory.length - 1].reason || 'No reason provided'}</div>
+                      <div><span className="font-medium">Date:</span> {new Date(selectedTask.holdHistory[selectedTask.holdHistory.length - 1].putOnHoldAt).toLocaleString()}</div>
+                      <div><span className="font-medium">By:</span> {(selectedTask.holdHistory[selectedTask.holdHistory.length - 1].putOnHoldBy as any)?.name || 'Unknown'}</div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Description */}
                 {selectedTask.description && (

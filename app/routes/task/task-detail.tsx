@@ -1774,6 +1774,12 @@ const TaskDetail = () => {
   const handlePutOnHold = async () => {
     if (!task) return;
 
+    // Validate that reason is provided
+    if (!holdReason.trim()) {
+      toast.error("Please provide a reason for putting the task on hold");
+      return;
+    }
+
     try {
       setIsHolding(true);
       const response = await fetch(
@@ -1938,10 +1944,10 @@ const TaskDetail = () => {
   const isTLAssignedToParent = Boolean(meMemberEntry && (meMemberEntry.role === 'tl') && isAssignee);
   const canApprove = task?.status === "done" && task?.approvalStatus === "pending-approval" && isCreator;
 
-  // ✅ NEW: Hold/Resume permissions
+  // ✅ NEW: Hold/Resume permissions - assignee can put on hold, only reporting managers can resume
   const isTL = Boolean(meMemberEntry && (meMemberEntry.role === 'tl'));
   const canPutOnHold = (isAssignee || isProjectHead || isTL || isAdmin) && ['to-do', 'in-progress'].includes(task?.status || '');
-  const canResume = (isAssignee || isProjectHead || isTL || isAdmin) && task?.currentlyOnHold;
+  const canResume = (isProjectHead || isTL || isAdmin) && task?.currentlyOnHold;
 
   // ✅ NEW: Task locking logic - lock when done and awaiting approval or approved
   // Only unlock when rejected or reassigned
@@ -3544,13 +3550,13 @@ const TaskDetail = () => {
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg">Put Task on Hold</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Temporarily pause this task and provide a reason (optional)
+              Temporarily pause this task and provide a reason (required)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
             <div>
               <label className="text-sm font-medium mb-2 block">
-                Reason (Optional)
+                Reason <span className="text-red-500">*</span>
               </label>
               <Textarea
                 value={holdReason}
@@ -3575,7 +3581,7 @@ const TaskDetail = () => {
             </Button>
             <Button
               onClick={handlePutOnHold}
-              disabled={isHolding}
+              disabled={isHolding || !holdReason.trim()}
               className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white h-9 text-sm"
             >
               {isHolding ? "Putting on hold..." : "Put on Hold"}
