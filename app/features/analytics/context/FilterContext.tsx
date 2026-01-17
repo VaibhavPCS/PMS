@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { ReactNode } from 'react';
 
 interface FilterContextType {
@@ -31,7 +31,20 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     if (storedProjectName) setSelectedProjectNameState(storedProjectName);
   }, []);
 
-  const setSelectedWorkspace = (id: string | null, name: string | null) => {
+  const setSelectedProject = useCallback((id: string | null, name: string | null) => {
+    setSelectedProjectIdState(id);
+    setSelectedProjectNameState(name);
+    
+    if (id) {
+      sessionStorage.setItem('selectedAnalyticsProject', id);
+      if (name) sessionStorage.setItem('selectedAnalyticsProjectName', name);
+    } else {
+      sessionStorage.removeItem('selectedAnalyticsProject');
+      sessionStorage.removeItem('selectedAnalyticsProjectName');
+    }
+  }, []);
+
+  const setSelectedWorkspace = useCallback((id: string | null, name: string | null) => {
     setSelectedWorkspaceIdState(id);
     setSelectedWorkspaceNameState(name);
     
@@ -44,33 +57,30 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     }
     
     // ✅ Clear project when workspace changes
-    setSelectedProject(null, null);
-  };
+    setSelectedProjectIdState(null);
+    setSelectedProjectNameState(null);
+    sessionStorage.removeItem('selectedAnalyticsProject');
+    sessionStorage.removeItem('selectedAnalyticsProjectName');
+  }, []);
 
-  const setSelectedProject = (id: string | null, name: string | null) => {
-    setSelectedProjectIdState(id);
-    setSelectedProjectNameState(name);
-    
-    if (id) {
-      sessionStorage.setItem('selectedAnalyticsProject', id);
-      if (name) sessionStorage.setItem('selectedAnalyticsProjectName', name);
-    } else {
-      sessionStorage.removeItem('selectedAnalyticsProject');
-      sessionStorage.removeItem('selectedAnalyticsProjectName');
-    }
-  };
+  const value = useMemo(() => ({
+    selectedWorkspaceId,
+    selectedProjectId,
+    selectedWorkspaceName,
+    selectedProjectName,
+    setSelectedWorkspace,
+    setSelectedProject,
+  }), [
+    selectedWorkspaceId,
+    selectedProjectId,
+    selectedWorkspaceName,
+    selectedProjectName,
+    setSelectedWorkspace,
+    setSelectedProject
+  ]);
 
   return (
-    <FilterContext.Provider
-      value={{
-        selectedWorkspaceId,
-        selectedProjectId,
-        selectedWorkspaceName,
-        selectedProjectName,
-        setSelectedWorkspace,
-        setSelectedProject,
-      }}
-    >
+    <FilterContext.Provider value={value}>
       {children}
     </FilterContext.Provider>
   );

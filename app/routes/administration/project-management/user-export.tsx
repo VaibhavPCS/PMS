@@ -104,6 +104,8 @@ interface ReportData {
 const UserExportPage = () => {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [userId, setUserId] = useState<string>('')
+  const [userSearch, setUserSearch] = useState<string>('')
+  const [userPopoverOpen, setUserPopoverOpen] = useState<boolean>(false)
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
@@ -132,6 +134,11 @@ const UserExportPage = () => {
   const canDownload = !!userId && !!startDate && !!endDate
   const canGenerateReport = !!userId && !!startDate && !!endDate
 
+  const selectedEmployee = employees.find(e => e.userId === userId)
+  const filteredEmployees = employees.filter(e =>
+    e.userName.toLowerCase().includes(userSearch.toLowerCase())
+  )
+
   const generateReport = async () => {
     if (!canGenerateReport) return
     try {
@@ -140,6 +147,8 @@ const UserExportPage = () => {
 
       // Try snapshot-based endpoint first (40x faster!)
       const res = await axios.get(`/analytics/snapshot/user/${userId}/range?startDate=${startDate}&endDate=${endDate}`)
+      
+      console.log('📊 Report Data Received:', res.data);
 
       // Transform snapshot data to match expected format
       const snapshotData = res.data
@@ -157,6 +166,7 @@ const UserExportPage = () => {
 
       setReportData(snapshotData)
     } catch (e: any) {
+      console.error('❌ Report Generation Error:', e);
       setError('Failed to generate report: ' + (e.response?.data?.message || e.message))
       setReportData(null)
     } finally {
@@ -216,9 +226,51 @@ const UserExportPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-[13px] font-medium text-[#111827] mb-2">User</label>
-              <select className="w-full border border-[#e6e8ec] rounded-[6px] px-3 py-2.5 text-[14px] focus:border-[#F2761B] focus:ring-1 focus:ring-[#F2761B] outline-none" value={userId} onChange={e => { setUserId(e.target.value); setReportData(null); }} disabled={loading}>
-                {employees.map(e => (<option key={e.userId} value={e.userId}>{e.userName}</option>))}
-              </select>
+              <Popover open={userPopoverOpen} onOpenChange={setUserPopoverOpen}>
+                <PopoverTrigger
+                  disabled={loading}
+                  className="w-full border border-[#e6e8ec] rounded-[6px] px-3 py-2.5 text-left text-[14px] hover:border-[#F2761B] focus:border-[#F2761B] focus:ring-1 focus:ring-[#F2761B] outline-none flex items-center justify-between gap-2"
+                >
+                  <span className={selectedEmployee ? "truncate text-[#111827]" : "text-[#9ca3af]"}>
+                    {selectedEmployee ? selectedEmployee.userName : loading ? "Loading users..." : "Select user"}
+                  </span>
+                  <span className="text-[#9ca3af] text-xs">▼</span>
+                </PopoverTrigger>
+                <PopoverContent className="p-2 w-[var(--radix-popover-trigger-width)]" align="start">
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      placeholder="Search user..."
+                      className="w-full border border-[#e6e8ec] rounded-[6px] px-3 py-2 text-[14px] outline-none focus:border-[#F2761B] focus:ring-1 focus:ring-[#F2761B]"
+                    />
+                    <div className="max-h-60 overflow-y-auto">
+                      {filteredEmployees.map(e => (
+                        <button
+                          key={e.userId}
+                          type="button"
+                          onClick={() => {
+                            setUserId(e.userId)
+                            setReportData(null)
+                            setUserPopoverOpen(false)
+                          }}
+                          className={`w-full text-left px-3 py-2 text-[14px] rounded-[6px] hover:bg-[#f5f4f9] ${
+                            e.userId === userId ? "bg-[#fff7ed] text-[#F2761B]" : "text-[#111827]"
+                          }`}
+                        >
+                          {e.userName}
+                        </button>
+                      ))}
+                      {!loading && filteredEmployees.length === 0 && (
+                        <div className="px-3 py-2 text-[13px] text-[#717182]">
+                          No users found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="block text-[13px] font-medium text-[#111827] mb-2">Start Date</label>
@@ -283,12 +335,12 @@ const UserExportPage = () => {
             <div className="bg-white rounded-[12px] border border-[#e6e8ec] p-4 md:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#F2761B] text-white flex items-center justify-center text-2xl font-semibold flex-shrink-0">
-                  {reportData.user.name.charAt(0).toUpperCase()}
+                  {reportData.user?.name?.charAt(0).toUpperCase() || '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user.name}</h2>
-                  <p className="text-[13px] text-[#717182] truncate">{reportData.user.email}</p>
-                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user.role}</p>
+                  <h2 className="text-[18px] md:text-[20px] font-semibold text-[#111827] truncate">{reportData.user?.name || 'Unknown User'}</h2>
+                  <p className="text-[13px] text-[#717182] truncate">{reportData.user?.email || 'No email'}</p>
+                  <p className="text-[13px] text-[#717182] capitalize">{reportData.user?.role || 'No role'}</p>
                 </div>
                 <div className="w-full sm:w-auto sm:text-right">
                   <p className="text-[13px] text-[#717182]">Selected Period</p>
@@ -304,7 +356,7 @@ const UserExportPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] text-[#717182] mb-1">Total Tasks</p>
-                    <p className="text-[28px] font-bold text-[#111827]">{reportData.summary.totalTasks}</p>
+                    <p className="text-[28px] font-bold text-[#111827]">{reportData.summary?.totalTasks ?? 0}</p>
                     <p className="text-[12px] text-[#717182] mt-1">100%</p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-2xl">
@@ -317,8 +369,8 @@ const UserExportPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] text-[#10b981] mb-1">Completed</p>
-                    <p className="text-[28px] font-bold text-[#10b981]">{reportData.summary.completedTasks}</p>
-                    <p className="text-[12px] text-[#10b981] mt-1">{reportData.summary.completionRate}%</p>
+                    <p className="text-[28px] font-bold text-[#10b981]">{reportData.summary?.completedTasks ?? 0}</p>
+                    <p className="text-[12px] text-[#10b981] mt-1">{reportData.summary?.completionRate ?? 0}%</p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">
                     ✅
@@ -330,8 +382,8 @@ const UserExportPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] text-[#f59e0b] mb-1">In Progress</p>
-                    <p className="text-[28px] font-bold text-[#f59e0b]">{reportData.summary.openTasks}</p>
-                    <p className="text-[12px] text-[#f59e0b] mt-1">{reportData.summary.totalTasks > 0 ? Math.round((reportData.summary.openTasks / reportData.summary.totalTasks) * 100) : 0}%</p>
+                    <p className="text-[28px] font-bold text-[#f59e0b]">{reportData.summary?.openTasks ?? 0}</p>
+                    <p className="text-[12px] text-[#f59e0b] mt-1">{(reportData.summary?.totalTasks ?? 0) > 0 ? Math.round(((reportData.summary?.openTasks ?? 0) / (reportData.summary?.totalTasks ?? 1)) * 100) : 0}%</p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">
                     ⏳
@@ -343,8 +395,8 @@ const UserExportPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] text-[#ef4444] mb-1">Overdue</p>
-                    <p className="text-[28px] font-bold text-[#ef4444]">{reportData.summary.overdueTasks}</p>
-                    <p className="text-[12px] text-[#ef4444] mt-1">{reportData.summary.totalTasks > 0 ? Math.round((reportData.summary.overdueTasks / reportData.summary.totalTasks) * 100) : 0}%</p>
+                    <p className="text-[28px] font-bold text-[#ef4444]">{reportData.summary?.overdueTasks ?? 0}</p>
+                    <p className="text-[12px] text-[#ef4444] mt-1">{(reportData.summary?.totalTasks ?? 0) > 0 ? Math.round(((reportData.summary?.overdueTasks ?? 0) / (reportData.summary?.totalTasks ?? 1)) * 100) : 0}%</p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-2xl">
                     ⚠️
@@ -358,7 +410,7 @@ const UserExportPage = () => {
               {/* Section 3: Completed Tasks Table */}
               <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-5 shadow-sm">
                 <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
-                  ✅ Completed Tasks ({reportData.completedTasks.length})
+                  ✅ Completed Tasks ({(reportData.completedTasks?.length ?? 0)})
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -371,12 +423,12 @@ const UserExportPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.completedTasks.length === 0 ? (
+                      {(reportData.completedTasks?.length ?? 0) === 0 ? (
                         <tr>
                           <td colSpan={4} className="text-center py-4 text-[#717182]">No completed tasks</td>
                         </tr>
                       ) : (
-                        reportData.completedTasks.slice(0, 10).map((task, idx) => (
+                        (reportData.completedTasks || []).slice(0, 10).map((task, idx) => (
                           <tr key={task.id} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                             <td className="py-2 px-2 text-[#111827]">{task.title}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.project}</td>
@@ -397,7 +449,7 @@ const UserExportPage = () => {
               {/* Section 4: Due Tasks Table */}
               <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-5 shadow-sm">
                 <h3 className="text-[16px] font-semibold text-[#111827] mb-4">
-                  ⏰ Due in Range ({reportData.openTasks.length})
+                  ⏰ Due in Range ({(reportData.openTasks?.length ?? 0)})
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -410,12 +462,12 @@ const UserExportPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.openTasks.length === 0 ? (
+                      {(reportData.openTasks?.length ?? 0) === 0 ? (
                         <tr>
                           <td colSpan={4} className="text-center py-4 text-[#717182]">No open tasks</td>
                         </tr>
                       ) : (
-                        reportData.openTasks.slice(0, 10).map((task, idx) => (
+                        (reportData.openTasks || []).slice(0, 10).map((task, idx) => (
                           <tr key={task.id} className={`${idx % 2 === 0 ? 'bg-gray-50' : ''} ${task.isOverdue ? 'bg-red-50' : ''}`}>
                             <td className="py-2 px-2 text-[#111827]">{task.title}</td>
                             <td className="py-2 px-2 text-[#717182]">{task.project}</td>
@@ -438,7 +490,7 @@ const UserExportPage = () => {
             <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-6 shadow-sm">
               <h3 className="text-[18px] font-semibold text-[#111827] mb-4">📊 Weekly Breakdown</h3>
               <div className="space-y-3">
-                {reportData.weekly.map((week) => (
+                {(reportData.weekly || []).map((week) => (
                   <div key={week.week}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[13px] font-medium text-[#111827]">
@@ -460,15 +512,15 @@ const UserExportPage = () => {
               <div className="mt-4 pt-4 border-t border-[#e6e8ec] grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-[13px] text-[#717182]">Total</p>
-                  <p className="text-[16px] font-bold text-[#111827]">{reportData.summary.completedTasks} tasks</p>
+                  <p className="text-[16px] font-bold text-[#111827]">{reportData.summary?.completedTasks ?? 0} tasks</p>
                 </div>
                 <div>
                   <p className="text-[13px] text-[#717182]">Peak Week</p>
-                  <p className="text-[16px] font-bold text-[#F2761B]">Week {reportData.weekly.reduce((max, w) => w.completed > max.completed ? w : max, reportData.weekly[0])?.week}</p>
+                  <p className="text-[16px] font-bold text-[#F2761B]">Week {(reportData.weekly || []).reduce((max, w) => w.completed > max.completed ? w : max, (reportData.weekly || [])[0] || {})?.week || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-[13px] text-[#717182]">Average</p>
-                  <p className="text-[16px] font-bold text-[#111827]">{(reportData.summary.completedTasks / reportData.weekly.length).toFixed(1)} tasks/week</p>
+                  <p className="text-[16px] font-bold text-[#111827]">{(reportData.summary?.completedTasks && reportData.weekly?.length ? (reportData.summary.completedTasks / reportData.weekly.length).toFixed(1) : '0.0')} tasks/week</p>
                 </div>
               </div>
             </div>
@@ -478,49 +530,49 @@ const UserExportPage = () => {
               <h3 className="text-[20px] font-bold mb-4">⭐ Productivity Score</h3>
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-[48px] font-bold">{reportData.performanceScore.overallScore}</p>
+                  <p className="text-[48px] font-bold">{reportData.performanceScore?.overallScore ?? 0}</p>
                   <p className="text-[16px] opacity-90">/ 100</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[32px] font-bold">{reportData.performanceScore.grade}</p>
-                  <p className="text-[14px] opacity-90">{reportData.performanceScore.status}</p>
+                  <p className="text-[32px] font-bold">{reportData.performanceScore?.grade ?? '-'}</p>
+                  <p className="text-[14px] opacity-90">{reportData.performanceScore?.status ?? 'Not Available'}</p>
                 </div>
               </div>
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-[13px]">Completion</span>
-                    <span className="text-[13px] font-semibold">{reportData.performanceScore.components.completion}%</span>
+                    <span className="text-[13px] font-semibold">{reportData.performanceScore?.components?.completion ?? 0}%</span>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore.components.completion}%` }} />
+                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore?.components?.completion ?? 0}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-[13px]">On-Time</span>
-                    <span className="text-[13px] font-semibold">{reportData.performanceScore.components.onTime}%</span>
+                    <span className="text-[13px] font-semibold">{reportData.performanceScore?.components?.onTime ?? 0}%</span>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore.components.onTime}%` }} />
+                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore?.components?.onTime ?? 0}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-[13px]">Diversity</span>
-                    <span className="text-[13px] font-semibold">{reportData.performanceScore.components.diversity}%</span>
+                    <span className="text-[13px] font-semibold">{reportData.performanceScore?.components?.diversity ?? 0}%</span>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore.components.diversity}%` }} />
+                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore?.components?.diversity ?? 0}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-[13px]">Consistency</span>
-                    <span className="text-[13px] font-semibold">{reportData.performanceScore.components.consistency}%</span>
+                    <span className="text-[13px] font-semibold">{reportData.performanceScore?.components?.consistency ?? 0}%</span>
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore.components.consistency}%` }} />
+                    <div className="bg-white h-2 rounded-full" style={{ width: `${reportData.performanceScore?.components?.consistency ?? 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -532,32 +584,32 @@ const UserExportPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Avg Time to Complete</p>
-                  <p className="text-[24px] font-bold text-[#111827]">{reportData.timing.avgTimeToComplete}</p>
+                  <p className="text-[24px] font-bold text-[#111827]">{reportData.timing?.avgTimeToComplete ?? 0}</p>
                   <p className="text-[12px] text-[#717182]">days</p>
                 </div>
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Fastest Completion</p>
-                  <p className="text-[16px] font-bold text-[#10b981]">{reportData.timing.fastestCompletion || 'N/A'}</p>
+                  <p className="text-[16px] font-bold text-[#10b981]">{reportData.timing?.fastestCompletion || 'N/A'}</p>
                   <p className="text-[12px] text-[#717182]">days</p>
                 </div>
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Slowest Completion</p>
-                  <p className="text-[16px] font-bold text-[#ef4444]">{reportData.timing.slowestCompletion || 'N/A'}</p>
+                  <p className="text-[16px] font-bold text-[#ef4444]">{reportData.timing?.slowestCompletion || 'N/A'}</p>
                   <p className="text-[12px] text-[#717182]">days</p>
                 </div>
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Peak Productivity Day</p>
-                  <p className="text-[16px] font-bold text-[#F2761B]">{reportData.peakDay}</p>
-                  <p className="text-[12px] text-[#717182]">{reportData.peakDayCount} completions</p>
+                  <p className="text-[16px] font-bold text-[#F2761B]">{reportData.peakDay || 'N/A'}</p>
+                  <p className="text-[12px] text-[#717182]">{reportData.peakDayCount ?? 0} completions</p>
                 </div>
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Avg Tasks/Day</p>
-                  <p className="text-[24px] font-bold text-[#111827]">{reportData.timing.tasksPerDay}</p>
+                  <p className="text-[24px] font-bold text-[#111827]">{reportData.timing?.tasksPerDay ?? 0}</p>
                   <p className="text-[12px] text-[#717182]">tasks</p>
                 </div>
                 <div className="bg-gray-50 rounded-[8px] p-4">
                   <p className="text-[13px] text-[#717182] mb-1">Productivity Trend</p>
-                  <p className="text-[14px] font-bold text-[#111827]">{reportData.productivityTrend}</p>
+                  <p className="text-[14px] font-bold text-[#111827]">{reportData.productivityTrend || 'Stable'}</p>
                 </div>
               </div>
             </div>
@@ -566,10 +618,10 @@ const UserExportPage = () => {
             <div className="bg-white rounded-[10px] border border-[#e6e8ec] p-6 shadow-sm">
               <h3 className="text-[18px] font-semibold text-[#111827] mb-4">📁 Project Breakdown</h3>
               <div className="space-y-3">
-                {reportData.projects.length === 0 ? (
+                {(reportData.projects?.length ?? 0) === 0 ? (
                   <p className="text-center text-[#717182] py-4">No projects</p>
                 ) : (
-                  reportData.projects.map((proj, idx) => (
+                  (reportData.projects || []).map((proj, idx) => (
                     <div key={idx} className="border border-[#e6e8ec] rounded-[8px] p-4">
                       <p className="text-[15px] font-semibold text-[#111827] mb-2">{proj.projectName}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[13px]">
@@ -610,7 +662,7 @@ const UserExportPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {reportData.comparison.map((comp, idx) => (
+                    {(reportData.comparison || []).map((comp, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
                         <td className="py-2 px-2 text-[#111827]">{comp.metric}</td>
                         <td className="py-2 px-2 font-semibold text-[#111827]">{comp.yourScore}</td>
@@ -627,7 +679,7 @@ const UserExportPage = () => {
               </div>
               {/* <div className="mt-4 p-4 bg-green-50 rounded-[8px] border border-green-200">
                 <p className="text-[14px] text-green-800 font-medium text-center">
-                  {reportData.comparison.filter(c => c.better).length >= reportData.comparison.length / 2
+                  {(reportData.comparison || []).filter(c => c.better).length >= (reportData.comparison?.length ?? 0) / 2
                     ? '✨ You\'re performing ABOVE AVERAGE compared to your team!'
                     : '💪 Keep pushing! You have room for improvement.'}
                 </p>

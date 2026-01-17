@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/provider/auth-context';
 
@@ -18,7 +18,10 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [selectedRole, setSelectedRoleState] = useState<UserRole | null>(null);
 
   // Determine available roles from user
-  const availableRoles: UserRole[] = user?.role ? [user.role] : [];
+  const availableRoles = useMemo<UserRole[]>(() => 
+    user?.role ? [user.role] : [], 
+  [user?.role]);
+  
   const hasMultipleRoles = availableRoles.length > 1;
 
   // Initialize selected role from session storage or default to user's role
@@ -32,23 +35,23 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     } else {
       setSelectedRoleState(user.role);
     }
-  }, [user?.role]);
+  }, [user?.role, availableRoles]);
 
   // Persist role selection to session storage
-  const setSelectedRole = (role: UserRole) => {
+  const setSelectedRole = useCallback((role: UserRole) => {
     setSelectedRoleState(role);
     sessionStorage.setItem('selectedAnalyticsRole', role);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    selectedRole,
+    setSelectedRole,
+    availableRoles,
+    hasMultipleRoles,
+  }), [selectedRole, setSelectedRole, availableRoles, hasMultipleRoles]);
 
   return (
-    <RoleContext.Provider
-      value={{
-        selectedRole,
-        setSelectedRole,
-        availableRoles,
-        hasMultipleRoles,
-      }}
-    >
+    <RoleContext.Provider value={value}>
       {children}
     </RoleContext.Provider>
   );

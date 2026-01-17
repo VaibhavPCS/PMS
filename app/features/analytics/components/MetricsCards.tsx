@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { Card } from '@/components/ui/card';
 
-export default function MetricsCards({ metrics }: { metrics: any }) {
+const MetricsCards = memo(function MetricsCards({ metrics }: { metrics: any }) {
   const total = Number(metrics?.total || 0);
   const completed = Number(metrics?.completed || 0);
   const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -23,5 +24,7 @@ export default function MetricsCards({ metrics }: { metrics: any }) {
       ))}
     </div>
   );
-}
+});
+
+export default MetricsCards;
 

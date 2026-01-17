@@ -17,8 +17,9 @@ export function useUserAnalytics(userId: string, options?: UseUserAnalyticsOptio
       return response.data;
     },
     enabled: !!userId && (options?.enabled ?? true),
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache to reduce server load
+    gcTime: 10 * 60 * 1000,   // 10 minutes garbage collection
+    refetchOnWindowFocus: false, // Optimization: prevent refetching on focus
+    retry: 1,
   });
 }

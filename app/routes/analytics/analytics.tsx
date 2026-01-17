@@ -1,6 +1,6 @@
 // frontend/app/routes/analytics/analytics.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navigate, Outlet, useNavigate, useLocation } from "react-router";
 import { useAuth } from "../../provider/auth-context";
 import { RoleProvider, useRole } from "@/features/analytics/context/RoleContext";
@@ -29,10 +29,10 @@ function AnalyticsContent() {
 
   const isWorkspaceLead = workspaceRole === 'lead';
   const isWorkspaceOwner = workspaceRole === 'owner';
-  const hasRestrictedAccess = isAdmin || isWorkspaceLead || isWorkspaceOwner;
+  const hasRestrictedAccess = isWorkspaceLead || isWorkspaceOwner;
 
   // Determine active tab based on current route
-  const getActiveTab = () => {
+  const activeTab = useMemo(() => {
     const path = location.pathname;
     if (!isAdmin && !hasRestrictedAccess) return "personal";
     if (path.includes("/analytics/workspace")) return "workspace";
@@ -40,14 +40,7 @@ function AnalyticsContent() {
     if (path.includes("/analytics/restricted")) return "restricted";
     if (path.includes("/analytics/personal")) return "personal";
     return "performance";
-  };
-
-  const [activeTab, setActiveTab] = useState(getActiveTab());
-
-  // Update active tab when location changes
-  useEffect(() => {
-    setActiveTab(getActiveTab());
-  }, [location.pathname]);
+  }, [location.pathname, isAdmin, hasRestrictedAccess]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -68,17 +61,15 @@ function AnalyticsContent() {
   const handleTabChange = (tab: string) => {
     // Check if user has access to restricted tab
     if (tab === 'restricted' && !hasRestrictedAccess) {
-      setActiveTab('personal');
       navigate('/analytics/personal', { replace: true });
       return;
     }
 
     if (!isAdmin && tab !== 'personal' && tab !== 'restricted') {
-      setActiveTab('personal');
       navigate('/analytics/personal', { replace: true });
       return;
     }
-    setActiveTab(tab);
+    
     if (tab === "performance") {
       navigate("/analytics");
     } else if (tab === "workspace") {

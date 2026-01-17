@@ -73,7 +73,11 @@ const VerticalSidebar = () => {
   });
 
   const visibleNavItems = effectiveNavItems.filter(
-    (item) => item.name !== "Administration" || isAdmin
+    (item) => {
+      if (item.name === "Administration") return isAdmin;
+      if (item.name === "Analytics") return !isAdmin;
+      return true;
+    }
   );
 
   const isActive = (
