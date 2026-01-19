@@ -1019,6 +1019,23 @@ const TaskDetail = () => {
   }, [socket, taskId]);
 
   useEffect(() => {
+    if (!editingSubtask) return;
+    setEditSubtaskTitle(editingSubtask.title || "");
+    setEditSubtaskDescription(editingSubtask.description || "");
+    const assigneeId = editingSubtask.assignee?._id || editingSubtask.assignee || "";
+    setEditSubtaskAssigneeId(assigneeId);
+    setEditSubtaskPriority(
+      (editingSubtask.priority as "low" | "medium" | "high" | "urgent") || "medium"
+    );
+    const start = editingSubtask.startDate ? new Date(editingSubtask.startDate) : null;
+    const end = editingSubtask.dueDate ? new Date(editingSubtask.dueDate) : null;
+    setEditSubtaskProjectStart(start);
+    setEditSubtaskProjectEnd(end);
+    setEditSubtaskStartDate(start ? start.toISOString() : "");
+    setEditSubtaskEndDate(end ? end.toISOString() : "");
+  }, [editingSubtask]);
+
+  useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
         const response = await fetchData("/auth/me");
@@ -3279,8 +3296,6 @@ const TaskDetail = () => {
                         }
                       }}
                       disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
                         const dateToCheck = new Date(date);
                         dateToCheck.setHours(0, 0, 0, 0);
                         const taskStart = task.startDate ? new Date(task.startDate) : null;
@@ -3288,7 +3303,6 @@ const TaskDetail = () => {
                         const taskDue = task.dueDate ? new Date(task.dueDate) : null;
                         if (taskDue) taskDue.setHours(0, 0, 0, 0);
 
-                        if (dateToCheck < today) return true;
                         if (taskStart && dateToCheck < taskStart) return true;
                         if (taskDue && dateToCheck > taskDue) return true;
 
@@ -3324,8 +3338,6 @@ const TaskDetail = () => {
                         }
                       }}
                       disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
                         const dateToCheck = new Date(date);
                         dateToCheck.setHours(0, 0, 0, 0);
                         const taskStart = task.startDate ? new Date(task.startDate) : null;
@@ -3335,7 +3347,6 @@ const TaskDetail = () => {
                         const selectedStart = editSubtaskProjectStart ? new Date(editSubtaskProjectStart) : null;
                         if (selectedStart) selectedStart.setHours(0, 0, 0, 0);
 
-                        if (dateToCheck < today) return true;
                         if (selectedStart && dateToCheck < selectedStart) return true;
                         if (taskStart && dateToCheck < taskStart) return true;
                         if (taskDue && dateToCheck > taskDue) return true;
