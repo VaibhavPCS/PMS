@@ -21,6 +21,7 @@ interface Task {
   description?: string;
   priority: 'urgent' | 'high' | 'medium' | 'low';
   status: 'to-do' | 'in-progress' | 'done' | 'on-hold';
+  approvalStatus?: 'not-required' | 'pending-approval' | 'approved' | 'rejected';
   dueDate: string;
   startDate?: string;
   project: {
@@ -85,10 +86,10 @@ const statusColors = {
     text: 'text-green-700'
   },
   'on-hold': {
-    bg: 'bg-gray-500',
-    border: 'border-gray-500',
-    ring: 'ring-gray-100',
-    text: 'text-gray-700'
+    bg: 'bg-purple-500',
+    border: 'border-purple-500',
+    ring: 'ring-purple-100',
+    text: 'text-purple-700'
   },
   'overdue': {
     bg: 'bg-red-500',
@@ -112,6 +113,19 @@ export default function Calendar() {
   const [showWeekends, setShowWeekends] = useState(true);
   const [workspaceDropdownOpen, setWorkspaceDropdownOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [dayStatusFilter, setDayStatusFilter] = useState<string | null>(null);
+
+  const dayFilterOptions = [
+    { key: 'on-hold', label: 'On Hold' },
+    { key: 'overdue', label: 'Overdue' },
+    { key: 'to-do', label: 'To Do' },
+    { key: 'in-progress', label: 'In Progress' },
+    { key: 'done-unapproved', label: 'Done' }
+  ];
+
+  const toggleDayStatusFilter = (key: string) => {
+    setDayStatusFilter((prev) => (prev === key ? null : key));
+  };
 
   // Access control - redirect if not admin
   // Removed admin check to allow all users to access calendar
@@ -179,11 +193,13 @@ export default function Calendar() {
         
         // Unified endpoint for all users (backend handles hierarchy)
         const endpoint = `/task/calendar/${selectedWorkspace}`;
-          
+        const statusFilterParam = viewMode === 'day' && dayStatusFilter ? dayStatusFilter : undefined;
+        
         const response = await axios.get(endpoint, {
           params: {
             startDate: format(currentDate, 'yyyy-MM-dd'),
-            viewMode
+            viewMode,
+            ...(statusFilterParam ? { statusFilter: statusFilterParam } : {})
           }
         });
         
@@ -206,7 +222,7 @@ export default function Calendar() {
     };
 
     fetchTasks();
-  }, [selectedWorkspace, currentDate, viewMode, isAuthenticated, isAdmin]);
+  }, [selectedWorkspace, currentDate, viewMode, isAuthenticated, isAdmin, dayStatusFilter]);
 
   // Navigation handlers
   const handlePrevious = () => {
@@ -277,6 +293,23 @@ export default function Calendar() {
     });
     return dayTasks;
   };
+
+  const matchesDayStatusFilter = (task: Task) => {
+    if (!dayStatusFilter) return true;
+    const taskEndDate = new Date(task.dueDate);
+    taskEndDate.setHours(23, 59, 59, 999);
+    const isOverdue = taskEndDate < new Date() && task.status !== 'done' && task.status !== 'on-hold';
+    const isDoneUnapproved = task.status === 'done' && task.approvalStatus !== 'approved';
+
+    if (dayStatusFilter === 'on-hold') return task.status === 'on-hold';
+    if (dayStatusFilter === 'overdue') return isOverdue;
+    if (dayStatusFilter === 'to-do') return task.status === 'to-do' && !isOverdue;
+    if (dayStatusFilter === 'in-progress') return task.status === 'in-progress' && !isOverdue;
+    if (dayStatusFilter === 'done-unapproved') return isDoneUnapproved;
+    return false;
+  };
+
+  const dayTasks = viewMode === 'day' ? getTasksForDay(currentDate).filter(matchesDayStatusFilter) : [];
 
   // Check if task spans multiple days
   const isMultiDayTask = (task: Task) => {
@@ -445,8 +478,33 @@ export default function Calendar() {
             <div className="p-4">
               {viewMode === 'day' ? (
                 <div className="flex flex-col gap-3">
-                  {getTasksForDay(currentDate).length > 0 ? (
-                    getTasksForDay(currentDate).map((task) => {
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setDayStatusFilter(null)}
+                      className={`px-3 py-1 text-xs font-medium rounded-md border transition-colors ${
+                        !dayStatusFilter
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {dayFilterOptions.map((option) => (
+                      <button
+                        key={option.key}
+                        onClick={() => toggleDayStatusFilter(option.key)}
+                        className={`px-3 py-1 text-xs font-medium rounded-md border transition-colors ${
+                          dayStatusFilter === option.key
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {dayTasks.length > 0 ? (
+                    dayTasks.map((task) => {
                       // Check if task is overdue
                       const taskEndDate = new Date(task.dueDate);
                       taskEndDate.setHours(23, 59, 59, 999);
