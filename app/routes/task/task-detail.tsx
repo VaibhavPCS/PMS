@@ -3493,7 +3493,7 @@ const TaskDetail = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {assignableMembers
-                    .filter((m) => m._id !== task.assignee?._id)
+                    // .filter((m) => m._id !== task.assignee?._id)
                     .map((member) => (
                       <SelectItem key={member._id} value={member._id}>
                         {member.name}
