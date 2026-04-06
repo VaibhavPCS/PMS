@@ -1616,7 +1616,7 @@ const ProjectDetail = () => {
     assigneeId: "",
     startDate: "",
     dueDate: "",
-    sprintId: null as string | null, // ✅ NEW: Sprint selection required
+    sprintId: null as string | null,
     rejectionAttachmentType: "either", // ✅ NEW: Default to 'either'
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -2036,8 +2036,8 @@ const ProjectDetail = () => {
   const handleCreateTask = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate || !newTask.sprintId) {
-        return toast.error("Please fill all required fields (title, start date, due date, sprint)");
+      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate) {
+        return toast.error("Please fill all required fields (title, start date, due date)");
       }
 
       const start = new Date(newTask.startDate);
@@ -2081,6 +2081,9 @@ const ProjectDetail = () => {
           formData.append("startDate", newTask.startDate);
           formData.append("dueDate", newTask.dueDate);
           formData.append("projectId", projectId || "");
+          if (newTask.sprintId) {
+            formData.append("sprintId", newTask.sprintId);
+          }
           formData.append("rejectionAttachmentType", newTask.rejectionAttachmentType); // ✅ NEW
 
           // Add reference link as array if provided
@@ -2105,6 +2108,9 @@ const ProjectDetail = () => {
           if (!newTask.assigneeId) {
             delete payload.assigneeId;
           }
+          if (!newTask.sprintId) {
+            delete payload.sprintId;
+          }
           // Add reference link as array if provided
           if (taskReferenceLink.trim()) {
             payload.referenceLinks = [taskReferenceLink.trim()];
@@ -2127,7 +2133,7 @@ const ProjectDetail = () => {
           assigneeId: "",
           startDate: "",
           dueDate: "",
-          sprintId: null, // ✅ NEW: Reset sprint selection
+          sprintId: null,
           rejectionAttachmentType: "either", // ✅ NEW
         });
         setStartDateObj(undefined);
@@ -3324,7 +3330,6 @@ const ProjectDetail = () => {
                   onSelectSprint={(sprintId) => setNewTask({ ...newTask, sprintId })}
                   taskStartDate={newTask.startDate}
                   taskDueDate={newTask.dueDate}
-                  error={!newTask.sprintId ? "Please select a sprint" : undefined}
                 />
               </div>
 

@@ -1,9 +1,8 @@
 import React from 'react'
-import type { Route } from "./+types/home";
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router';
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "PMS" },
     { name: "description", content: "Welcome to PMS" },
