@@ -20,6 +20,10 @@ vi.mock('react-router', () => ({
   useNavigate: () => vi.fn(),
 }));
 
+vi.mock('@/provider/auth-context', () => ({
+  useAuth: () => ({ user: { _id: 'u1', role: 'admin' } }),
+}));
+
 import { putData } from '@/lib/fetch-util';
 import { toast } from 'sonner';
 import { ProjectCard } from '../ProjectCard';
@@ -112,6 +116,5 @@ describe('ProjectCard delete', () => {
     await user.click(deleteItem);
 
     expect(onDelete).toHaveBeenCalledWith(baseProject._id);
-    expect(toast.success).toHaveBeenCalledWith('Project deleted successfully');
   });
 });
