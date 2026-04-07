@@ -44,6 +44,7 @@ interface ProjectResponse {
 
 export function WorkspaceProjectSelector() {
   const { user } = useAuth();
+  const userId = (user as any)?.id || (user as any)?._id;
   const {
     selectedWorkspaceId,
     selectedProjectId,
@@ -88,7 +89,7 @@ export function WorkspaceProjectSelector() {
     };
 
     fetchWorkspaces();
-  }, [user]);
+  }, [userId]);
 
   // Fetch projects when workspace changes
   useEffect(() => {

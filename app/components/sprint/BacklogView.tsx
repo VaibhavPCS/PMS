@@ -8,6 +8,7 @@ interface Task {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   startDate: string;
   dueDate: string;
+  sprint?: string | { _id: string } | null;
   assignee?: {
     _id: string;
     name: string;

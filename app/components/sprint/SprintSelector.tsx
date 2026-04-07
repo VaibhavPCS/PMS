@@ -125,11 +125,7 @@ export const SprintSelector: React.FC<SprintSelectorProps> = ({
   return (
     <div className="w-full space-y-1">
       <label htmlFor="sprint" className="block text-sm font-medium text-gray-700 mb-2">
-        {isRecurring ? (
-          <>Sprint (Optional for recurring tasks)</>
-        ) : (
-          <>Sprint * <span className="text-xs text-gray-500">(Required)</span></>
-        )}
+        Sprint <span className="text-xs text-gray-500">(Optional)</span>
       </label>
 
       {loading ? (
@@ -143,7 +139,7 @@ export const SprintSelector: React.FC<SprintSelectorProps> = ({
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-700 font-medium">No active sprints available</p>
               <p className="text-xs text-gray-600 mt-1">
-                Create a sprint for this project before creating tasks.
+                You can still create the task without a sprint.
               </p>
             </div>
           </div>
@@ -163,7 +159,7 @@ export const SprintSelector: React.FC<SprintSelectorProps> = ({
             } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           >
             <option value="">
-              {isRecurring ? 'No sprint (backlog)' : 'Select a sprint'}
+              No sprint (backlog)
             </option>
             {sprints.map((sprint) => (
               <option key={sprint._id} value={sprint._id}>

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 vi.mock('@/provider/auth-context', () => ({
@@ -49,10 +49,10 @@ describe('WorkspaceProjectSelector', () => {
       </FilterProvider>
     )
 
-    const wsTrigger = await screen.findByText('Select Workspace')
-    await user.click(wsTrigger)
-    expect(await screen.findByText('Workspace A')).toBeInTheDocument()
-    expect(await screen.findByText('Workspace B')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).not.toHaveAttribute('disabled'))
+    await user.click(screen.getAllByRole('combobox')[0])
+    expect(await screen.findByRole('option', { name: 'Workspace A' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Workspace B' })).toBeInTheDocument()
   })
 
   it('updates projects when changing workspace and supports All Projects', async () => {
@@ -81,14 +81,14 @@ describe('WorkspaceProjectSelector', () => {
       </FilterProvider>
     )
 
-    const wsTrigger = await screen.findByText('Select Workspace')
-    await user.click(wsTrigger)
-    const wsItem = await screen.findByText('Workspace A')
+    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).not.toHaveAttribute('disabled'))
+    await user.click(screen.getAllByRole('combobox')[0])
+    const wsItem = await screen.findByRole('option', { name: 'Workspace A' })
     await user.click(wsItem)
 
-    const projTrigger = await screen.findByText('Select Project')
-    await user.click(projTrigger)
-    expect(await screen.findByText('Project X')).toBeInTheDocument()
-    expect(await screen.findByText('All Projects')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('combobox')[1]).not.toHaveAttribute('disabled'))
+    await user.click(screen.getAllByRole('combobox')[1])
+    expect(await screen.findByRole('option', { name: 'Project X' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'All Projects' })).toBeInTheDocument()
   })
 })
