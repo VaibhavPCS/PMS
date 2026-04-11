@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "../../provider/auth-context";
 import { Navigate, useNavigate } from "react-router";
-import { fetchData, postData } from "@/lib/fetch-util";
-import { buildApiUrl } from "@/lib/config";
+import { fetchData, postData, putData, postMultipart, deleteData } from "@/lib/fetch-util";
 import { formatDateDDMMYYYY, calculateDaysBetween } from "@/lib/date-utils";
 import { format } from "date-fns";
 import {
@@ -161,7 +160,6 @@ const Dashboard = () => {
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [projectTypeFilter, setProjectTypeFilter] = useState("all");
@@ -266,7 +264,6 @@ const Dashboard = () => {
       // Store current workspace in localStorage for API calls
       if (response.currentWorkspace) {
         localStorage.setItem("currentWorkspaceId", response.currentWorkspace._id);
-        localStorage.setItem("workspace-id", response.currentWorkspace._id);
       }
     } catch (error) {
       console.error("Error fetching workspaces:", error);
@@ -280,7 +277,6 @@ const Dashboard = () => {
       await postData("/workspace/switch", { workspaceId });
       // Update localStorage
       localStorage.setItem("currentWorkspaceId", workspaceId);
-      localStorage.setItem("workspace-id", workspaceId);
       // Dispatch custom event for workspace change - COMMENTED OUT
       // window.dispatchEvent(new CustomEvent('workspaceChanged'));
       // Update current workspace state
@@ -515,16 +511,12 @@ const Dashboard = () => {
     }
   }, [isAdmin, isLead, accessibleProjectIds, currentUserId]);
 
-  // Filter tasks based on status and search query
-  useEffect(() => {
-    let filtered = tasks;
-
-    // Filter by status
+  // Derive filtered tasks synchronously — no extra render cycle
+  const filteredTasks = useMemo(() => {
+    let filtered = tasks.filter((t: any) => t.approvalStatus !== "approved");
     if (taskStatusFilter !== "all") {
       filtered = filtered.filter(task => task.status === taskStatusFilter);
     }
-
-    // Filter by search query
     if (taskSearchQuery.trim()) {
       const query = taskSearchQuery.toLowerCase();
       filtered = filtered.filter(task =>
@@ -534,23 +526,26 @@ const Dashboard = () => {
         (task.project && task.project.title.toLowerCase().includes(query))
       );
     }
-
-    filtered = filtered.filter((t: any) => t.approvalStatus !== "approved");
-
-    setFilteredTasks(filtered);
+    return filtered;
   }, [tasks, taskStatusFilter, taskSearchQuery]);
 
   useEffect(() => {
     if (isAuthenticated) {
       const loadData = async () => {
         setLoading(true);
-        await fetchWorkspaces();
-        const projects = await fetchAccessibleProjects();
-        await fetchProjectStatistics(projects);
-        await fetchRecentProjects();
-        await fetchMonthlyProjectStats(selectedMonth, selectedYear, projects);
-        await fetchTasks();
-        await fetchApprovalStats();
+        // Round 1: all independent fetches in parallel
+        const [, projects] = await Promise.all([
+          fetchWorkspaces(),
+          fetchAccessibleProjects(),
+          fetchRecentProjects(),
+          fetchTasks(),
+          fetchApprovalStats(),
+        ]);
+        // Round 2: stats that depend on the projects list
+        await Promise.all([
+          fetchProjectStatistics(projects),
+          fetchMonthlyProjectStats(selectedMonth, selectedYear, projects),
+        ]);
         setLoading(false);
       };
       loadData();
@@ -667,55 +662,14 @@ const Dashboard = () => {
         payload.status = updateForm.status;
       }
 
-      const response = await fetch(buildApiUrl(`/task/${selectedTask._id}`), {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update task");
-      }
+      await putData(`/task/${selectedTask._id}`, payload);
 
       // 2. Handle Hold/Resume transitions
       if (isPuttingOnHold) {
-        const holdResponse = await fetch(buildApiUrl(`/task/${selectedTask._id}/hold`), {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-          },
-          body: JSON.stringify({ reason: "Updated via dashboard" }),
-        });
-
-        if (!holdResponse.ok) {
-          const error = await holdResponse.json();
-          throw new Error(error.message || "Failed to put task on hold");
-        }
+        await postData(`/task/${selectedTask._id}/hold`, { reason: "Updated via dashboard" });
       } else if (isResuming) {
-        const resumeResponse = await fetch(buildApiUrl(`/task/${selectedTask._id}/resume`), {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-          },
-          body: JSON.stringify({}),
-        });
-
-        if (!resumeResponse.ok) {
-          const error = await resumeResponse.json();
-          throw new Error(error.message || "Failed to resume task");
-        }
-        
-        // Note: resumeTask sets status to 'in-progress'. 
-        // If user wanted 'done', they might need to update again, but we'll leave it as in-progress for safety.
+        // Note: resumeTask sets status to 'in-progress'.
+        await postData(`/task/${selectedTask._id}/resume`, {});
       }
 
       toast.success("Task updated successfully");
@@ -729,7 +683,7 @@ const Dashboard = () => {
       
     } catch (error: any) {
       console.error("Failed to update task:", error);
-      toast.error(error.message || "Failed to update task");
+      toast.error(error.response?.data?.message || error.message || "Failed to update task");
     } finally {
       setIsUpdating(false);
     }
@@ -745,20 +699,7 @@ const Dashboard = () => {
 
     try {
       setIsDeleting(true);
-      const response = await fetch(buildApiUrl(`/task/${selectedTask._id}`), {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to delete task");
-      }
-
+      await deleteData(`/task/${selectedTask._id}`);
       toast.success("Task deleted successfully");
       setShowDeleteDialog(false);
       setSelectedTask(null);
@@ -775,20 +716,7 @@ const Dashboard = () => {
   const handleApproveTask = async (taskId: string) => {
     setApprovingTaskId(taskId);
     try {
-      const response = await fetch(buildApiUrl(`/task/${taskId}/approve`), {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to approve task");
-      }
-
+      await postData(`/task/${taskId}/approve`, {});
       toast.success("Task approved successfully");
       fetchApprovalTasks(); // Refresh approval tasks
       fetchApprovalStats(); // Refresh approval stats
@@ -833,9 +761,7 @@ const Dashboard = () => {
         }
       }
 
-      let response;
       if (hasFile) {
-        // Use FormData for file upload
         const formData = new FormData();
         formData.append("reason", rejectionReason.trim());
         formData.append("newDueDate", rejectDueDate);
@@ -844,36 +770,14 @@ const Dashboard = () => {
         rejectionFiles.forEach((file) => {
           formData.append("rejectionFiles", file);
         });
-
-        response = await fetch(buildApiUrl(`/task/${taskToReject._id}/reject`), {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-          },
-          body: formData,
-        });
+        await postMultipart(`/task/${taskToReject._id}/reject`, formData);
       } else {
-        // Use JSON for non-file requests
-        response = await fetch(buildApiUrl(`/task/${taskToReject._id}/reject`), {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "workspace-id": localStorage.getItem("currentWorkspaceId") || "",
-          },
-          body: JSON.stringify({
-            reason: rejectionReason.trim(),
-            newDueDate: rejectDueDate,
-            reassigneeId: rejectReassigneeId || undefined,
-            rejectionLink: hasLink ? rejectionLink.trim() : undefined,
-          }),
+        await postData(`/task/${taskToReject._id}/reject`, {
+          reason: rejectionReason.trim(),
+          newDueDate: rejectDueDate,
+          reassigneeId: rejectReassigneeId || undefined,
+          rejectionLink: hasLink ? rejectionLink.trim() : undefined,
         });
-      }
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to reject task");
       }
 
       toast.success("Task rejected successfully");
