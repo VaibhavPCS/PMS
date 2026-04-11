@@ -2,7 +2,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/provider/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, AlertCircle, Calendar as CalendarIcon, User } from 'lucide-react';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-2';
+import AlertCircle from 'lucide-react/dist/esm/icons/alert-circle';
+import CalendarIcon from 'lucide-react/dist/esm/icons/calendar';
+import User from 'lucide-react/dist/esm/icons/user';
 import axios from '@/lib/axios';
 import { ProductivityReportView } from '@/features/analytics/components/ProductivityReportView';
 import { format } from 'date-fns';

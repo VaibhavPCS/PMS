@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield } from 'lucide-react';
+import Shield from 'lucide-react/dist/esm/icons/shield';
 
 const RoleManagement = () => {
   return (

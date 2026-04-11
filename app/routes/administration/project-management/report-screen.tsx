@@ -341,10 +341,16 @@ export default function ReportScreen() {
         const res = await axios.get(`/projects/${selectedProject}/team`);
         
         // Combine project head and members
-        const allMembers = [];
-        if (res.data.projectHead) {
-          allMembers.push({ ...res.data.projectHead, role: 'project-head' });
-        }
+        const allMembers: any[] = [];
+        const headPool = [
+          ...(res.data.projectHeads || []),
+          ...(res.data.projectHead ? [res.data.projectHead] : [])
+        ];
+        headPool.forEach((head: any) => {
+          if (head?._id && !allMembers.some((m: any) => m._id === head._id)) {
+            allMembers.push({ ...head, role: 'project-head' });
+          }
+        });
         if (res.data.members) {
           allMembers.push(...res.data.members);
         }
