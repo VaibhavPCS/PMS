@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Link, useNavigate } from "react-router";
 import { useSignInMutation } from "@/hooks/use-auth";
-import { useAuth } from "../../provider/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";

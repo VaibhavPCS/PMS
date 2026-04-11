@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../../provider/auth-context';
+import { useAuth } from '@/hooks/use-auth';
 import { fetchData, postData, postMultipart } from '@/lib/fetch-util';
 import ChatSidebarNew from '../../components/chat/chat-sidebar-new';
 import ChatWindow from '../../components/chat/chat-window';
 import { io, Socket } from 'socket.io-client';
 import { toast } from 'sonner';
+import { getBackendBaseUrl } from '@/lib/config';
 
 interface Chat {
   _id: string;
@@ -113,13 +114,10 @@ const Chat: React.FC = () => {
   useEffect(() => {
     const handleNewMessageEvent = (event: CustomEvent) => {
       const { message, chatId } = event.detail;
-      if (activeChat && chatId === activeChat._id) {
-        // Check for duplicates before adding
+      if (activeChatRef.current && chatId === activeChatRef.current._id) {
         setMessages(prev => {
           const messageExists = prev.some(m => m._id === message._id);
-          if (messageExists) {
-            return prev;
-          }
+          if (messageExists) return prev;
           return [...prev, message];
         });
       }
@@ -130,7 +128,7 @@ const Chat: React.FC = () => {
     return () => {
       window.removeEventListener('chat:new-message', handleNewMessageEvent as EventListener);
     };
-  }, [activeChat]);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -163,7 +161,7 @@ const Chat: React.FC = () => {
     // Track if this effect instance is still mounted
     let isMounted = true;
 
-    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+    const newSocket = io(getBackendBaseUrl(), {
       withCredentials: true, // Send HTTP-only cookies
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,

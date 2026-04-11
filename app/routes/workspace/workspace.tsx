@@ -19,7 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Calendar as CalendarIcon, Settings as SettingsIcon } from 'lucide-react';
+import Plus from 'lucide-react/dist/esm/icons/plus';
+import Search from 'lucide-react/dist/esm/icons/search';
+import CalendarIcon from 'lucide-react/dist/esm/icons/calendar';
+import SettingsIcon from 'lucide-react/dist/esm/icons/settings';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -187,7 +190,6 @@ const WorkspacePage = () => {
       setCurrentWorkspace(response.currentWorkspace);
       // Persist current workspace id for request headers
       if (response.currentWorkspace?._id) {
-        localStorage.setItem('workspace-id', response.currentWorkspace._id);
         localStorage.setItem('currentWorkspaceId', response.currentWorkspace._id);
 
         // Check if current workspace exists (show notification but don't block)
@@ -211,7 +213,13 @@ const WorkspacePage = () => {
         if (user?.role === 'admin') return true;
 
         const isCreator = p?.creator?._id === currentUserId;
-        const isHead = p?.projectHead?._id === currentUserId;
+        const headIds = [
+          ...(p?.projectHeads || []),
+          ...(p?.projectHead ? [p.projectHead] : [])
+        ]
+          .map((head: any) => (head?._id || head)?.toString())
+          .filter(Boolean);
+        const isHead = headIds.includes(currentUserId?.toString());
         const inMembers = Array.isArray(p?.members)
           ? p.members.some((m: any) => (m?.userId?._id || m?._id) === currentUserId)
           : Array.isArray(p?.categories)
@@ -243,7 +251,6 @@ const WorkspacePage = () => {
     try {
       await postData('/workspace/switch', { workspaceId }); // ✅ Change from '/workspaces/switch' to '/workspace/switch'
       // Persist new workspace id immediately so subsequent requests use correct header
-      localStorage.setItem('workspace-id', workspaceId);
       localStorage.setItem('currentWorkspaceId', workspaceId);
       await fetchWorkspaces();
       await fetchProjects();

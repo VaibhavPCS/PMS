@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchData } from '@/lib/fetch-util';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User } from 'lucide-react';
+import User from 'lucide-react/dist/esm/icons/user';
 
 interface UserInfo {
   _id: string;
