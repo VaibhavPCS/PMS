@@ -21,7 +21,7 @@ vi.mock('react-router', () => ({
 }));
 
 vi.mock('@/provider/auth-context', () => ({
-  useAuth: () => ({ user: { _id: 'u1', role: 'admin' } }),
+  useAuth: () => ({ user: { _id: 'u1', role: 'admin' }, isAuthenticated: true, isLoading: false }),
 }));
 
 import { putData } from '@/lib/fetch-util';

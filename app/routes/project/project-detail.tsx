@@ -99,7 +99,11 @@ import { InviteMembersButton } from "@/components/project/InviteMembersButton";
 import { ProjectOverviewPanel } from "@/components/project/ProjectOverviewPanel";
 import { AttachmentsSidebar } from "@/components/project/AttachmentsSidebar";
 import { FilePreviewModal } from "@/components/project/FilePreviewModal";
-import { SprintList, SprintModal, SprintDetails, SprintSelector, BacklogView } from "@/components/sprint";
+import { SprintList } from "@/components/sprint/SprintList";
+import { SprintModal } from "@/components/sprint/SprintModal";
+import { SprintDetails } from "@/components/sprint/SprintDetails";
+import { SprintSelector } from "@/components/sprint/SprintSelector";
+import BacklogView from "@/components/sprint/BacklogView";
 import { SprintSetupWarning } from "@/components/project/SprintSetupWarning";
 import { AttachmentUpload } from "@/components/project/AttachmentUpload";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -150,6 +154,7 @@ interface Project {
   endDate: string;
   progress: number;
   projectHead?: { _id: string; name: string; email: string };
+  projectHeads?: Array<{ _id: string; name: string; email: string }>;
   // ✅ UPDATED: New project structure uses a flat members array
   members?: Array<{
     userId: { _id: string; name: string; email: string };
@@ -226,6 +231,119 @@ const getStatusColor = (status: string) => {
   );
 };
 
+// ── Hoisted pure helpers (no state/context deps) ──────────────────────────
+const getTaskPositionType = (task: Task, date: Date): "single" | "start" | "middle" | "end" => {
+  if (!task.startDate || !task.dueDate) return "single";
+  const taskStart = new Date(task.startDate);
+  const taskEnd = new Date(task.dueDate);
+  const currentDay = new Date(date);
+  taskStart.setHours(0, 0, 0, 0);
+  taskEnd.setHours(0, 0, 0, 0);
+  currentDay.setHours(0, 0, 0, 0);
+  const isSameDay = taskStart.getTime() === taskEnd.getTime();
+  const isStartDay = currentDay.getTime() === taskStart.getTime();
+  const isEndDay = currentDay.getTime() === taskEnd.getTime();
+  if (isSameDay) return "single";
+  if (isStartDay) return "start";
+  if (isEndDay) return "end";
+  return "middle";
+};
+
+const getPriorityDotClass = (priority: string): string => {
+  const colors: Record<string, string> = {
+    urgent: "bg-red-500",
+    high: "bg-orange-500",
+    medium: "bg-yellow-500",
+    low: "bg-green-500",
+  };
+  return colors[priority] || "bg-gray-400";
+};
+
+const getTaskStatusColorClass = (status: string, positionType: string): string => {
+  const baseColors: Record<string, string> = {
+    "to-do": "bg-gray-100 text-gray-800",
+    "in-progress": "bg-blue-100 text-blue-800",
+    "on-hold": "bg-red-100 text-red-800",
+    done: "bg-green-100 text-green-800",
+  };
+  const borderStyles: Record<string, string> = {
+    single: "rounded-md border-l-4",
+    start: "rounded-l-md border-l-4 rounded-r-none",
+    middle: "rounded-none border-l-0 border-r-0",
+    end: "rounded-r-md border-r-4 rounded-l-none",
+  };
+  const borderColors: Record<string, string> = {
+    "to-do": "border-l-gray-500 border-r-gray-500",
+    "in-progress": "border-l-blue-500 border-r-blue-500",
+    "on-hold": "border-l-red-500 border-r-red-500",
+    done: "border-l-green-500 border-r-green-500",
+  };
+  return `${baseColors[status] || baseColors["to-do"]} ${borderStyles[positionType]} ${borderColors[status] || borderColors["to-do"]}`;
+};
+
+const TaskItem = React.memo<{ task: Task; date: Date; compact?: boolean; showTaskDetails: boolean }>(
+  ({ task, date, compact = false, showTaskDetails }) => {
+    const navigate = useNavigate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isOverdue = new Date(task.dueDate) < today && task.status !== "done";
+    const positionType = getTaskPositionType(task, date);
+    const isStartDay = positionType === "start" || positionType === "single";
+
+    return (
+      <div
+        className={cn(
+          "p-1 text-xs cursor-pointer hover:shadow-sm transition-all mb-1 relative",
+          getTaskStatusColorClass(task.status, positionType),
+          isOverdue && "bg-red-100 text-red-800 border-l-red-500 border-r-red-500",
+          compact && "py-0.5"
+        )}
+        onClick={() => navigate(`/task/${task._id}`)}
+      >
+        <div className="flex items-center justify-between gap-1">
+          <span
+            className={cn(
+              "font-medium truncate flex-1",
+              task.status === "done" && "line-through opacity-60",
+              positionType === "middle" && "text-transparent select-none"
+            )}
+          >
+            {positionType === "middle" ? "•••" : task.title}
+          </span>
+          {isStartDay && (
+            <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", getPriorityDotClass(task.priority))} />
+          )}
+        </div>
+
+        {!compact && showTaskDetails && isStartDay && (
+          <div className="mt-0.5 flex items-center justify-between text-xs opacity-80">
+            <div className="flex items-center gap-1 min-w-0">
+              <Avatar className="w-2.5 h-2.5">
+                <AvatarFallback className="bg-current bg-opacity-20 text-current text-[8px] font-bold">
+                  {(task.assignee?.name?.charAt(0) || task.assignee?.email?.charAt(0) || "?")}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate text-[10px]">{(task.assignee?.name || task.assignee?.email || "?").split(" ")[0]}</span>
+            </div>
+            {task.durationDays && task.durationDays > 1 && (
+              <span className="text-[9px] opacity-70">{task.durationDays}d</span>
+            )}
+          </div>
+        )}
+
+        {positionType !== "single" && (
+          <div className="absolute top-0 right-0 text-[8px] opacity-60 leading-none">
+            {positionType === "start" && "▶"}
+            {positionType === "middle" && "─"}
+            {positionType === "end" && "◀"}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+TaskItem.displayName = "TaskItem";
+
 // ✅ UPDATED: Calendar View Component with Task Spans (Start to End)
 const CalendarViewComponent: React.FC<CalendarViewProps> = ({
   tasks,
@@ -300,28 +418,6 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
     [tasks]
   );
 
-  // ✅ UPDATED: Determine task's position type for the given date
-  const getTaskPositionType = useCallback((task: Task, date: Date) => {
-    if (!task.startDate || !task.dueDate) return "single";
-
-    const taskStart = new Date(task.startDate);
-    const taskEnd = new Date(task.dueDate);
-    const currentDay = new Date(date);
-
-    // Normalize dates
-    taskStart.setHours(0, 0, 0, 0);
-    taskEnd.setHours(0, 0, 0, 0);
-    currentDay.setHours(0, 0, 0, 0);
-
-    const isSameDay = taskStart.getTime() === taskEnd.getTime();
-    const isStartDay = currentDay.getTime() === taskStart.getTime();
-    const isEndDay = currentDay.getTime() === taskEnd.getTime();
-
-    if (isSameDay) return "single";
-    if (isStartDay) return "start";
-    if (isEndDay) return "end";
-    return "middle";
-  }, []);
 
   const getCalendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -399,114 +495,6 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
     return days;
   }, [currentDate, getTasksForDate]);
 
-  const getPriorityDot = useCallback((priority: string) => {
-    const colors: Record<string, string> = {
-      urgent: "bg-red-500",
-      high: "bg-orange-500",
-      medium: "bg-yellow-500",
-      low: "bg-green-500",
-    };
-    return colors[priority] || "bg-gray-400";
-  }, []);
-
-  // ✅ UPDATED: Enhanced task styling based on position
-  const getTaskStatusColor = useCallback(
-    (status: string, positionType: string) => {
-      const baseColors: Record<string, string> = {
-        "to-do": "bg-gray-100 text-gray-800",
-        "in-progress": "bg-blue-100 text-blue-800",
-        "on-hold": "bg-red-100 text-red-800",
-        done: "bg-green-100 text-green-800",
-      };
-
-      const borderStyles: Record<string, string> = {
-        single: "rounded-md border-l-4",
-        start: "rounded-l-md border-l-4 rounded-r-none",
-        middle: "rounded-none border-l-0 border-r-0",
-        end: "rounded-r-md border-r-4 rounded-l-none",
-      };
-
-      const borderColors: Record<string, string> = {
-        "to-do": "border-l-gray-500 border-r-gray-500",
-        "in-progress": "border-l-blue-500 border-r-blue-500",
-        "on-hold": "border-l-red-500 border-r-red-500",
-        done: "border-l-green-500 border-r-green-500",
-      };
-
-      return `${baseColors[status] || baseColors["to-do"]} ${borderStyles[positionType]} ${borderColors[status] || borderColors["to-do"]}`;
-    },
-    []
-  );
-
-  // ✅ UPDATED: Enhanced TaskItem with position awareness
-  const TaskItem: React.FC<{ task: Task; date: Date; compact?: boolean }> = ({
-    task,
-    date,
-    compact = false,
-  }) => {
-    // Task is overdue if due date is before today (not today or later)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isOverdue = new Date(task.dueDate) < today && task.status !== "done";
-    const positionType = getTaskPositionType(task, date);
-    const isStartDay = positionType === "start" || positionType === "single";
-
-    return (
-      <div
-        className={cn(
-          "p-1 text-xs cursor-pointer hover:shadow-sm transition-all mb-1 relative",
-          getTaskStatusColor(task.status, positionType),
-          isOverdue && "bg-red-100 text-red-800 border-l-red-500 border-r-red-500",
-          compact && "py-0.5"
-        )}
-        onClick={() => navigate(`/task/${task._id}`)}
-      >
-        <div className="flex items-center justify-between gap-1">
-          <span
-            className={cn(
-              "font-medium truncate flex-1",
-              task.status === "done" && "line-through opacity-60",
-              // Only show title on start day for multi-day tasks
-              positionType === "middle" && "text-transparent select-none"
-            )}
-          >
-            {positionType === "middle" ? "•••" : task.title}
-          </span>
-
-          {/* Priority dot only on start day */}
-          {isStartDay && (
-            <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", getPriorityDot(task.priority))} />
-          )}
-        </div>
-
-        {!compact && showTaskDetails && isStartDay && (
-          <div className="mt-0.5 flex items-center justify-between text-xs opacity-80">
-            <div className="flex items-center gap-1 min-w-0">
-              <Avatar className="w-2.5 h-2.5">
-                <AvatarFallback className="bg-current bg-opacity-20 text-current text-[8px] font-bold">
-                  {(task.assignee?.name?.charAt(0) || task.assignee?.email?.charAt(0) || "?")}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate text-[10px]">{(task.assignee?.name || task.assignee?.email || "?").split(" ")[0]}</span>
-            </div>
-
-            {task.durationDays && task.durationDays > 1 && (
-              <span className="text-[9px] opacity-70">{task.durationDays}d</span>
-            )}
-          </div>
-        )}
-
-        {/* Span indicator for multi-day tasks */}
-        {positionType !== "single" && (
-          <div className="absolute top-0 right-0 text-[8px] opacity-60 leading-none">
-            {positionType === "start" && "▶"}
-            {positionType === "middle" && "─"}
-            {positionType === "end" && "◀"}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-4">
@@ -655,6 +643,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                         key={`${task._id}-${currentDate.toDateString()}`}
                         task={task}
                         date={currentDate}
+                        showTaskDetails={showTaskDetails}
                       />
                     ))
                   )}
@@ -702,6 +691,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                               task={task}
                               date={calendarDay.date}
                               compact={true}
+                              showTaskDetails={showTaskDetails}
                             />
                           ))}
                           {calendarDay.tasks.length > 4 && (
@@ -747,6 +737,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                                   key={`${task._id}-${weekDay.date.toDateString()}`}
                                   task={task}
                                   date={weekDay.date}
+                                  showTaskDetails={showTaskDetails}
                                 />
                               ))
                             )}
@@ -793,6 +784,7 @@ const CalendarViewComponent: React.FC<CalendarViewProps> = ({
                             key={`${task._id}-${currentDate.toDateString()}`}
                             task={task}
                             date={currentDate}
+                            showTaskDetails={showTaskDetails}
                           />
                         ))
                       )}
@@ -895,7 +887,13 @@ const TaskCard = React.memo<{
 
   const isProjectLead = useMemo(() => {
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
-    return project?.projectHead?._id?.toString() === currentUserIdStr;
+    const headIds = [
+      ...(project?.projectHeads || []),
+      ...(project?.projectHead ? [project.projectHead] : [])
+    ]
+      .map((head: any) => (head?._id || head)?.toString())
+      .filter(Boolean);
+    return headIds.includes(currentUserIdStr);
   }, [currentUser, project]);
 
   const isAssigneeOrCreator = useMemo(() => {
@@ -1616,7 +1614,7 @@ const ProjectDetail = () => {
     assigneeId: "",
     startDate: "",
     dueDate: "",
-    sprintId: null as string | null,
+    sprintId: null as string | null, // ✅ NEW: Sprint selection required
     rejectionAttachmentType: "either", // ✅ NEW: Default to 'either'
   });
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -1640,11 +1638,19 @@ const ProjectDetail = () => {
 
   // Derived role flags
   const isAdmin = useMemo(() => ["admin", "super_admin", "super-admin"].includes(userRole), [userRole]);
+  const projectHeadIds = useMemo(() => {
+    return [
+      ...(project?.projectHeads || []),
+      ...(project?.projectHead ? [project.projectHead] : [])
+    ]
+      .map((head: any) => (head?._id || head)?.toString())
+      .filter(Boolean);
+  }, [project]);
+
   const isProjectLead = useMemo(() => {
     const currentId = (currentUser?.id || currentUser?._id || "").toString();
-    const leadId = (project?.projectHead?._id || "").toString();
-    return !!currentId && !!leadId && currentId === leadId;
-  }, [project?.projectHead?._id, currentUser?.id, currentUser?._id]);
+    return !!currentId && projectHeadIds.includes(currentId);
+  }, [projectHeadIds, currentUser?.id, currentUser?._id]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1696,7 +1702,7 @@ const ProjectDetail = () => {
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
     const isProjectMember = !!(
       project?.members?.some((m) => (m.userId?._id || "").toString() === currentUserIdStr) ||
-      (project?.projectHead?._id || "").toString() === currentUserIdStr
+      projectHeadIds.includes(currentUserIdStr)
     );
 
     let tasksToShow = allTasks;
@@ -1705,7 +1711,7 @@ const ProjectDetail = () => {
       tasksToShow = allTasks;
     } else if ((currentUser.role || userRole) === "lead" && isProjectMember) {
       tasksToShow = allTasks;
-    } else if ((project?.projectHead?._id || "").toString() === currentUserIdStr) {
+    } else if (projectHeadIds.includes(currentUserIdStr)) {
       tasksToShow = allTasks;
     } else if (projectRole === 'tl') {
       tasksToShow = allTasks;
@@ -1735,12 +1741,12 @@ const ProjectDetail = () => {
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
     const isProjectMember = !!(
       project?.members?.some((m) => (m.userId?._id || "").toString() === currentUserIdStr) ||
-      (project?.projectHead?._id || "").toString() === currentUserIdStr
+      projectHeadIds.includes(currentUserIdStr)
     );
 
     const relevantTasks = ["admin", "super_admin", "super-admin"].includes(userRole)
       ? allTasks
-      : ((userRole === "lead" && isProjectMember) || (project?.projectHead?._id || "").toString() === currentUserIdStr)
+      : ((userRole === "lead" && isProjectMember) || projectHeadIds.includes(currentUserIdStr))
         ? kanbanFilteredTasks
         : userTasks;
 
@@ -1767,7 +1773,7 @@ const ProjectDetail = () => {
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
     return !!(
       project?.members?.some((m) => (m.userId?._id || "").toString() === currentUserIdStr) ||
-      (project?.projectHead?._id || "").toString() === currentUserIdStr
+      projectHeadIds.includes(currentUserIdStr)
     );
   }, [userRole, project, currentUser]);
 
@@ -1775,7 +1781,7 @@ const ProjectDetail = () => {
     const currentUserIdStr = (currentUser?.id || currentUser?._id || "").toString();
     const isProjectMember = !!(
       project?.members?.some((m) => (m.userId?._id || "").toString() === currentUserIdStr) ||
-      (project?.projectHead?._id || "").toString() === currentUserIdStr
+      projectHeadIds.includes(currentUserIdStr)
     );
 
     return (
@@ -1793,9 +1799,9 @@ const ProjectDetail = () => {
       const id = member.userId?._id?.toString() || "";
       if (id) ids.add(id);
     });
-    if (project?.projectHead?._id) ids.add(project.projectHead._id.toString());
+    projectHeadIds.forEach((id) => ids.add(id));
     return ids;
-  }, [project]);
+  }, [project, projectHeadIds]);
 
   const filteredAssignableMembers = useMemo(() => {
     return assignableMembers.filter((m) => m && projectMemberIds.has(m._id?.toString() || ""));
@@ -2036,8 +2042,8 @@ const ProjectDetail = () => {
   const handleCreateTask = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate) {
-        return toast.error("Please fill all required fields (title, start date, due date)");
+      if (!newTask.title.trim() || !newTask.startDate || !newTask.dueDate || !newTask.sprintId) {
+        return toast.error("Please fill all required fields (title, start date, due date, sprint)");
       }
 
       const start = new Date(newTask.startDate);
@@ -2081,9 +2087,6 @@ const ProjectDetail = () => {
           formData.append("startDate", newTask.startDate);
           formData.append("dueDate", newTask.dueDate);
           formData.append("projectId", projectId || "");
-          if (newTask.sprintId) {
-            formData.append("sprintId", newTask.sprintId);
-          }
           formData.append("rejectionAttachmentType", newTask.rejectionAttachmentType); // ✅ NEW
 
           // Add reference link as array if provided
@@ -2108,9 +2111,6 @@ const ProjectDetail = () => {
           if (!newTask.assigneeId) {
             delete payload.assigneeId;
           }
-          if (!newTask.sprintId) {
-            delete payload.sprintId;
-          }
           // Add reference link as array if provided
           if (taskReferenceLink.trim()) {
             payload.referenceLinks = [taskReferenceLink.trim()];
@@ -2133,7 +2133,7 @@ const ProjectDetail = () => {
           assigneeId: "",
           startDate: "",
           dueDate: "",
-          sprintId: null,
+          sprintId: null, // ✅ NEW: Reset sprint selection
           rejectionAttachmentType: "either", // ✅ NEW
         });
         setStartDateObj(undefined);
@@ -2354,7 +2354,9 @@ const ProjectDetail = () => {
               Project Lead
             </div>
             <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
-              {project.projectHead?.name || '—'}
+              {(project.projectHeads?.length
+                ? project.projectHeads.map(h => h.name).filter(Boolean).join(', ')
+                : project.projectHead?.name) || '—'}
             </div>
           </div>
 
@@ -2545,6 +2547,7 @@ const ProjectDetail = () => {
           onOpenChange={setShowMembersModal}
           projectId={project._id}
           projectHead={project.projectHead || null}
+          projectHeads={project.projectHeads || []}
           members={project.members || []}
           userRole={userRole}
           currentUserId={(currentUser?.id || currentUser?._id || '').toString()}
@@ -2628,6 +2631,7 @@ const ProjectDetail = () => {
             <ProjectOverviewPanel
               projectManager={project.creator.name}
               projectHead={project.projectHead?.name}
+              projectHeads={(project.projectHeads || []).map(h => h.name).filter(Boolean)}
               description={project.description}
               startDate={project.startDate}
               endDate={project.endDate}
@@ -3330,6 +3334,7 @@ const ProjectDetail = () => {
                   onSelectSprint={(sprintId) => setNewTask({ ...newTask, sprintId })}
                   taskStartDate={newTask.startDate}
                   taskDueDate={newTask.dueDate}
+                  error={!newTask.sprintId ? "Please select a sprint" : undefined}
                 />
               </div>
 

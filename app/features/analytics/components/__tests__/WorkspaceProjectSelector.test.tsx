@@ -3,13 +3,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+const authUser = { _id: 'u1', role: 'admin' }
+
 vi.mock('@/provider/auth-context', () => ({
-  useAuth: () => ({ user: { _id: 'u1', role: 'admin' }, isAuthenticated: true, isLoading: false })
+  useAuth: () => ({ user: authUser, isAuthenticated: true, isLoading: false })
 }))
 
 const fetchMock = vi.fn()
+const postMock = vi.fn().mockResolvedValue({})
 vi.mock('@/lib/fetch-util', () => ({
-  fetchData: (url: string) => fetchMock(url)
+  fetchData: (url: string) => fetchMock(url),
+  postData: (...args: any[]) => postMock(...args),
 }))
 
 import { FilterProvider } from '@/features/analytics/context/FilterContext'
@@ -49,8 +53,9 @@ describe('WorkspaceProjectSelector', () => {
       </FilterProvider>
     )
 
-    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).not.toHaveAttribute('disabled'))
-    await user.click(screen.getAllByRole('combobox')[0])
+    const [wsTrigger] = await screen.findAllByRole('combobox')
+    await waitFor(() => expect(wsTrigger).not.toBeDisabled())
+    await user.click(wsTrigger)
     expect(await screen.findByRole('option', { name: 'Workspace A' })).toBeInTheDocument()
     expect(await screen.findByRole('option', { name: 'Workspace B' })).toBeInTheDocument()
   })
@@ -81,13 +86,14 @@ describe('WorkspaceProjectSelector', () => {
       </FilterProvider>
     )
 
-    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).not.toHaveAttribute('disabled'))
-    await user.click(screen.getAllByRole('combobox')[0])
+    const [wsTrigger, projTrigger] = await screen.findAllByRole('combobox')
+    await waitFor(() => expect(wsTrigger).not.toBeDisabled())
+    await user.click(wsTrigger)
     const wsItem = await screen.findByRole('option', { name: 'Workspace A' })
     await user.click(wsItem)
 
-    await waitFor(() => expect(screen.getAllByRole('combobox')[1]).not.toHaveAttribute('disabled'))
-    await user.click(screen.getAllByRole('combobox')[1])
+    await waitFor(() => expect(projTrigger).not.toBeDisabled())
+    await user.click(projTrigger)
     expect(await screen.findByRole('option', { name: 'Project X' })).toBeInTheDocument()
     expect(await screen.findByRole('option', { name: 'All Projects' })).toBeInTheDocument()
   })
