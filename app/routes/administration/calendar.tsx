@@ -3,7 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/provider/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, ChevronDown, EyeOff, Calendar as CalendarIcon, X, ExternalLink } from 'lucide-react';
+import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left';
+import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right';
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down';
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off';
+import CalendarIcon from 'lucide-react/dist/esm/icons/calendar';
+import X from 'lucide-react/dist/esm/icons/x';
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays, differenceInDays } from 'date-fns';
 import axios from '@/lib/axios';
 import { Badge } from '@/components/ui/badge';

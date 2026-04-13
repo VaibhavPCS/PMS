@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users } from 'lucide-react';
+import Users from 'lucide-react/dist/esm/icons/users';
 
 const UserManagement = () => {
   return (

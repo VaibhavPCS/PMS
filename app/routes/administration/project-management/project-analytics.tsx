@@ -10,6 +10,7 @@ interface AnalyticsData {
   projectName: string
   projectDescription: string
   projectHead: { userId: string; name: string; email: string } | null
+  projectHeads?: Array<{ userId: string; name: string; email: string }>
   dateRange: { start: string; end: string; days: number; daysPassed: number; daysRemaining: number }
   health: {
     overallScore: number
@@ -289,9 +290,13 @@ const ProjectAnalyticsPage = () => {
                   <div>
                     <h2 className="text-[20px] font-bold text-[#111827]">{analytics.projectName}</h2>
                     <p className="text-[13px] text-[#717182] mt-1">{analytics.projectDescription || 'No description'}</p>
-                    {analytics.projectHead && (
+                    {(analytics.projectHeads?.length || analytics.projectHead) && (
                       <p className="text-[13px] text-[#717182] mt-2">
-                        Project Lead: <span className="font-medium text-[#111827]">{analytics.projectHead.name}</span>
+                        Project Lead: <span className="font-medium text-[#111827]">
+                          {(analytics.projectHeads?.length
+                            ? analytics.projectHeads.map(h => h.name).filter(Boolean).join(', ')
+                            : analytics.projectHead?.name) || 'Unknown'}
+                        </span>
                       </p>
                     )}
                   </div>
