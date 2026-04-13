@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Navigate } from "react-router";
-import { useAuth } from "../../provider/auth-context";
+import { useAuth } from "@/hooks/use-auth";
 import { fetchData, postData, putData } from "@/lib/fetch-util";
 import { buildApiUrl, buildBackendUrl } from "@/lib/config";
 import {
@@ -75,6 +75,7 @@ import { AvatarGroup } from "@/components/ui/avatar-group";
 import { ImagePreviewModal } from "@/components/ui/image-preview-modal";
 import { cn } from "@/lib/utils";
 import { io, Socket } from "socket.io-client";
+import { getBackendBaseUrl } from "@/lib/config";
 
 interface Task {
   _id: string;
@@ -100,6 +101,11 @@ interface Task {
       name?: string;
       email?: string;
     };
+    projectHeads?: Array<{
+      _id: string;
+      name?: string;
+      email?: string;
+    }>;
   };
   category: string;
   startDate: string;
@@ -959,7 +965,7 @@ const TaskDetail = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+    const newSocket = io(getBackendBaseUrl(), {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       path: '/socket.io/'
@@ -1956,7 +1962,13 @@ const TaskDetail = () => {
   const isCreator = activeUser?._id === task?.creator?._id || activeUser?.id === task?.creator?._id;
   const isAssignee = activeUser?._id === task?.assignee?._id || activeUser?.id === task?.assignee?._id;
   const isAdmin = ['admin', 'super_admin'].includes(activeUser?.role || '');
-  const isProjectHead = String(task?.project?.projectHead?._id || task?.project?.projectHead || '') === String(activeUser?._id || activeUser?.id || '');
+  const headIds = [
+    ...(task?.project?.projectHeads || []),
+    ...(task?.project?.projectHead ? [task.project.projectHead] : [])
+  ]
+    .map((head: any) => (head?._id || head)?.toString())
+    .filter(Boolean);
+  const isProjectHead = headIds.includes(String(activeUser?._id || activeUser?.id || ''));
   const meMemberEntry = assignableMembers.find((m) => String(m._id) === String(activeUser?._id || activeUser?.id || ''));
   const isTLAssignedToParent = Boolean(meMemberEntry && (meMemberEntry.role === 'tl') && isAssignee);
   const canApprove = task?.status === "done" && task?.approvalStatus === "pending-approval" && isCreator;
